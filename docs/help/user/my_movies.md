@@ -2,6 +2,8 @@
 
 Movies from your Trakt **watchlist** and/or **watched** history, with local metadata (poster, description, genres).
 
+Opening this page refreshes the **full** Trakt watchlist/watched lists (all pages). Order here follows last local sync activity, not Trakt’s website sort (Trakt often sorts by release date).
+
 ## Filters
 
 Default: **Wishlist**.

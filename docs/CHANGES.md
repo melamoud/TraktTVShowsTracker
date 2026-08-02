@@ -1,5 +1,13 @@
 # Changes log
 
+## 2026-08-02 — Latest lazy sync + numbered pager
+
+- Removed hard 2-page Latest sync cap; first load pulls newest pages only (lazy older pages — avoids Trakt 429)  
+- Cursor repair + seed oldest window page when cache is stuck on a single day  
+- Numbered pager `< 1 2 3 … N >` on Latest (top and bottom); page count grows as older updates load  
+- My lists: full Trakt watchlist/watched pagination (was truncating at ~10)  
+- Note: Trakt `/updates` volume can be huge in one day — may redesign Latest if that stays painful  
+
 ## 2026-08-02 — Preference match = genres + keywords only
 
 - Purple **Preference match** no longer includes owned streaming services (too many false positives)

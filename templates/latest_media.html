@@ -1,18 +1,48 @@
 {% extends "base.html" %}
 {% block title %}{{ title }} — {{ app_name }}{% endblock %}
 {% block content %}
+{% set hw = 1 if hide_watched else 0 %}
+{% macro pager(position) %}
+  {% if pages > 1 or has_more_older %}
+  <nav class="pager pill-row" aria-label="Pagination {{ position }}">
+    {% if page > 1 %}
+      <a class="pill" href="?page={{ page - 1 }}&per_page={{ per_page }}&hide_watched={{ hw }}" aria-label="Previous page">&lt;</a>
+    {% else %}
+      <span class="pill disabled" aria-disabled="true">&lt;</span>
+    {% endif %}
+    {% for p in page_links %}
+      {% if p is none %}
+        <span class="pill ellipsis" aria-hidden="true">…</span>
+      {% elif p == page %}
+        <span class="pill on" aria-current="page">{{ p }}</span>
+      {% else %}
+        <a class="pill" href="?page={{ p }}&per_page={{ per_page }}&hide_watched={{ hw }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page < pages %}
+      <a class="pill" href="?page={{ page + 1 }}&per_page={{ per_page }}&hide_watched={{ hw }}" aria-label="Next page">&gt;</a>
+    {% else %}
+      <span class="pill disabled" aria-disabled="true">&gt;</span>
+    {% endif %}
+    <span class="pill meta-pill">{{ total }} titles</span>
+  </nav>
+  {% endif %}
+{% endmacro %}
 <h1>{{ title }}</h1>
 <p class="muted">
   {{ feed_blurb }}
   Highlighted rows match your preferences. Dimmed rows are at or older than your review marker.
   Watched titles are hidden by default (toggle below if you want them).
+  Trakt often records thousands of DB updates in a single day — the first list pages can all show
+  today’s date even though the sync window is ~30 days; use the page numbers (or last page) for older activity.
+  Page count grows as older Trakt updates are loaded.
 </p>
 
 <div class="toolbar">
   <div class="pill-row">
     {% for n in (10, 50, 100) %}
       <a class="pill {% if per_page == n %}on{% endif %}"
-         href="?page=1&per_page={{ n }}&hide_watched={{ 1 if hide_watched else 0 }}">{{ n }} / page</a>
+         href="?page=1&per_page={{ n }}&hide_watched={{ hw }}">{{ n }} / page</a>
     {% endfor %}
     {% if hide_watched %}
       <a class="pill" href="?page=1&per_page={{ per_page }}&hide_watched=0">Show watched</a>
@@ -26,6 +56,8 @@
     <button class="btn btn-small" data-action="sync-catalog" data-media-type="{{ media_type }}" data-trakt-id="0">Refresh from Trakt</button>
   </div>
 </div>
+{{ pager('top') }}
+
 
 {% if marker %}
   <p class="meta">Review marker: <strong>{{ marker.title }}</strong>
@@ -113,17 +145,5 @@
   {% endfor %}
 </div>
 
-{% if pages > 1 %}
-<div class="toolbar">
-  <div class="pill-row">
-    {% if page > 1 %}
-      <a class="pill" href="?page={{ page - 1 }}&per_page={{ per_page }}&hide_watched={{ 1 if hide_watched else 0 }}">Prev</a>
-    {% endif %}
-    <span class="pill on">Page {{ page }} / {{ pages }} ({{ total }})</span>
-    {% if page < pages %}
-      <a class="pill" href="?page={{ page + 1 }}&per_page={{ per_page }}&hide_watched={{ 1 if hide_watched else 0 }}">Next</a>
-    {% endif %}
-  </div>
-</div>
-{% endif %}
+{{ pager('bottom') }}
 {% endblock %}

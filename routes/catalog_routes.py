@@ -13,7 +13,16 @@ from flask_login import current_user, login_required
 from models import CachedMedia, MediaFoundOn, ReviewMarker, ReleaseWatch, UserMediaState, db
 from services import trakt_client
 from services.streaming_matcher import match_preferences
-from services.sync_jobs import sync_catalog, sync_providers_for_media, sync_user_media_state
+from services.sync_jobs import (
+    catalog_has_more_older,
+    ensure_catalog_for_offset,
+    ensure_catalog_through_marker,
+    feed_count,
+    refresh_catalog_newest,
+    sync_catalog,
+    sync_providers_for_media,
+    sync_user_media_state,
+)
 
 catalog_bp = Blueprint('catalog', __name__)
 
@@ -52,6 +61,31 @@ def _per_page(view_type: str) -> int:
     if stored in allowed:
         return stored
     return default
+
+
+def _pagination_pages(page: int, pages: int, radius: int = 2) -> list[int | None]:
+    """
+    Page numbers for a compact pager: 1 … 4 5 6 … 10.
+
+    ``None`` entries are ellipsis placeholders for the template.
+    """
+    if pages <= 0:
+        return []
+    if pages <= 9:
+        return list(range(1, pages + 1))
+    selected = {1, pages, page}
+    for i in range(page - radius, page + radius + 1):
+        if 1 <= i <= pages:
+            selected.add(i)
+    ordered = sorted(selected)
+    out: list[int | None] = []
+    prev = None
+    for n in ordered:
+        if prev is not None and n > prev + 1:
+            out.append(None)
+        out.append(n)
+        prev = n
+    return out
 
 
 def _state_map(media_type: str, trakt_ids: list[int]) -> dict[int, UserMediaState]:
@@ -167,6 +201,28 @@ def latest_shows():
     return _latest_page('show')
 
 
+def _latest_feed_query(media_type: str):
+    """Ordered Latest-feed query (Trakt DB updates)."""
+    return (
+        CachedMedia.query
+        .filter_by(media_type=media_type, feed_source='trakt_db_updates')
+        .order_by(
+            CachedMedia.trakt_listed_at.desc(),
+            CachedMedia.id.desc(),
+        )
+    )
+
+
+def _latest_visible_rows(media_type: str, hide_watched: bool) -> list[dict]:
+    """Decorate feed rows and apply hide-watched + review-marker dimming."""
+    items_all = _latest_feed_query(media_type).all()
+    rows_all = _decorate(media_type, items_all)
+    if hide_watched:
+        rows_all = [r for r in rows_all if not r['watched']]
+    _apply_marker_to_visible_rows(rows_all, media_type)
+    return rows_all
+
+
 def _latest_page(media_type: str):
     """Shared latest-movies / latest-shows listing (Trakt DB updates feed)."""
     view = f'latest_{media_type}s'
@@ -175,35 +231,53 @@ def _latest_page(media_type: str):
     # Default: hide titles already watched on Trakt (still “in DB”, just less noise).
     hide_watched = request.args.get('hide_watched', '1') != '0'
 
-    feed_count = CachedMedia.query.filter_by(
-        media_type=media_type, feed_source='trakt_db_updates'
-    ).count()
-    if feed_count < per_page:
-        try:
-            sync_catalog(media_type, days_back=7, pages=2)
-        except Exception as exc:
-            current_app.logger.warning('On-demand catalog sync failed: %s', exc)
+    try:
+        if feed_count(media_type) == 0:
+            from services.sync_jobs import bootstrap_catalog_initial
+            bootstrap_catalog_initial(media_type)
+        else:
+            ensure_catalog_through_marker(media_type, current_user)
+    except Exception as exc:
+        current_app.logger.warning('On-demand catalog sync failed: %s', exc)
+        # Cached list still renders; avoid alarming on transient Trakt 429s.
+        if '429' not in str(exc):
             flash('Could not refresh catalog from Trakt right now. Showing cached items.', 'warning')
 
-    q = (
-        CachedMedia.query
-        .filter_by(media_type=media_type, feed_source='trakt_db_updates')
-        .order_by(
-            CachedMedia.trakt_listed_at.desc(),
-            CachedMedia.id.desc(),
-        )
-    )
     from services.sync_jobs import enrich_media_list_for_display
     from services.tmdb_client import is_configured as tmdb_is_configured
 
-    items_all = q.all()
-    rows_all = _decorate(media_type, items_all)
-    if hide_watched:
-        rows_all = [r for r in rows_all if not r['watched']]
-    _apply_marker_to_visible_rows(rows_all, media_type)
+    rows_all = _latest_visible_rows(media_type, hide_watched)
+    # Lazy-load older Trakt pages when the UI page needs more rows, or when the
+    # user is on/past the last filled page (so Next reveals older than "today").
+    needed = page * per_page
+    filled_pages = max((len(rows_all) + per_page - 1) // per_page, 1) if rows_all else 1
+    lazy_rounds = 0
+    while catalog_has_more_older(media_type) and lazy_rounds < 5:
+        need_more_rows = len(rows_all) < needed
+        on_tail = page >= filled_pages
+        if not need_more_rows and not on_tail:
+            break
+        # Prefetch only a couple older API pages when merely sitting on the tail.
+        if not need_more_rows and on_tail and lazy_rounds >= 2:
+            break
+        try:
+            if not ensure_catalog_for_offset(media_type):
+                break
+        except Exception as exc:
+            current_app.logger.warning('Lazy older catalog fetch failed: %s', exc)
+            break
+        rows_all = _latest_visible_rows(media_type, hide_watched)
+        filled_pages = max((len(rows_all) + per_page - 1) // per_page, 1) if rows_all else 1
+        lazy_rounds += 1
+
     total = len(rows_all)
-    pages = max((total + per_page - 1) // per_page, 1)
-    page = min(page, pages)
+    filled_pages = max((total + per_page - 1) // per_page, 1) if total else 1
+    pages = filled_pages
+    # If more older Trakt pages exist, expose one extra page so Next can lazy-load.
+    if catalog_has_more_older(media_type):
+        pages = max(filled_pages + 1, page)
+    else:
+        page = min(page, pages)
     rows = rows_all[(page - 1) * per_page: page * per_page]
     # Trakt /updates stubs have no plot/art — fetch for the visible page only.
     # Keep marker flags from the full-list pass above (do not re-apply on the slice).
@@ -238,10 +312,12 @@ def _latest_page(media_type: str):
         rows=rows,
         page=page,
         pages=pages,
+        page_links=_pagination_pages(page, pages),
         per_page=per_page,
         total=total,
         marker=marker,
         hide_watched=hide_watched,
+        has_more_older=catalog_has_more_older(media_type),
         tmdb_configured=tmdb_is_configured(),
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='Latest Movies' if media_type == 'movie' else 'Latest Shows',
@@ -250,10 +326,10 @@ def _latest_page(media_type: str):
             '(official /updates API). Trakt does not publish a separate “first inserted” '
             'timestamp, so first inserts and later metadata edits both appear here. '
             'This is NOT the public release calendar. '
+            'Newest pages load first; older activity loads as you page. '
             '“Streaming” uses TMDB/JustWatch availability (Trakt does not expose that in its API).'
         ),
     )
-
 
 @catalog_bp.route('/catalog/<media_type>/<int:trakt_id>')
 @login_required
@@ -433,11 +509,15 @@ def api_release_watch(media_type, trakt_id):
 @catalog_bp.route('/api/sync-catalog/<media_type>', methods=['POST'])
 @login_required
 def api_sync_catalog(media_type):
-    """Manually refresh latest catalog cache from Trakt."""
+    """Manually refresh newest Latest activity from Trakt (keeps older cache)."""
     if media_type not in ('movie', 'show'):
         return jsonify({'success': False, 'message': 'bad type'}), 400
     try:
-        count = sync_catalog(media_type, days_back=7, pages=2)
+        if feed_count(media_type) == 0:
+            from services.sync_jobs import bootstrap_catalog_initial
+            count = bootstrap_catalog_initial(media_type)
+        else:
+            count = refresh_catalog_newest(media_type, pages=2)
         sync_user_media_state(current_user)
         return jsonify({'success': True, 'count': count})
     except Exception as exc:

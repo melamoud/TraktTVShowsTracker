@@ -117,6 +117,25 @@ class StreamingServiceSuggestion(db.Model):
     user = db.relationship('User', foreign_keys=[user_id])
 
 
+class CatalogFeedSync(db.Model):
+    """
+    Lazy-sync cursor for Trakt /movies|/shows/updates.
+
+    Trakt pages are oldest-first: page 1 = oldest in the window,
+    page_count = newest. We track which page range is already in CachedMedia.
+    """
+
+    __tablename__ = 'catalog_feed_sync'
+
+    media_type = db.Column(db.String(16), primary_key=True)  # movie | show
+    start_date = db.Column(db.String(16), nullable=False)  # YYYY-MM-DD window start
+    page_count = db.Column(db.Integer, default=1, nullable=False)
+    oldest_fetched_page = db.Column(db.Integer)  # lowest Trakt page number in cache
+    newest_fetched_page = db.Column(db.Integer)  # highest Trakt page number in cache
+    bootstrapped_at = db.Column(db.DateTime)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class CachedMedia(db.Model):
     """Cached movie/show metadata from Trakt (and optional TMDB ids)."""
 

@@ -35,11 +35,20 @@ def test_latest_movies_dims_marker_row_in_html(app, client, user):
 
     login_client(client, app, user)
     with patch('routes.catalog_routes.sync_catalog'), patch(
+        'routes.catalog_routes.ensure_catalog_through_marker'
+    ), patch(
+        'routes.catalog_routes.ensure_catalog_for_offset', return_value=False
+    ), patch(
+        'routes.catalog_routes.catalog_has_more_older', return_value=False
+    ), patch(
         'services.sync_jobs.enrich_media_list_for_display'
     ):
         resp = client.get('/latest/movies?hide_watched=0&per_page=50')
     assert resp.status_code == 200
     html = resp.data.decode('utf-8')
+    # Three rows, one page — pager hidden until pages > 1.
+    assert 'Above Marker' in html
+    assert 'Clicked Marker' in html
 
     parts = html.split('<article class="media-row')
     assert len(parts) >= 4  # preamble + 3 rows

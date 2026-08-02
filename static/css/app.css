@@ -83,6 +83,10 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 650; letter-spacing:
   color: var(--muted); font-size: .85rem; font-weight: 600;
 }
 .pill.on { color: #041210; background: var(--accent); border-color: var(--accent); }
+.pill.disabled { opacity: .35; cursor: default; }
+.pill.ellipsis { border-style: dashed; min-width: 2rem; text-align: center; }
+.pill.meta-pill { font-weight: 500; }
+.pager { margin: .35rem 0 1rem; }
 
 .media-list { display: grid; gap: .85rem; }
 .media-row {

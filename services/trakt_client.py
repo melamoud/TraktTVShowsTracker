@@ -150,7 +150,11 @@ def api_request(
                 timeout=45,
             )
         if resp.status_code >= 400:
-            raise TraktError(f'Trakt API error on {path}', resp.status_code, resp.text)
+            raise TraktError(
+                f'Trakt API error on {path} ({resp.status_code})',
+                resp.status_code,
+                resp.text,
+            )
         if resp.status_code == 204 or not resp.content:
             data = None
         else:
@@ -181,30 +185,65 @@ def get_user_settings(access_token: str) -> dict:
     return resp.json()
 
 
-def fetch_recent_updates(media_type: str, start_date: str, pages: int = 2) -> list:
-    """
-    Titles recently touched in Trakt's database (/movies|/shows/updates).
+def _updates_path(media_type: str, start_date: str) -> str:
+    """Build Trakt /updates path for movies or shows."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    return f'/{media_type}s/updates/{start_date}'
 
-    This is the official API closest to “added/changed in Trakt DB”.
-    Trakt does not expose a separate created_at / first-inserted timestamp.
-    Results are oldest-first, so we read the last pages (newest activity).
+
+def probe_updates_pagination(media_type: str, start_date: str) -> dict:
+    """
+    Probe Trakt /updates pagination for a start_date window.
+
+    Returns dict: page_count, item_count, limit. Page 1 is oldest; page_count is newest.
     start_date must be within ~29 days or Trakt returns [].
     """
-    path = f'/{media_type}s/updates/{start_date}'
+    path = _updates_path(media_type, start_date)
     base = current_app.config['TRAKT_API_BASE'].rstrip('/')
     headers = _headers()
-    params = {'limit': 100, 'page': 1}
-    resp = requests.get(f'{base}{path}', headers=headers, params=params, timeout=45)
+    resp = requests.get(
+        f'{base}{path}',
+        headers=headers,
+        params={'limit': 100, 'page': 1},
+        timeout=45,
+    )
     if resp.status_code >= 400:
-        raise TraktError(f'Trakt API error on {path}', resp.status_code, resp.text)
-    page_count = int(resp.headers.get('X-Pagination-Page-Count') or 1)
-    pages = max(1, int(pages))
-    start_page = max(1, page_count - pages + 1)
+        raise TraktError(
+            f'Trakt API error on {path} ({resp.status_code})',
+            resp.status_code,
+            resp.text,
+        )
+    return {
+        'page_count': max(1, int(resp.headers.get('X-Pagination-Page-Count') or 1)),
+        'item_count': int(resp.headers.get('X-Pagination-Item-Count') or 0),
+        'limit': int(resp.headers.get('X-Pagination-Limit') or 100),
+        'page1': resp.json() if resp.content else [],
+    }
 
+
+def fetch_updates_pages(
+    media_type: str,
+    start_date: str,
+    from_page: int,
+    to_page: int,
+    *,
+    page1_cache: list | None = None,
+) -> list:
+    """
+    Fetch inclusive Trakt /updates page range (1 = oldest … page_count = newest).
+
+    Results are sorted newest-first by updated_at.
+    """
+    path = _updates_path(media_type, start_date)
+    base = current_app.config['TRAKT_API_BASE'].rstrip('/')
+    headers = _headers()
+    from_page = max(1, int(from_page))
+    to_page = max(from_page, int(to_page))
     collected: list = []
-    for page in range(start_page, page_count + 1):
-        if page == 1 and start_page == 1:
-            data = resp.json() if resp.content else []
+    for page in range(from_page, to_page + 1):
+        if page == 1 and page1_cache is not None:
+            data = page1_cache
         else:
             r = requests.get(
                 f'{base}{path}',
@@ -213,14 +252,51 @@ def fetch_recent_updates(media_type: str, start_date: str, pages: int = 2) -> li
                 timeout=45,
             )
             if r.status_code >= 400:
-                raise TraktError(f'Trakt API error on {path}', r.status_code, r.text)
+                raise TraktError(
+                    f'Trakt API error on {path} ({r.status_code})',
+                    r.status_code,
+                    r.text,
+                )
             data = r.json() if r.content else []
         if isinstance(data, list):
             collected.extend(data)
-
     collected.sort(key=lambda item: item.get('updated_at') or '', reverse=True)
     return collected
 
+
+def fetch_all_updates(media_type: str, start_date: str) -> list:
+    """Fetch every /updates page in the start_date window (bootstrap)."""
+    meta = probe_updates_pagination(media_type, start_date)
+    return fetch_updates_pages(
+        media_type,
+        start_date,
+        1,
+        meta['page_count'],
+        page1_cache=meta.get('page1'),
+    )
+
+
+def fetch_recent_updates(media_type: str, start_date: str, pages: int | None = None) -> list:
+    """
+    Titles recently touched in Trakt's database (/movies|/shows/updates).
+
+    If pages is None, fetch the full window. If pages is set, fetch only the
+    newest N pages (legacy helper for callers that want a small slice).
+    """
+    meta = probe_updates_pagination(media_type, start_date)
+    page_count = meta['page_count']
+    if pages is None:
+        start_page = 1
+    else:
+        pages = max(1, int(pages))
+        start_page = max(1, page_count - pages + 1)
+    return fetch_updates_pages(
+        media_type,
+        start_date,
+        start_page,
+        page_count,
+        page1_cache=meta.get('page1') if start_page == 1 else None,
+    )
 
 def fetch_media_summary(media_type: str, trakt_id: int) -> dict:
     """
@@ -240,13 +316,25 @@ def fetch_media_summary(media_type: str, trakt_id: int) -> dict:
 
 
 def get_watchlist(user: User, media_type: str) -> list:
-    """Return the user's Trakt watchlist for movies or shows."""
-    return api_request('GET', f'/sync/watchlist/{media_type}s', user=user) or []
+    """Return the user's full Trakt watchlist for movies or shows (all pages)."""
+    return api_request(
+        'GET',
+        f'/sync/watchlist/{media_type}s',
+        user=user,
+        params={'limit': 100},
+        paginate_max_pages=50,
+    ) or []
 
 
 def get_watched(user: User, media_type: str) -> list:
-    """Return the user's watched movies or shows."""
-    return api_request('GET', f'/sync/watched/{media_type}s', user=user) or []
+    """Return the user's full watched list for movies or shows (all pages)."""
+    return api_request(
+        'GET',
+        f'/sync/watched/{media_type}s',
+        user=user,
+        params={'limit': 100},
+        paginate_max_pages=50,
+    ) or []
 
 
 def add_to_watchlist(user: User, media_type: str, trakt_id: int) -> dict:
