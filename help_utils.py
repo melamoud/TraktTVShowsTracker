@@ -34,6 +34,7 @@ def get_help_toc(role: str = 'user') -> list[dict]:
             {'title': 'Managing users', 'slug': 'managing_users'},
             {'title': 'Streaming services', 'slug': 'streaming_services'},
             {'title': 'System configuration', 'slug': 'system_config'},
+            {'title': 'TMDB API key', 'slug': 'tmdb_api_key'},
             {'title': 'Security', 'slug': 'security'},
             {'title': 'SSL certificates', 'slug': 'ssl_certificates'},
             {'title': 'Testing', 'slug': 'testing'},
