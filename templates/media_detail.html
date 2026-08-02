@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% set m = row.media %}
+{% block title %}{{ m.title }} — {{ app_name }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('catalog.latest_movies' if media_type == 'movie' else 'catalog.latest_shows') }}">← Back</a></p>
+
+<div class="detail-layout">
+  <div class="detail-poster">
+    {% if m.poster_url %}
+      <img src="{{ m.poster_url }}" alt="Poster for {{ m.title }}" width="300" height="450">
+    {% else %}
+      <div class="poster-missing muted">No poster available</div>
+    {% endif %}
+  </div>
+  <div class="detail-main">
+    <h1>{{ m.title }}{% if m.year %} ({{ m.year }}){% endif %}</h1>
+    <div class="meta">
+      Trakt DB added/updated: {{ m.trakt_listed_at or 'unknown' }}
+      {% if m.released_at %} · Public release: {{ m.released_at }}{% endif %}
+      {% if m.network %} · Network / channel: {{ m.network }}{% endif %}
+      {% if m.runtime %} · Runtime: {{ m.runtime }} min{% endif %}
+    </div>
+
+    {% if genres %}
+      <div class="tags" style="margin-top:.75rem;">
+        {% for g in genres %}
+          <span class="tag">{{ g }}</span>
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if m.overview %}
+      <p class="detail-overview">{{ m.overview }}</p>
+    {% else %}
+      <p class="muted">No description available from Trakt yet.</p>
+    {% endif %}
+
+    <div class="tags" style="margin:1rem 0;">
+      {% if row.match.matched %}<span class="tag match">Preference match</span>{% endif %}
+      {% if row.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
+      {% if row.watched %}<span class="tag watched">Watched</span>{% endif %}
+    </div>
+    <div class="streaming-line meta">
+      <span class="streaming-label">Streaming:</span>
+      {% if row.providers %}
+        {% for p in row.providers %}<span class="tag stream">{{ p }}</span>{% endfor %}
+      {% else %}
+        <span class="muted">No subscription streaming listed</span>
+      {% endif %}
+    </div>
+    {% if row.found_on %}
+      <div class="streaming-line meta">
+        <span class="streaming-label">Found on:</span>
+        {% for s in row.found_on %}<span class="tag found">{{ s }}</span>{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="actions">
+      {% if row.on_watchlist %}
+        <button class="btn" type="button" data-action="watchlist-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Remove watchlist</button>
+      {% else %}
+        <button class="btn" type="button" data-action="watchlist-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Add watchlist</button>
+      {% endif %}
+      {% if row.watched %}
+        <button class="btn" type="button" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
+      {% else %}
+        <button class="btn" type="button" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Mark watched</button>
+      {% endif %}
+      <button class="btn btn-warn" type="button" data-action="review-marker" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}">Reviewed older than this</button>
+      <button class="btn" type="button" data-action="found-on" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}" data-providers="{{ row.providers|join('|') }}" data-found-on="{{ row.found_on|join('|') }}">Found on…</button>
+      <button class="btn" type="button" data-action="release-watch" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Alert when streaming</button>
+      {% if media_type == 'show' %}
+        <a class="btn btn-primary" href="{{ url_for('user.series_progress', trakt_id=m.trakt_id) }}">Series progress</a>
+      {% endif %}
+      {% if m.imdb_id %}<a class="btn" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>{% endif %}
+      {% if m.trailer_url %}<a class="btn" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>{% endif %}
+      {% if m.homepage %}<a class="btn" href="{{ m.homepage }}" target="_blank" rel="noopener">Homepage</a>{% endif %}
+      <a class="btn" href="https://trakt.tv/{{ media_type }}s/{{ m.slug or m.trakt_id }}" target="_blank" rel="noopener">Trakt</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

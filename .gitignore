@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+eggs/
+.eggs/
+*.egg-info/
+*.egg
+.venv/
+venv/
+env/
+ENV/
+
+# IDE / OS
+.vscode/settings.json
+.idea/
+*.swp
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Secrets & local config
+.env
+.env.local
+.env.test
+config_local.py
+.flask_secret_key
+instance/*.db
+instance/poster_cache/
+*.db-shm
+*.db-wal
+
+# TLS
+*.pem
+*.key
+cert.pem
+key.pem
+
+# Runtime
+logs/
+*.log
+*.pid
+.server.pid
+
+# Test / temp
+.pytest_cache/
+.coverage
+htmlcov/
+*.tmp
+*.temp
+.tmp/

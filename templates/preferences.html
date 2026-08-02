@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Preferences — {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Preferences</h1>
+<p class="muted">Streaming services you use, plus genres/keywords used to highlight catalog matches.</p>
+
+<form method="post" class="form-grid" style="margin-top:1.25rem;" novalidate>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+  <section>
+    <h2>Streaming services</h2>
+    <div class="checks">
+      {% for s in defaults %}
+        <label>
+          <input type="checkbox" name="service_ids" value="{{ s.id }}" {% if s.id in selected %}checked{% endif %}>
+          {{ s.name }}
+        </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section>
+    <h2>Your custom services</h2>
+    {% if customs %}
+      <ul class="meta" style="padding-left:1.1rem;">
+        {% for c in customs %}
+          <li style="margin:.35rem 0;">
+            <strong>{{ c.display_name }}</strong>
+            {% if c.custom_url %} — <a href="{{ c.custom_url }}" target="_blank" rel="noopener">{{ c.custom_url }}</a>{% endif %}
+            {% if c.custom_note %} — {{ c.custom_note }}{% endif %}
+            <label style="display:inline-flex;gap:.35rem;margin-left:.75rem;font-weight:500;">
+              <input type="checkbox" name="remove_custom_ids" value="{{ c.id }}"> Remove
+            </label>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="meta">No custom services yet.</p>
+    {% endif %}
+
+    <h3 style="margin-top:1rem;">Add your own service</h3>
+    <label>Name <input type="text" name="custom_name" placeholder="e.g. Yes TV" autocomplete="off"></label>
+    <label>URL <input type="text" name="custom_url" placeholder="https://..." autocomplete="off"></label>
+    <label>Note <textarea name="custom_note" rows="2"></textarea></label>
+    <label style="display:flex;gap:.5rem;align-items:center;font-weight:500;">
+      <input type="checkbox" name="suggest_default" value="1">
+      Suggest this service to admin for the default list
+    </label>
+  </section>
+
+  <section>
+    <h2>Genres you care about</h2>
+    <div class="checks">
+      {% for g in common_genres %}
+        <label>
+          <input type="checkbox" name="genre_checks" value="{{ g }}" {% if g in user_genres %}checked{% endif %}>
+          {{ g }}
+        </label>
+      {% endfor %}
+    </div>
+    <label style="margin-top:.75rem;">Extra genres (comma-separated)
+      <input type="text" name="genres" placeholder="noir, true crime">
+    </label>
+  </section>
+
+  <section>
+    <h2>Keywords</h2>
+    <label>Keywords / themes (comma-separated)
+      <textarea name="keywords" rows="3" placeholder="space, heist, time travel">{{ keywords_text }}</textarea>
+    </label>
+  </section>
+
+  <button class="btn btn-primary" type="submit">Save preferences</button>
+</form>
+{% endblock %}

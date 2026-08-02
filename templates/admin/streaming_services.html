@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Streaming services — Admin{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('admin.dashboard') }}">← Admin</a></p>
+<h1>Default streaming services</h1>
+
+<form method="post" class="form-grid" style="margin:1rem 0 1.5rem; max-width:520px;">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="add">
+  <h2>Add service</h2>
+  <label>Name <input type="text" name="name" required></label>
+  <label>URL <input type="url" name="url"></label>
+  <label>Note <textarea name="note" rows="2"></textarea></label>
+  <button class="btn btn-primary" type="submit">Add</button>
+</form>
+
+{% if pending %}
+<h2>Pending suggestions</h2>
+<table class="data">
+  <thead><tr><th>Name</th><th>From</th><th>Note</th><th></th></tr></thead>
+  <tbody>
+    {% for s in pending %}
+    <tr>
+      <td>{{ s.name }}{% if s.url %}<div class="meta">{{ s.url }}</div>{% endif %}</td>
+      <td>{{ s.user.username if s.user else s.user_id }}</td>
+      <td>{{ s.note or '' }}</td>
+      <td>
+        <form method="post" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="approve">
+          <input type="hidden" name="suggestion_id" value="{{ s.id }}">
+          <button class="btn btn-small btn-primary" type="submit">Approve</button>
+        </form>
+        <form method="post" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="action" value="reject">
+          <input type="hidden" name="suggestion_id" value="{{ s.id }}">
+          <button class="btn btn-small" type="submit">Reject</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+<h2 style="margin-top:1.5rem;">Current defaults</h2>
+<table class="data">
+  <thead><tr><th>Name</th><th>URL</th><th>TMDB id</th><th>Note</th></tr></thead>
+  <tbody>
+    {% for s in services %}
+    <tr>
+      <td>{{ s.name }}</td>
+      <td>{{ s.url or '—' }}</td>
+      <td>{{ s.tmdb_provider_id or '—' }}</td>
+      <td>{{ s.note or '' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

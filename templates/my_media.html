@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p class="muted">
+  Synced from your TraktTV watchlist and watched history.
+  “Found on” is your local choice of where you actually have it — independent of the Streaming list from TMDB/JustWatch.
+</p>
+
+<div class="toolbar">
+  <div class="pill-row">
+    {% for key, label in [('wishlist','Wishlist'), ('watched','Watched'), ('both','Both')] %}
+      <a class="pill {% if filt == key %}on{% endif %}" href="?filter={{ key }}">{{ label }}</a>
+    {% endfor %}
+    {% if media_type == 'show' %}
+      <a class="pill {% if filt == 'unwatched_episodes' %}on{% endif %}" href="?filter=unwatched_episodes">Unwatched episodes</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="media-list">
+  {% for row in rows %}
+    {% set m = row.media %}
+    {% set st = row.state %}
+    <article class="media-row"
+             data-media-type="{{ media_type }}"
+             data-trakt-id="{{ st.trakt_id }}"
+             data-title="{{ (m.title if m else st.trakt_id)|e }}">
+      <a class="media-poster" href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=st.trakt_id) }}">
+        {% if m and m.poster_url %}
+          <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
+        {% else %}
+          <div class="poster-missing-sm">No image</div>
+        {% endif %}
+      </a>
+      <div class="media-body">
+        <h2 class="media-title">
+          {% if m %}
+            <a href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=st.trakt_id) }}">
+              {{ m.title }}{% if m.year %} ({{ m.year }}){% endif %}
+            </a>
+          {% else %}
+            Trakt id {{ st.trakt_id }}
+          {% endif %}
+        </h2>
+        {% if m %}
+          <div class="meta">
+            {% if m.released_at %}Public release: {{ m.released_at }}{% endif %}
+            {% if m.runtime %}{% if m.released_at %} · {% endif %}{{ m.runtime }} min{% endif %}
+            {% if m.network %}{% if m.released_at or m.runtime %} · {% endif %}{{ m.network }}{% endif %}
+          </div>
+          {% if m.overview %}
+            <div class="row-overview">{{ m.overview[:320] }}{% if m.overview|length > 320 %}…{% endif %}</div>
+          {% endif %}
+        {% endif %}
+        <div class="tags">
+          {% if st.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
+          {% if st.watched %}<span class="tag watched">Watched</span>{% endif %}
+          {% if st.progress_percent and st.progress_percent < 100 %}<span class="tag partial">{{ '%.0f'|format(st.progress_percent) }}%</span>{% endif %}
+          {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
+        </div>
+        {% if row.found_on %}
+          <div class="streaming-line meta">
+            <span class="streaming-label">Found on:</span>
+            {% for s in row.found_on %}<span class="tag found">{{ s }}</span>{% endfor %}
+          </div>
+        {% endif %}
+        <div class="actions">
+          {% if media_type == 'show' %}
+            <a class="btn btn-small btn-primary" href="{{ url_for('user.series_progress', trakt_id=st.trakt_id) }}">Progress</a>
+          {% endif %}
+          {% if st.on_watchlist %}
+            <button class="btn btn-small" data-action="watchlist-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Remove watchlist</button>
+          {% else %}
+            <button class="btn btn-small" data-action="watchlist-add" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Add watchlist</button>
+          {% endif %}
+          {% if st.watched %}
+            <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Unwatch</button>
+          {% else %}
+            <button class="btn btn-small" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Mark watched</button>
+          {% endif %}
+          <button class="btn btn-small"
+                  type="button"
+                  data-action="found-on"
+                  data-media-type="{{ media_type }}"
+                  data-trakt-id="{{ st.trakt_id }}"
+                  data-title="{{ (m.title if m else st.trakt_id)|e }}"
+                  data-providers="{{ row.providers|join('|') }}"
+                  data-found-on="{{ row.found_on|join('|') }}">Found on…</button>
+          {% if m and m.imdb_id %}
+            <a class="btn btn-small" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>
+          {% endif %}
+          {% if m and m.trailer_url %}
+            <a class="btn btn-small" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>
+          {% endif %}
+        </div>
+      </div>
+    </article>
+  {% else %}
+    <p class="muted">Nothing here yet. Add titles from Latest pages or sync after login.</p>
+  {% endfor %}
+</div>
+{% endblock %}

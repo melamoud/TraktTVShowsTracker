@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Admin — {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Admin</h1>
+<p class="muted">Manage local users and default streaming services. Admins are also normal users with their own Trakt account.</p>
+<div class="media-list" style="margin-top:1rem;">
+  <a class="media-row" href="{{ url_for('admin.users') }}">
+    <h2 class="media-title">Users ({{ stats.users }})</h2>
+    <div class="meta">{{ stats.active_users }} active. Disable, revoke sessions, delete local data, promote admins.</div>
+  </a>
+  <a class="media-row" href="{{ url_for('admin.streaming_services') }}">
+    <h2 class="media-title">Streaming services ({{ stats.services }})</h2>
+    <div class="meta">{{ stats.pending_suggestions }} pending suggestions from users.</div>
+  </a>
+  <article class="media-row">
+    <h2 class="media-title">Release alerts</h2>
+    <div class="meta">
+      Active watches waiting: {{ stats.active_release_watches }}.
+      TMDB key: {% if stats.tmdb_configured %}<strong>configured</strong>{% else %}<strong>missing</strong> (required for checks){% endif %}.
+      Background job runs every PROVIDER_SYNC_INTERVAL_HOURS.
+    </div>
+    <div class="actions">
+      <form method="post" action="{{ url_for('admin.run_release_check') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-small btn-primary" type="submit">Run release check now</button>
+      </form>
+    </div>
+  </article>
+  <a class="media-row" href="{{ url_for('admin.help_page') }}">
+    <h2 class="media-title">Admin help</h2>
+    <div class="meta">Security, SSL, configuration, troubleshooting.</div>
+  </a>
+</div>
+{% endblock %}

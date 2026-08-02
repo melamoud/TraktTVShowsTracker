@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Users — Admin{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('admin.dashboard') }}">← Admin</a></p>
+<h1>Users</h1>
+<p class="muted">Local account controls only — never changes the user’s TraktTV data.</p>
+<table class="data">
+  <thead>
+    <tr><th>Username</th><th>Admin</th><th>Active</th><th>Last login</th><th>Actions</th></tr>
+  </thead>
+  <tbody>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.username }}{% if u.name %} <span class="muted">({{ u.name }})</span>{% endif %}</td>
+      <td>{{ 'yes' if u.is_admin else 'no' }}</td>
+      <td>{{ 'yes' if u.is_active_account else 'no' }}</td>
+      <td>{{ u.last_login_at or '—' }}</td>
+      <td>
+        <form method="post" action="{{ url_for('admin.toggle_active', user_id=u.id) }}" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-small" type="submit">{{ 'Disable' if u.is_active_account else 'Enable' }}</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.toggle_admin', user_id=u.id) }}" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-small" type="submit">{{ 'Demote' if u.is_admin else 'Make admin' }}</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.revoke_sessions', user_id=u.id) }}" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-small btn-warn" type="submit">Revoke sessions</button>
+        </form>
+        <form method="post" action="{{ url_for('admin.delete_local', user_id=u.id) }}" style="display:inline" onsubmit="return confirm('Delete local data for {{ u.username }}?');">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-small btn-danger" type="submit">Delete local</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

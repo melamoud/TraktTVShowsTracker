@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Help — {{ app_name }}{% endblock %}
+{% block content %}
+<h1>{{ 'Admin help' if role == 'admin' else 'Help' }}</h1>
+<div class="help-layout" style="margin-top:1rem;">
+  <aside class="help-toc">
+    {% for item in toc %}
+      {% if role == 'admin' %}
+        <a class="{% if topic == item.slug %}active{% endif %}" href="{{ url_for('admin.help_page', topic=item.slug) }}">{{ item.title }}</a>
+      {% else %}
+        <a class="{% if topic == item.slug %}active{% endif %}" href="{{ url_for('user.help_page', topic=item.slug) }}">{{ item.title }}</a>
+      {% endif %}
+    {% endfor %}
+  </aside>
+  <article class="help-body">
+    {{ content_html | safe }}
+  </article>
+</div>
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Login — {{ app_name }}{% endblock %}
+{% block content %}
+<div class="hero-login">
+  <div class="login-panel">
+    <div class="muted">Welcome to</div>
+    <h1 class="brand-hero">TraktTV Shows Tracker</h1>
+    <p class="muted">
+      Find new movies and shows from Trakt, match them to your streaming services,
+      and sync watch progress with your TraktTV account.
+    </p>
+    <p style="margin: 1.25rem 0;">
+      <a class="btn btn-primary" href="{{ url_for('auth.auth_trakt') }}">Login with TraktTV</a>
+    </p>
+    <details>
+      <summary>Need a TraktTV account?</summary>
+      <div class="meta" style="margin-top:.75rem;">
+        <p>This app uses Trakt for identity and watch history. Create a free account at
+        <a href="https://trakt.tv" target="_blank" rel="noopener">trakt.tv</a>.</p>
+        <p>You can sign up with email or continue with Google — then return here and click
+        <strong>Login with TraktTV</strong>.</p>
+        <p>Administrators must also create a Trakt API application and put the client id/secret
+        in <code>.env</code>. See <code>docs/SETUP.md</code>.</p>
+      </div>
+    </details>
+  </div>
+</div>
+{% endblock %}

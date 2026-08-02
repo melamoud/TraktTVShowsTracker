@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}{{ app_name }}{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=4">
+  {% block head %}{% endblock %}
+</head>
+<body>
+  {% if current_user.is_authenticated %}
+  <nav class="topnav">
+    <a class="brand" href="{{ url_for('catalog.home') }}">TraktTV <span>Shows Tracker</span></a>
+    <a href="{{ url_for('catalog.latest_movies') }}">Latest movies</a>
+    <a href="{{ url_for('catalog.latest_shows') }}">Latest shows</a>
+    <a href="{{ url_for('user.my_movies') }}">My movies</a>
+    <a href="{{ url_for('user.my_shows') }}">My shows</a>
+    <a href="{{ url_for('user.preferences') }}">Preferences</a>
+    <a href="{{ url_for('user.notifications') }}">Alerts{% if unread_notifications %}<span class="badge">{{ unread_notifications }}</span>{% endif %}</a>
+    <a href="{{ url_for('user.help_page') }}">Help</a>
+    {% if current_user.is_admin %}
+      <a href="{{ url_for('admin.dashboard') }}">Admin</a>
+    {% endif %}
+    <a href="{{ url_for('auth.logout') }}">Logout ({{ current_user.username }})</a>
+  </nav>
+  {% endif %}
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        <div class="flash-wrap">
+          {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+
+  {% if current_user.is_authenticated %}
+  <div id="found-on-modal" class="modal-overlay" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="found-on-heading">
+      <div class="modal-panel">
+        <h2 id="found-on-heading">Where did you find it?</h2>
+        <p class="muted" id="found-on-title"></p>
+        <p class="meta" id="found-on-hint">Select one or more. Services listed as streaming for this title are highlighted.</p>
+        <div id="found-on-options" class="found-on-options">
+          {% if found_on_service_choices %}
+            {% for name in found_on_service_choices %}
+              <label data-service-name="{{ name }}">
+                <input type="checkbox" name="found_on_service" value="{{ name }}">
+                <span class="found-on-name">{{ name }}</span>
+                <span class="tag stream found-on-listed" hidden>Listed streaming</span>
+              </label>
+            {% endfor %}
+          {% else %}
+            <p class="muted">No services yet — type one below, or add services under Preferences.</p>
+          {% endif %}
+        </div>
+        <label class="found-on-other">Other (optional extra)
+          <input type="text" id="found-on-other" name="found_on_other" placeholder="Type another service name" autocomplete="off">
+        </label>
+        <div class="actions" style="margin-top:1rem;">
+          <button class="btn btn-primary" type="button" id="found-on-save">Save</button>
+          <button class="btn" type="button" id="found-on-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=4"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Progress — {{ title }}{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('user.my_shows') }}">← My shows</a></p>
+<h1>{{ title }}</h1>
+<p class="muted">Watched seasons/episodes are dimmed. The next episode is highlighted so you can mark it quickly. Updates write to TraktTV.</p>
+
+{% if next_episode %}
+  <div class="media-row" style="margin:1rem 0;">
+    <h2 class="media-title">Next up: S{{ next_episode.get('season') }}E{{ next_episode.get('number') }} — {{ next_episode.get('title') or 'Episode' }}</h2>
+    <div class="actions">
+      <button class="btn btn-primary"
+              data-action="episode-watched"
+              data-media-type="show"
+              data-trakt-id="{{ trakt_id }}"
+              data-ids='{{ next_episode.get("ids", {}) | tojson }}'>
+        I just watched it
+      </button>
+    </div>
+  </div>
+{% endif %}
+
+{% for season in seasons %}
+  <details class="season {% if season.all_watched %}dimmed{% endif %}" {% if not season.all_watched %}open{% endif %}>
+    <summary>Season {{ season.number }} {% if season.all_watched %}(watched){% endif %}</summary>
+    {% for ep in season.episodes %}
+      <div class="episode {% if ep.watched %}watched{% endif %} {% if next_episode and next_episode.get('season') == season.number and next_episode.get('number') == ep.number %}next{% endif %}">
+        <div>
+          <strong>E{{ ep.number }}</strong> {{ ep.title or '' }}
+        </div>
+        <div>
+          {% if ep.watched %}
+            <button class="btn btn-small"
+                    data-action="episode-unwatched"
+                    data-media-type="show"
+                    data-trakt-id="{{ trakt_id }}"
+                    data-ids='{{ ep.ids | tojson }}'>Unwatch</button>
+          {% else %}
+            <button class="btn btn-small btn-primary"
+                    data-action="episode-watched"
+                    data-media-type="show"
+                    data-trakt-id="{{ trakt_id }}"
+                    data-ids='{{ ep.ids | tojson }}'>Watched</button>
+          {% endif %}
+        </div>
+      </div>
+    {% endfor %}
+  </details>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Home — {{ app_name }}{% endblock %}
+{% block content %}
+<h1>Home</h1>
+<p class="muted">Review newly listed titles on Trakt, highlight matches to your tastes, and keep progress in sync.</p>
+
+<div class="media-list" style="margin-top:1.25rem;">
+  <a class="media-row" href="{{ url_for('catalog.latest_movies') }}">
+    <h2 class="media-title">Latest movies</h2>
+    <div class="meta">Newest movie entries on Trakt — mark watched, watchlist, or set a review marker.</div>
+  </a>
+  <a class="media-row" href="{{ url_for('catalog.latest_shows') }}">
+    <h2 class="media-title">Latest shows</h2>
+    <div class="meta">Newest series entries on Trakt with the same review workflow.</div>
+  </a>
+  <a class="media-row" href="{{ url_for('user.preferences') }}">
+    <h2 class="media-title">Preferences</h2>
+    <div class="meta">Your streaming services, genres, and keywords used for highlighting.</div>
+  </a>
+  <a class="media-row" href="{{ url_for('user.my_shows') }}?filter=unwatched_episodes">
+    <h2 class="media-title">Shows with unwatched episodes</h2>
+    <div class="meta">Jump into series progress and mark the next episode.</div>
+  </a>
+  <a class="media-row" href="{{ url_for('user.notifications') }}">
+    <h2 class="media-title">Alerts {% if unread %}<span class="badge">{{ unread }}</span>{% endif %}</h2>
+    <div class="meta">In-app notifications, including release-to-streaming alerts.</div>
+  </a>
+</div>
+{% endblock %}
