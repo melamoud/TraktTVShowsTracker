@@ -1,6 +1,6 @@
 # Getting started
 
-TraktTV Shows Tracker helps you review newly listed movies and shows on Trakt, match them to your streaming tastes, and keep watch progress synced with your TraktTV account.
+TraktTV Shows Tracker helps you review newly listed movies and shows on Trakt, highlight titles that match your genres/keywords, and keep watch progress synced with your TraktTV account.
 
 ## Main areas
 

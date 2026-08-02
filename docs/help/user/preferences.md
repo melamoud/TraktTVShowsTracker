@@ -10,4 +10,4 @@ Pick from the default list (Netflix, Prime, …) and/or add a custom service (na
 
 ## Genres & keywords
 
-Used to highlight catalog rows that match your tastes (genre overlap, keyword hits in title/overview/network).
+These drive the purple **Preference match** highlight on Latest (genre overlap, keyword hits in title/overview/network). Your streaming services do **not** count toward that highlight — they are for Found-on / release alerts only.

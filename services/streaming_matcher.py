@@ -8,7 +8,7 @@ import json
 import re
 from typing import Iterable
 
-from models import CachedMedia, MediaProviderAvailability, User, UserPreference, UserStreamingService
+from models import CachedMedia, User, UserPreference, UserStreamingService
 
 
 def _parse_json_list(raw: str | None) -> list[str]:
@@ -49,7 +49,11 @@ def match_preferences(media: CachedMedia, user: User) -> dict:
     """
     Compute preference match highlights for a media item.
 
+    Purple highlight is genres + keywords only (not streaming services —
+    those flood the feed with false positives).
+
     Returns dict with keys: matched (bool), genres, keywords, streaming, reasons.
+    ``streaming`` is always empty (kept for template/API compatibility).
     """
     genres, keywords = get_user_genres_keywords(user)
     media_genre_list = media_genres(media)
@@ -69,29 +73,17 @@ def match_preferences(media: CachedMedia, user: User) -> dict:
         if k.lower() in text_blob
     ]
 
-    user_services = user_service_names(user)
-    provider_names = {
-        (p.provider_name or '').lower()
-        for p in (media.providers or [])
-    }
-    matched_streaming = sorted(
-        name for name in user_services
-        if any(name in pn or pn in name for pn in provider_names if pn)
-    )
-
     reasons = []
     if matched_genres:
         reasons.append('genres: ' + ', '.join(matched_genres))
     if matched_keywords:
         reasons.append('keywords: ' + ', '.join(matched_keywords))
-    if matched_streaming:
-        reasons.append('streaming: ' + ', '.join(matched_streaming))
 
     return {
         'matched': bool(reasons),
         'genres': matched_genres,
         'keywords': matched_keywords,
-        'streaming': matched_streaming,
+        'streaming': [],
         'reasons': reasons,
     }
 

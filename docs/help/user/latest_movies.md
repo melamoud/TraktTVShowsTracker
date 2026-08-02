@@ -19,7 +19,7 @@ This is **not** the public release / “coming soon” calendar.
 
 - **10 / 50 / 100** per page  
 - **Hide watched** on by default  
-- Preference highlights, watchlist/watched, review marker  
+- Preference highlights (genres/keywords only), watchlist/watched, review marker  
 - Poster, description, genres  
 - **Streaming:** read-only TMDB/JustWatch list (needs free `TMDB_API_KEY`)  
 - **Alert when streaming** for in-app release notifications  

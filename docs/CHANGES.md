@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-02 — Preference match = genres + keywords only
+
+- Purple **Preference match** no longer includes owned streaming services (too many false positives)
+- Help: Preferences page clarifies streaming is for Found-on / release alerts only
+
 ## 2026-08-02 — Phase II polish
 
 - Latest: read-only **Streaming:** (TMDB); removed Found-on from Latest  
