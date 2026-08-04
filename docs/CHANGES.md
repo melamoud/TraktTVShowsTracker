@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-04 — Series progress specials vs watched counts
+
+- Progress header counts / next-up ignore season 0 specials so finished season 1 no longer looks like “0 watched”
+- Specials listed at the bottom; mark-watched fails on Trakt silent `added.episodes=0` no-ops
+
 ## 2026-08-02 — Latest lazy sync + numbered pager
 
 - Removed hard 2-page Latest sync cap; first load pulls newest pages only (lazy older pages — avoids Trakt 429)  

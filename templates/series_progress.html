@@ -6,6 +6,7 @@
 <p class="muted">
   Watched marks come from your Trakt <strong>watch history</strong> (same source as the episode ✓ list),
   not Trakt’s season “0 eps” progress bar — that bar is often wrong.
+  Counts above are regular seasons only; specials are listed separately at the bottom.
   Updates write back to Trakt immediately.
 </p>
 {% if progress_aired is not none %}
@@ -28,9 +29,9 @@
 {% endif %}
 
 {% for season in seasons %}
-  <details class="season {% if season.all_watched %}dimmed{% endif %}" {% if not season.all_watched %}open{% endif %}>
+  <details class="season {% if season.all_watched %}dimmed{% endif %}{% if season.is_specials %} season-specials{% endif %}" {% if season.default_open %}open{% endif %}>
     <summary>
-      Season {{ season.number }}
+      {{ season.label or ('Season ' ~ season.number) }}
       {% if season.aired is not none %} — {{ season.completed or 0 }}/{{ season.aired }} watched{% endif %}
       {% if season.all_watched %} (complete){% endif %}
     </summary>

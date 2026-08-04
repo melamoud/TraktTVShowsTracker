@@ -445,8 +445,11 @@ def series_progress(trakt_id):
                 aired_keys.add((int(s_no), int(e_no)))
 
     # Full season lists from metadata so unaired/future eps still appear.
+    # Season 0 (specials) is kept, but must not steal next-up / default-open /
+    # header counts — that made shows like True Blood look like "0 watched".
     season_views = []
-    next_episode = None
+    next_regular = None
+    next_special = None
     total_aired = 0
     total_completed = 0
     for season in seasons_meta or []:
@@ -460,6 +463,7 @@ def series_progress(trakt_id):
         episodes = []
         completed = 0
         aired_count = 0
+        is_specials = number == 0
         for ep in raw_eps:
             ep_no = ep.get('number')
             if ep_no is None:
@@ -474,13 +478,18 @@ def series_progress(trakt_id):
                 aired_count += 1
                 if watched:
                     completed += 1
-                elif next_episode is None:
-                    next_episode = {
+                else:
+                    candidate = {
                         'season': number,
                         'number': ep_no,
                         'title': ep.get('title'),
                         'ids': trakt_client.sanitize_episode_ids(ep.get('ids') or {}),
                     }
+                    if is_specials:
+                        if next_special is None:
+                            next_special = candidate
+                    elif next_regular is None:
+                        next_regular = candidate
             episodes.append({
                 'number': ep_no,
                 'title': ep.get('title'),
@@ -491,15 +500,37 @@ def series_progress(trakt_id):
             })
         if not episodes:
             continue
-        total_aired += aired_count
-        total_completed += completed
+        # Header totals = regular seasons only (matches Trakt season progress).
+        if not is_specials:
+            total_aired += aired_count
+            total_completed += completed
         season_views.append({
             'number': number,
+            'label': 'Specials' if is_specials else f'Season {number}',
+            'is_specials': is_specials,
             'episodes': episodes,
             'all_watched': aired_count > 0 and completed == aired_count,
             'aired': aired_count,
             'completed': completed,
+            'default_open': False,
         })
+
+    # Regular seasons first, specials last.
+    season_views.sort(key=lambda s: (s['is_specials'], s['number']))
+
+    for season in season_views:
+        if season['is_specials']:
+            continue
+        if not season['all_watched'] and season['aired'] > 0:
+            season['default_open'] = True
+            break
+    else:
+        for season in season_views:
+            if season['is_specials'] and not season['all_watched'] and season['aired'] > 0:
+                season['default_open'] = True
+                break
+
+    next_episode = next_regular or next_special
 
     return render_template(
         'series_progress.html',

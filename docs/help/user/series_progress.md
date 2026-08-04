@@ -14,9 +14,12 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 
 ## Episode list
 
+- Header counts are **regular seasons only** (season 1+). Specials are listed separately at the bottom and do not make a show look like “0 watched” when you’ve finished season 1.  
 - One line per episode: title, air date (`Aired …` / `Airs … · Not aired yet`), and the action button  
 - Future episodes use a blue highlight  
 - Buttons: **Watch** (not in history) vs **Watched** (in history; click to unwatch)  
+- **Next up** prefers the next unwatched regular-season episode, not a special  
+
 
 ## Actions
 

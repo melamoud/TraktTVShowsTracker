@@ -409,7 +409,11 @@ def get_show_watched_entry(user: User, trakt_id: int) -> dict | None:
         page_count = int(resp.headers.get('X-Pagination-Page-Count') or page)
         for item in data or []:
             ids = ((item.get('show') or {}).get('ids') or {})
-            if ids.get('trakt') == tid:
+            try:
+                item_tid = int(ids.get('trakt'))
+            except (TypeError, ValueError):
+                continue
+            if item_tid == tid:
                 return item
         if page >= page_count:
             break
@@ -546,9 +550,12 @@ def mark_episode_watched(user: User, episode_ids: dict) -> dict:
     body = {'episodes': [{'ids': ids}]}
     result = api_request('POST', '/sync/history', user=user, json_body=body) or {}
     not_found = (result.get('not_found') or {}).get('episodes') or []
-    if not_found:
+    added = int(((result.get('added') or {}).get('episodes')) or 0)
+    # Trakt can return HTTP 200 with added.episodes=0 (silent no-op) when ids
+    # are rejected — same class of failure as nested plex.guid payloads.
+    if not_found or added < 1:
         raise TraktError(
-            'Trakt could not find that episode to mark watched',
+            'Trakt did not record the watch (episode not added to history)',
             400,
             result,
         )

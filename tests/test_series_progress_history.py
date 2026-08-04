@@ -105,3 +105,105 @@ def test_episode_watched_keys_union_history_and_watched_progress():
         },
     )
     assert keys == {(1, 1), (1, 2), (1, 4)}
+
+
+def test_series_progress_specials_do_not_hide_regular_watched(app, client, user):
+    """Season 0 specials must not steal next-up or make header counts look empty."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show',
+            trakt_id=10494,
+            title='True Blood',
+            year=2008,
+        ))
+        db.session.commit()
+
+    progress = {'aired': 14, 'completed': 12, 'seasons': []}
+    seasons_meta = [
+        {
+            'number': 0,
+            'episodes': [
+                {
+                    'number': 1,
+                    'title': 'Unaired Pilot',
+                    'ids': {'trakt': 1, 'plex': {'guid': 'x'}},
+                    'first_aired': '2008-01-01T00:00:00.000Z',
+                },
+                {
+                    'number': 2,
+                    'title': 'Special 2',
+                    'ids': {'trakt': 2},
+                    'first_aired': '2008-01-02T00:00:00.000Z',
+                },
+            ],
+        },
+        {
+            'number': 1,
+            'episodes': [
+                {
+                    'number': 1,
+                    'title': 'Strange Love',
+                    'ids': {'trakt': 101},
+                    'first_aired': '2008-09-07T00:00:00.000Z',
+                },
+                {
+                    'number': 2,
+                    'title': 'The First Taste',
+                    'ids': {'trakt': 102},
+                    'first_aired': '2008-09-14T00:00:00.000Z',
+                },
+            ],
+        },
+        {
+            'number': 2,
+            'episodes': [
+                {
+                    'number': 1,
+                    'title': 'Nothing But the Blood',
+                    'ids': {'trakt': 201},
+                    'first_aired': '2009-06-14T00:00:00.000Z',
+                },
+            ],
+        },
+    ]
+    history = [
+        {'episode': {'season': 1, 'number': 1}},
+        {'episode': {'season': 1, 'number': 2}},
+    ]
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.trakt_client.get_show_progress', return_value=progress), patch(
+        'routes.user_routes.trakt_client.get_show_seasons', return_value=seasons_meta
+    ), patch(
+        'routes.user_routes.trakt_client.get_show_watch_history', return_value=history
+    ), patch(
+        'routes.user_routes.trakt_client.get_show_watched_entry', return_value=None
+    ):
+        resp = client.get('/shows/10494/progress')
+
+    assert resp.status_code == 200
+    html = resp.data.decode('utf-8')
+    # Regular seasons only in header (2 watched / 3 aired), not specials.
+    assert '2</strong> / 3 aired' in html
+    assert 'Next up: S2E1' in html
+    assert 'Specials' in html
+    # Specials section exists but is not the open/default focus when S2 needs watching.
+    assert html.index('Season 2') < html.index('Specials')
+    assert 'open' in html
+
+
+def test_mark_episode_watched_rejects_silent_noop():
+    """HTTP 200 with added.episodes=0 must not look like success."""
+    from services.trakt_client import TraktError, mark_episode_watched
+    from unittest.mock import MagicMock
+
+    user = MagicMock()
+    with patch(
+        'services.trakt_client.api_request',
+        return_value={'added': {'episodes': 0}, 'not_found': {'episodes': []}},
+    ):
+        try:
+            mark_episode_watched(user, {'trakt': 12949723})
+            assert False, 'expected TraktError'
+        except TraktError as exc:
+            assert 'did not record the watch' in str(exc)
