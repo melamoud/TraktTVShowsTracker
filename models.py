@@ -59,6 +59,10 @@ class UserPreference(db.Model):
     genres_json = db.Column(db.Text, default='[]')  # JSON list of genre strings
     keywords_json = db.Column(db.Text, default='[]')  # JSON list of keyword strings
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    # Onboarding / reminder for empty match filters (genres + keywords).
+    onboarding_completed_at = db.Column(db.DateTime)  # finished wizard or skipped
+    prefs_reminder_disabled = db.Column(db.Boolean, default=False, nullable=False)
+    prefs_reminder_snooze_until = db.Column(db.DateTime)  # hide banner until this time
 
 
 class StreamingService(db.Model):

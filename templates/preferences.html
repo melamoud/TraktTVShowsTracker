@@ -2,7 +2,39 @@
 {% block title %}Preferences — {{ app_name }}{% endblock %}
 {% block content %}
 <h1>Preferences</h1>
-<p class="muted">Streaming services you use, plus genres/keywords used to highlight catalog matches.</p>
+<p class="muted">Streaming services you use, plus genres/keywords used to highlight and filter catalog matches.</p>
+
+{% if marker_prompt %}
+<div class="callout warn" id="marker-prompt">
+  <h2>Match filters changed — update review markers?</h2>
+  <p>
+    Genres/keywords changed, so different titles will be purple. Your review markers still sit on the same
+    rows: newly matching titles <em>below</em> a marker stay dimmed (easy to miss), and titles that no longer
+    match may still look “caught up.”
+  </p>
+  {% if markers.movie or markers.show %}
+    <p class="meta">
+      Current markers:
+      {% if markers.movie %}<strong>Movies:</strong> {{ markers.movie.title }}{% endif %}
+      {% if markers.movie and markers.show %} · {% endif %}
+      {% if markers.show %}<strong>Shows:</strong> {{ markers.show.title }}{% endif %}
+    </p>
+  {% else %}
+    <p class="meta">You have no review markers yet.</p>
+  {% endif %}
+  <div class="actions" style="flex-wrap:wrap;">
+    <button class="btn btn-small" type="button" data-action="marker-prompt-keep">Keep markers</button>
+    <button class="btn btn-small" type="button" data-action="review-marker-clear" data-media-type="movie" data-trakt-id="0">Clear movie marker</button>
+    <button class="btn btn-small" type="button" data-action="review-marker-clear" data-media-type="show" data-trakt-id="0">Clear show marker</button>
+    <button class="btn btn-small" type="button" data-action="review-marker-clear" data-media-type="all" data-trakt-id="0">Clear both</button>
+    <button class="btn btn-small btn-warn" type="button" data-action="review-marker-caught-up" data-media-type="all" data-trakt-id="0"
+            title="Set marker on the newest title in each feed">Caught up as of now (both)</button>
+  </div>
+  <p class="meta" style="margin-top:.75rem;">
+    <strong>Caught up as of now</strong> dims everything currently in the feed and only leaves future Trakt updates undimmed.
+  </p>
+</div>
+{% endif %}
 
 <form method="post" class="form-grid" style="margin-top:1.25rem;" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -50,6 +82,7 @@
 
   <section>
     <h2>Genres you care about</h2>
+    <p class="meta">Used for purple matches and the default Latest “Matches only” filter.</p>
     <div class="checks">
       {% for g in common_genres %}
         <label>
@@ -68,6 +101,16 @@
     <label>Keywords / themes (comma-separated)
       <textarea name="keywords" rows="3" placeholder="space, heist, time travel">{{ keywords_text }}</textarea>
     </label>
+  </section>
+
+  <section>
+    <h2>Reminders</h2>
+    {% if prefs_reminder_disabled %}
+      <p class="meta">Empty-prefs reminders are off.</p>
+      <button class="btn btn-small" type="button" data-action="prefs-reminder" data-reminder-action="enable" data-media-type="prefs" data-trakt-id="0">Turn reminders back on</button>
+    {% else %}
+      <p class="meta">If you clear all genres and keywords, we’ll remind you about once a day (unless you snooze or turn that off).</p>
+    {% endif %}
   </section>
 
   <button class="btn btn-primary" type="submit">Save preferences</button>

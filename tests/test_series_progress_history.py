@@ -1,0 +1,107 @@
+"""Series progress uses Trakt history for watched marks, not progress.completed."""
+
+from unittest.mock import patch
+
+from models import CachedMedia, db
+from tests.conftest import login_client
+
+
+def test_series_progress_prefers_history_over_progress_flags(app, client, user):
+    """Episodes in history show as watched even when progress.completed is false."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show',
+            trakt_id=10494,
+            title='True Blood',
+            year=2008,
+        ))
+        db.session.commit()
+
+    # Progress only lists 2 aired eps; metadata has the full season.
+    progress = {
+        'aired': 2,
+        'completed': 0,
+        'seasons': [{
+            'number': 1,
+            'aired': 2,
+            'completed': 0,
+            'episodes': [
+                {'number': 1, 'completed': False},
+                {'number': 2, 'completed': False},
+            ],
+        }],
+    }
+    seasons_meta = [{
+        'number': 1,
+        'episodes': [
+            {'number': 1, 'title': 'E1', 'ids': {'trakt': 101}, 'first_aired': '2026-01-01T00:00:00.000Z'},
+            {'number': 2, 'title': 'E2', 'ids': {'trakt': 102}, 'first_aired': '2026-01-08T00:00:00.000Z'},
+            {'number': 3, 'title': 'E3', 'ids': {'trakt': 103}, 'first_aired': '2030-01-01T00:00:00.000Z'},
+            {'number': 4, 'title': 'E4', 'ids': {'trakt': 104}, 'first_aired': '2030-01-08T00:00:00.000Z'},
+        ],
+    }]
+    history = [
+        {'episode': {'season': 1, 'number': 1, 'ids': {'trakt': 101}}},
+        {'episode': {'season': 1, 'number': 2, 'ids': {'trakt': 102}}},
+    ]
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.trakt_client.get_show_progress', return_value=progress), patch(
+        'routes.user_routes.trakt_client.get_show_seasons', return_value=seasons_meta
+    ), patch(
+        'routes.user_routes.trakt_client.get_show_watch_history', return_value=history
+    ), patch(
+        'routes.user_routes.trakt_client.get_show_watched_entry', return_value=None
+    ):
+        resp = client.get('/shows/10494/progress')
+
+    assert resp.status_code == 200
+    html = resp.data.decode('utf-8')
+    assert '2</strong> / 2 aired' in html
+    assert 'Next up:' not in html  # all aired eps watched; E3/E4 future
+    assert 'E3' in html and 'E4' in html
+    assert 'Airs 2030-01-01 · Not aired yet' in html
+    assert 'episode-line' in html
+    assert 'btn-watched' in html and '>Watched<' in html
+    assert 'btn-watch' in html and '>Watch<' in html
+
+
+def test_sanitize_episode_ids_strips_nested_plex():
+    """Nested plex.guid must not be sent to Trakt history sync."""
+    from services.trakt_client import sanitize_episode_ids
+
+    clean = sanitize_episode_ids({
+        'trakt': 12949723,
+        'tvdb': 1,
+        'tmdb': 2,
+        'imdb': 'tt1',
+        'plex': {'guid': 'plex://episode/1'},
+    })
+    assert clean == {'trakt': 12949723, 'tvdb': 1, 'tmdb': 2, 'imdb': 'tt1'}
+
+
+def test_episode_watched_keys_union_history_and_watched_progress():
+    """Watched keys come from history + sync/watched plays + progress flags."""
+    from services.trakt_client import episode_watched_keys_from_trakt
+
+    keys = episode_watched_keys_from_trakt(
+        history=[{'episode': {'season': 1, 'number': 1}}],
+        watched_entry={
+            'seasons': [{
+                'number': 1,
+                'episodes': [
+                    {'number': 2, 'plays': 1, 'last_watched_at': '2026-01-01T00:00:00.000Z'},
+                    {'number': 3, 'plays': 0},
+                ],
+            }],
+        },
+        progress={
+            'seasons': [{
+                'number': 1,
+                'episodes': [
+                    {'number': 4, 'completed': True, 'stats': {'play_count': 0}},
+                ],
+            }],
+        },
+    )
+    assert keys == {(1, 1), (1, 2), (1, 4)}

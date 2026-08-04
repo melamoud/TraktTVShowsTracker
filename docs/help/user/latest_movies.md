@@ -2,6 +2,17 @@
 
 Shows titles recently **added or changed in Trakt’s database**, newest Trakt activity first.
 
+## Matches only + recent years (defaults)
+
+Trakt can add **hundreds of updates per day**, and most are **metadata edits on old titles** — Trakt has **no** “first inserted” flag.
+
+By default Latest applies two local filters:
+
+1. **Recent years** — keep production year ≥ this year (or ≥ last year in Jan–Jun). Toggle **Include older years** to see classics that just got a DB edit.  
+2. **Matches only** — purple genres/keywords. Toggle **All titles** for the unfiltered (but still year-filtered) feed.  
+
+Without genres/keywords, Matches only is empty — use the setup wizard / Preferences, or All titles.
+
 ## Source
 
 Uses Trakt’s official `/movies/updates` API — the closest public feed to “what just showed up / changed in Trakt’s DB”.
@@ -17,17 +28,20 @@ This is **not** the public release / “coming soon” calendar.
 
 ## How sync works
 
-1. **First time** (empty cache): pulls the **newest** Trakt update pages (a few hundred titles) so the page stays fast.  
-2. **Later visits**: uses your local cache; occasionally refreshes the newest page; walks older pages only until **your** review marker is covered.  
-3. **Older pages**: loaded **lazily** when you move to a later list page — never the whole ~30-day window in one click (that rate-limits Trakt).  
+1. **First time** / **Refresh**: light pagination probe (`limit=1`), then **one newest** Trakt `/updates` page with `extended=full` (genres/overview for Matches-only). Does **not** sync your whole watchlist.  
+2. **Later visits**: uses your local cache; at most a throttled 1-page newest refresh.  
+3. **Older pages**: loaded **only** when you click **Load older Trakt page** — never invent empty UI pages.  
 
-Use the numbered pager **`< 1 2 3 … N >`** (top and bottom) to jump pages. The page count is only what’s loaded locally so far — it can grow as older Trakt updates are fetched.
+The review marker only **dims** titles already in cache; it is not a sync depth target anymore.
+
+Trakt’s `/updates` API **cannot** filter by genre/keyword server-side. Matches-only filters locally after each page is cached (genres/overview come from `extended=full`).
 
 ## Features
 
+- **Matches only / Show all**  
 - **10 / 50 / 100** per page  
 - **Hide watched** on by default  
-- Preference highlights (genres/keywords only), watchlist/watched, review marker  
+- Preference highlights (genres/keywords only), watchlist/watched, review marker (set / clear)  
 - Poster, description, genres  
 - **Streaming:** read-only TMDB/JustWatch list (needs free `TMDB_API_KEY`)  
 - **Alert when streaming** for in-app release notifications  
@@ -38,4 +52,4 @@ Use the numbered pager **`< 1 2 3 … N >`** (top and bottom) to jump pages. The
 
 Trakt only returns about the **last 29–30 days** of DB updates. Older change history cannot be re-pulled. Titles already saved locally stay in this app.
 
-Trakt can record **thousands** of DB updates in a single day, so the first pages may all show today’s date. Jump to later/last pages for older activity. If that stays too noisy day-to-day, we’ll revisit the Latest design.
+Trakt can record **thousands** of DB updates in a single day, so the first pages may all show today’s date when you use **Show all**. Prefer **Matches only** for day-to-day review.

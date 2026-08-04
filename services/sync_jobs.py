@@ -270,9 +270,8 @@ def upsert_cached_media(
 
 # Trakt /updates rejects dates older than ~30 days; stay inside with margin.
 UPDATES_WINDOW_DAYS = 28
-# Never pull the whole window in one request (rate-limits Trakt to 429).
-INITIAL_BOOTSTRAP_PAGES = 3
-MAX_MARKER_WALK_PAGES = 5
+# One newest page only — older pages load when the user pages back.
+INITIAL_BOOTSTRAP_PAGES = 1
 NEWEST_REFRESH_MIN_INTERVAL = timedelta(minutes=15)
 
 
@@ -438,22 +437,27 @@ def sync_catalog(
     pages: int | None = INITIAL_BOOTSTRAP_PAGES,
     *,
     full_window: bool = False,
+    enrich: bool = False,
 ) -> int:
     """
     Sync Latest feed from Trakt DB updates (/movies|/shows/updates).
 
-    Default: newest INITIAL_BOOTSTRAP_PAGES only (safe for interactive loads).
-    Pass full_window=True only for rare offline/admin fills — still capped per call
-    via pages when set; use lazy paging to walk older pages.
+    Default: newest INITIAL_BOOTSTRAP_PAGES only (1 page). Older pages load lazily.
+    ``enrich`` is off by default — visible-page enrich handles display; bulk enrich
+    was the main cause of 30s+ Refresh times.
+
+    Uses a *light* pagination probe (limit=1, no extended), then fetches only the
+    newest page(s) with extended=full — never the oldest page.
     """
+    import time
     del days_forward  # API compatibility
+    t0 = time.perf_counter()
     start = _updates_start_date(days_back)
     meta = trakt_client.probe_updates_pagination(media_type, start)
     page_count = meta['page_count']
+    t_probe = time.perf_counter()
 
     if full_window and pages is None:
-        # Still do not fetch every page in one shot — take a large but capped slice
-        # from the newest end; remainder comes from lazy older loads.
         pages = max(INITIAL_BOOTSTRAP_PAGES, min(page_count, 10))
 
     if pages is None:
@@ -461,13 +465,16 @@ def sync_catalog(
 
     pages = max(1, int(pages))
     from_page = max(1, page_count - pages + 1)
+    # Never pass page1_cache from the light probe (limit=1 / incomplete).
     items = trakt_client.fetch_updates_pages(
         media_type,
         start,
         from_page,
         page_count,
-        page1_cache=meta.get('page1') if from_page == 1 else None,
+        page1_cache=None,
+        extended='full',
     )
+    t_fetch = time.perf_counter()
     count = _upsert_update_items(media_type, items)
     existing = _get_feed_sync(media_type)
     oldest = from_page
@@ -486,25 +493,28 @@ def sync_catalog(
 
     db.session.commit()
     logger.info(
-        'Catalog sync %s (Trakt DB updates): upserted %s since %s pages %s-%s/%s',
-        media_type, count, start, oldest, newest, page_count,
+        'Catalog sync %s: upserted %s pages %s-%s/%s '
+        '(probe=%.2fs fetch=%d page(s) %.2fs total=%.2fs)',
+        media_type, count, oldest, newest, page_count,
+        t_probe - t0, pages, t_fetch - t_probe, time.perf_counter() - t0,
     )
-    try:
-        enriched = enrich_media_details(media_type, limit=min(40, max(count, 10)))
-        if enriched:
-            logger.info('Catalog enrich %s: filled details for %s titles', media_type, enriched)
-    except Exception as exc:
-        logger.warning('Catalog enrich after sync failed: %s', exc)
+    if enrich:
+        try:
+            enriched = enrich_media_details(media_type, limit=min(20, max(count, 5)))
+            if enriched:
+                logger.info('Catalog enrich %s: filled details for %s titles', media_type, enriched)
+        except Exception as exc:
+            logger.warning('Catalog enrich after sync failed: %s', exc)
     return count
 
 
 def refresh_catalog_newest(
     media_type: str,
     days_back: int = UPDATES_WINDOW_DAYS,
-    pages: int = 2,
+    pages: int = 1,
 ) -> int:
-    """Re-pull the newest Trakt /updates pages; keep older cached rows."""
-    return sync_catalog(media_type, days_back=days_back, pages=pages)
+    """Re-pull the newest Trakt /updates page(s); keep older cached rows. No bulk enrich."""
+    return sync_catalog(media_type, days_back=days_back, pages=pages, enrich=False)
 
 
 def bootstrap_catalog_initial(
@@ -512,14 +522,13 @@ def bootstrap_catalog_initial(
     days_back: int = UPDATES_WINDOW_DAYS,
 ) -> int:
     """
-    First-load sync: newest pages only. Older pages load lazily when paging.
-
-    Pulling the entire ~30-day window in one request rate-limits Trakt (429).
+    First-load sync: newest page only. Older pages load lazily when paging.
     """
     return sync_catalog(
         media_type,
         days_back=days_back,
         pages=INITIAL_BOOTSTRAP_PAGES,
+        enrich=False,
     )
 
 
@@ -529,104 +538,27 @@ def ensure_catalog_through_marker(
     days_back: int = UPDATES_WINDOW_DAYS,
 ) -> int:
     """
-    Ensure cache is ready for Latest without blocking on a full-window pull.
+    Keep Latest cache ready without walking to the review marker.
 
-    - Empty / never bootstrapped: fetch newest INITIAL_BOOTSTRAP_PAGES.
-    - Existing cache with marker already present: no Trakt call (throttled refresh only).
-    - Marker missing from cache: walk a few older pages per request.
+    Review markers only dim rows already in cache. Older Trakt pages load when
+    the user pages back (ensure_catalog_for_offset) — never eagerly here.
     """
+    del user  # kept for call-site compatibility
     count = feed_count(media_type)
     if count == 0:
         return bootstrap_catalog_initial(media_type, days_back=days_back)
 
     cursor = reconcile_feed_cursor(media_type, days_back=days_back)
     if not cursor or not cursor.bootstrapped_at:
-        # Existing rows but no usable cursor: newest pages + open lazy older path.
         return bootstrap_catalog_initial(media_type, days_back=days_back)
 
     start = _updates_start_date(days_back)
     if cursor.start_date != start:
-        # New calendar day for the window — refresh newest; re-open older walk.
-        return refresh_catalog_newest(media_type, days_back=days_back, pages=2)
+        return refresh_catalog_newest(media_type, days_back=days_back, pages=1)
 
-    # Trakt can log tens of thousands of updates in one day. If cache is still a
-    # single calendar day, seed the *oldest* API page in the ~28-day window so the
-    # bottom of Latest shows older dates (page 1 of /updates is oldest-first).
-    # Keep the lazy cursor at the newest edge so sequential older loads continue.
-    if catalog_has_more_older(media_type):
-        mn = (
-            db.session.query(db.func.min(CachedMedia.trakt_listed_at))
-            .filter_by(media_type=media_type, feed_source='trakt_db_updates')
-            .scalar()
-        )
-        mx = (
-            db.session.query(db.func.max(CachedMedia.trakt_listed_at))
-            .filter_by(media_type=media_type, feed_source='trakt_db_updates')
-            .scalar()
-        )
-        if mn and mx and mn.date() == mx.date():
-            try:
-                seed = trakt_client.fetch_updates_pages(media_type, start, 1, 2)
-                added = _upsert_update_items(media_type, seed)
-                db.session.commit()
-                logger.info(
-                    'Seeded %s feed with oldest window pages (+%s titles) past single-day cache',
-                    media_type, added,
-                )
-            except Exception as exc:
-                logger.warning('Oldest-window seed failed for %s: %s', media_type, exc)
-
-    marker = ReviewMarker.query.filter_by(user_id=user.id, media_type=media_type).first()
-    if marker and CachedMedia.query.filter_by(
-        media_type=media_type,
-        trakt_id=marker.trakt_id,
-        feed_source='trakt_db_updates',
-    ).first():
-        if _should_refresh_newest(media_type):
-            return refresh_catalog_newest(media_type, days_back=days_back, pages=1)
-        return 0
-
-    if not marker:
-        if _should_refresh_newest(media_type):
-            return refresh_catalog_newest(media_type, days_back=days_back, pages=1)
-        return 0
-
-    # Marker not in cache yet — walk a few older pages (rest via lazy paging).
-    meta = trakt_client.probe_updates_pagination(media_type, start)
-    page_count = meta['page_count']
-    newest = int(cursor.newest_fetched_page or page_count)
-    oldest_have = int(cursor.oldest_fetched_page or newest)
-    added_total = 0
-
-    if page_count > newest:
-        end = min(page_count, newest + INITIAL_BOOTSTRAP_PAGES)
-        items = trakt_client.fetch_updates_pages(media_type, start, newest + 1, end)
-        added_total += _upsert_update_items(media_type, items)
-        newest = end
-        _save_feed_sync(media_type, start, page_count, oldest_have, newest)
-        db.session.commit()
-        if CachedMedia.query.filter_by(
-            media_type=media_type, trakt_id=marker.trakt_id, feed_source='trakt_db_updates'
-        ).first():
-            return added_total
-
-    page = oldest_have - 1
-    walked = 0
-    while page >= 1 and walked < MAX_MARKER_WALK_PAGES:
-        items = trakt_client.fetch_updates_pages(media_type, start, page, page)
-        added_total += _upsert_update_items(media_type, items)
-        oldest_have = page
-        _save_feed_sync(media_type, start, page_count, oldest_have, newest)
-        db.session.commit()
-        walked += 1
-        if any(_item_trakt_id(it, media_type) == int(marker.trakt_id) for it in items):
-            break
-        if CachedMedia.query.filter_by(
-            media_type=media_type, trakt_id=marker.trakt_id, feed_source='trakt_db_updates'
-        ).first():
-            break
-        page -= 1
-    return added_total
+    if _should_refresh_newest(media_type):
+        return refresh_catalog_newest(media_type, days_back=days_back, pages=1)
+    return 0
 
 
 def ensure_catalog_for_offset(
@@ -695,11 +627,13 @@ def enrich_media_details(media_type: str, limit: int = 40) -> int:
     return updated
 
 
-def sync_user_media_state(user: User) -> None:
+def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None) -> None:
     """Refresh local watchlist/watched cache from Trakt for one user."""
-    for media_type in ('movie', 'show'):
+    types = media_types or ('movie', 'show')
+    for media_type in types:
         try:
             watchlist = trakt_client.get_watchlist(user, media_type)
+            # No extended=progress here — bulk show progress is too slow for Refresh.
             watched = trakt_client.get_watched(user, media_type)
         except Exception as exc:
             logger.warning('State sync failed for user %s %s: %s', user.id, media_type, exc)

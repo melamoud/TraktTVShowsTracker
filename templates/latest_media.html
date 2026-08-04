@@ -2,11 +2,16 @@
 {% block title %}{{ title }} — {{ app_name }}{% endblock %}
 {% block content %}
 {% set hw = 1 if hide_watched else 0 %}
+{% set mo = 1 if match_only else 0 %}
+{% set ry = 1 if recent_years else 0 %}
+{% macro qs(page_n=None, per=None, hw_v=None, mo_v=None, ry_v=None) -%}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&match_only={{ mo_v if mo_v is not none else mo }}&recent_years={{ ry_v if ry_v is not none else ry }}
+{%- endmacro %}
 {% macro pager(position) %}
-  {% if pages > 1 or has_more_older %}
+  {% if pages > 1 %}
   <nav class="pager pill-row" aria-label="Pagination {{ position }}">
     {% if page > 1 %}
-      <a class="pill" href="?page={{ page - 1 }}&per_page={{ per_page }}&hide_watched={{ hw }}" aria-label="Previous page">&lt;</a>
+      <a class="pill" href="?{{ qs(page_n=page - 1) }}" aria-label="Previous page">&lt;</a>
     {% else %}
       <span class="pill disabled" aria-disabled="true">&lt;</span>
     {% endif %}
@@ -16,52 +21,90 @@
       {% elif p == page %}
         <span class="pill on" aria-current="page">{{ p }}</span>
       {% else %}
-        <a class="pill" href="?page={{ p }}&per_page={{ per_page }}&hide_watched={{ hw }}">{{ p }}</a>
+        <a class="pill" href="?{{ qs(page_n=p) }}">{{ p }}</a>
       {% endif %}
     {% endfor %}
     {% if page < pages %}
-      <a class="pill" href="?page={{ page + 1 }}&per_page={{ per_page }}&hide_watched={{ hw }}" aria-label="Next page">&gt;</a>
+      <a class="pill" href="?{{ qs(page_n=page + 1) }}" aria-label="Next page">&gt;</a>
     {% else %}
       <span class="pill disabled" aria-disabled="true">&gt;</span>
     {% endif %}
-    <span class="pill meta-pill">{{ total }} titles</span>
   </nav>
   {% endif %}
 {% endmacro %}
 <h1>{{ title }}</h1>
 <p class="muted">
   {{ feed_blurb }}
-  Highlighted rows match your preferences. Dimmed rows are at or older than your review marker.
-  Watched titles are hidden by default (toggle below if you want them).
-  Trakt often records thousands of DB updates in a single day — the first list pages can all show
-  today’s date even though the sync window is ~30 days; use the page numbers (or last page) for older activity.
-  Page count grows as older Trakt updates are loaded.
+  By default: <strong>recent years</strong> + <strong>preference matches</strong> (purple) to cut Trakt metadata-edit noise.
+  Dimmed rows are at or older than your review marker. Watched titles are hidden by default.
 </p>
 
 <div class="toolbar">
   <div class="pill-row">
+    {% if recent_years %}
+      <span class="pill on" title="Hide titles older than {{ min_discovery_year }}">Years ≥ {{ min_discovery_year }}</span>
+      <a class="pill" href="?{{ qs(page_n=1, ry_v=0) }}">Include older years</a>
+    {% else %}
+      <a class="pill" href="?{{ qs(page_n=1, ry_v=1) }}">Recent years only</a>
+      <span class="pill on">All years</span>
+    {% endif %}
+    {% if match_only %}
+      <span class="pill on">Matches only</span>
+      <a class="pill" href="?{{ qs(page_n=1, mo_v=0) }}">All titles</a>
+    {% else %}
+      <a class="pill" href="?{{ qs(page_n=1, mo_v=1) }}">Matches only</a>
+      <span class="pill on">All titles</span>
+    {% endif %}
     {% for n in (10, 50, 100) %}
       <a class="pill {% if per_page == n %}on{% endif %}"
-         href="?page=1&per_page={{ n }}&hide_watched={{ hw }}">{{ n }} / page</a>
+         href="?{{ qs(page_n=1, per=n) }}">{{ n }} / page</a>
     {% endfor %}
     {% if hide_watched %}
-      <a class="pill" href="?page=1&per_page={{ per_page }}&hide_watched=0">Show watched</a>
+      <a class="pill" href="?{{ qs(page_n=1, hw_v=0) }}">Show watched</a>
       <span class="pill on">Hiding watched</span>
     {% else %}
-      <a class="pill on" href="?page=1&per_page={{ per_page }}&hide_watched=0">Showing watched</a>
-      <a class="pill" href="?page=1&per_page={{ per_page }}&hide_watched=1">Hide watched</a>
+      <a class="pill on" href="?{{ qs(page_n=1, hw_v=0) }}">Showing watched</a>
+      <a class="pill" href="?{{ qs(page_n=1, hw_v=1) }}">Hide watched</a>
     {% endif %}
   </div>
   <div class="actions">
     <button class="btn btn-small" data-action="sync-catalog" data-media-type="{{ media_type }}" data-trakt-id="0">Refresh from Trakt</button>
+    {% if has_more_older %}
+      <a class="btn btn-small" href="?{{ qs(page_n=1) }}&load_older=1">Load older Trakt page</a>
+    {% endif %}
   </div>
 </div>
+<p class="meta">
+  Showing <strong>{{ total }}</strong>{% if match_only %} match{{ '' if total == 1 else 'es' }}{% else %} title{{ '' if total == 1 else 's' }}{% endif %}
+  from <strong>{{ filter_stats.cached_total }}</strong> cached Trakt updates
+  {% if recent_years and min_discovery_year %}
+    · after year filter (≥{{ min_discovery_year }}): {{ filter_stats.after_year }}
+  {% endif %}
+  {% if hide_watched %}
+    · after hiding watched: {{ filter_stats.after_watched }}
+  {% endif %}
+  {% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}.
+  {% if has_more_older %}
+    Older Trakt pages are not loaded until you click <strong>Load older Trakt page</strong>.
+  {% endif %}
+</p>
 {{ pager('top') }}
 
+{% if match_only and not has_match_prefs %}
+  <div class="callout warn">
+    <p><strong>No genres or keywords yet</strong> — Matches only is empty until you set them.</p>
+    <p class="actions">
+      <a class="btn btn-primary btn-small" href="{{ url_for('user.preferences_setup') }}">Set up preferences</a>
+      <a class="btn btn-small" href="?{{ qs(page_n=1, mo_v=0) }}">Show all titles</a>
+    </p>
+  </div>
+{% endif %}
 
 {% if marker %}
   <p class="meta">Review marker: <strong>{{ marker.title }}</strong>
-    ({{ marker.trakt_listed_at }}) — items at/older than this are dimmed.</p>
+    ({{ marker.trakt_listed_at }}) — items at/older than this are dimmed.
+    <button class="btn btn-small" type="button" data-action="review-marker-clear" data-media-type="{{ media_type }}" data-trakt-id="0">Clear marker</button>
+  </p>
 {% else %}
   <p class="meta">No review marker yet. Use “Reviewed older than this” on a row when you catch up.</p>
 {% endif %}
@@ -141,7 +184,18 @@
       </div>
     </article>
   {% else %}
-    <p class="muted">No cached titles yet. Click “Refresh from Trakt” (requires valid API credentials).</p>
+    {% if match_only %}
+      <p class="muted">No preference matches in the loaded cache yet
+        ({{ filter_stats.cached_total }} cached titles scanned).
+        {% if has_more_older %}
+          <a href="?{{ qs(page_n=1) }}&load_older=1">Load older Trakt page</a>
+          or
+        {% endif %}
+        <a href="?{{ qs(page_n=1, mo_v=0) }}">show all titles</a>.
+      </p>
+    {% else %}
+      <p class="muted">No cached titles yet. Click “Refresh from Trakt” (requires valid API credentials).</p>
+    {% endif %}
   {% endfor %}
 </div>
 

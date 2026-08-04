@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date, datetime
 from typing import Iterable
 
 from models import CachedMedia, User, UserPreference, UserStreamingService
@@ -30,6 +31,72 @@ def get_user_genres_keywords(user: User) -> tuple[list[str], list[str]]:
     if not prefs:
         return [], []
     return _parse_json_list(prefs.genres_json), _parse_json_list(prefs.keywords_json)
+
+
+def user_has_match_prefs(user: User) -> bool:
+    """True when the user has at least one genre or keyword for purple matching."""
+    genres, keywords = get_user_genres_keywords(user)
+    return bool(genres or keywords)
+
+
+def user_needs_prefs_reminder(user: User) -> bool:
+    """
+    True when Latest match filtering will be empty/useless and we should nudge.
+
+    Skipped when the user permanently disabled reminders or is within a snooze window.
+    """
+    if user_has_match_prefs(user):
+        return False
+    prefs = user.preferences
+    if not prefs:
+        return True
+    if prefs.prefs_reminder_disabled:
+        return False
+    snooze = prefs.prefs_reminder_snooze_until
+    if snooze and snooze > datetime.utcnow():
+        return False
+    return True
+
+
+def discovery_year_cutoff(today: date | None = None) -> int:
+    """
+    Minimum production year kept by Latest's default “recent years” filter.
+
+    Trakt /updates cannot tell first inserts from metadata edits on old titles.
+    Year is the best cheap noise filter:
+    - Jan–Jun: include last year + this year (awards / late DB adds)
+    - Jul–Dec: this year only
+    """
+    today = today or date.today()
+    if today.month <= 6:
+        return today.year - 1
+    return today.year
+
+
+def media_year_for_discovery(media: CachedMedia) -> int | None:
+    """Best available year for discovery filtering (Trakt year, else release year)."""
+    if media.year:
+        try:
+            return int(media.year)
+        except (TypeError, ValueError):
+            pass
+    if media.released_at:
+        return int(media.released_at.year)
+    return None
+
+
+def media_passes_discovery_year(media: CachedMedia, min_year: int | None) -> bool:
+    """
+    True when media should appear under the recent-years filter.
+
+    Missing year is kept (unknown / not yet filled) so we do not hide stubs.
+    """
+    if min_year is None:
+        return True
+    year = media_year_for_discovery(media)
+    if year is None:
+        return True
+    return year >= int(min_year)
 
 
 def user_service_names(user: User) -> set[str]:

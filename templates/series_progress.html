@@ -3,7 +3,14 @@
 {% block content %}
 <p><a href="{{ url_for('user.my_shows') }}">← My shows</a></p>
 <h1>{{ title }}</h1>
-<p class="muted">Watched seasons/episodes are dimmed. The next episode is highlighted so you can mark it quickly. Updates write to TraktTV.</p>
+<p class="muted">
+  Watched marks come from your Trakt <strong>watch history</strong> (same source as the episode ✓ list),
+  not Trakt’s season “0 eps” progress bar — that bar is often wrong.
+  Updates write back to Trakt immediately.
+</p>
+{% if progress_aired is not none %}
+  <p class="meta">From history: <strong>{{ progress_completed or 0 }}</strong> / {{ progress_aired }} aired episodes watched.</p>
+{% endif %}
 
 {% if next_episode %}
   <div class="media-row" style="margin:1rem 0;">
@@ -14,7 +21,7 @@
               data-media-type="show"
               data-trakt-id="{{ trakt_id }}"
               data-ids='{{ next_episode.get("ids", {}) | tojson }}'>
-        I just watched it
+        Watch
       </button>
     </div>
   </div>
@@ -22,25 +29,33 @@
 
 {% for season in seasons %}
   <details class="season {% if season.all_watched %}dimmed{% endif %}" {% if not season.all_watched %}open{% endif %}>
-    <summary>Season {{ season.number }} {% if season.all_watched %}(watched){% endif %}</summary>
+    <summary>
+      Season {{ season.number }}
+      {% if season.aired is not none %} — {{ season.completed or 0 }}/{{ season.aired }} watched{% endif %}
+      {% if season.all_watched %} (complete){% endif %}
+    </summary>
     {% for ep in season.episodes %}
-      <div class="episode {% if ep.watched %}watched{% endif %} {% if next_episode and next_episode.get('season') == season.number and next_episode.get('number') == ep.number %}next{% endif %}">
-        <div>
-          <strong>E{{ ep.number }}</strong> {{ ep.title or '' }}
+      <div class="episode {% if ep.watched %}is-watched{% endif %} {% if not ep.aired %}is-future{% endif %} {% if next_episode and next_episode.get('season') == season.number and next_episode.get('number') == ep.number %}next{% endif %}">
+        <div class="episode-main">
+          <span class="episode-line">
+            <strong>E{{ ep.number }}</strong> {{ ep.title or '' }}
+            <span class="episode-air {% if ep.aired %}air-aired{% else %}air-future{% endif %}">· {{ ep.air_label }}</span>
+          </span>
         </div>
-        <div>
+        <div class="episode-actions">
           {% if ep.watched %}
-            <button class="btn btn-small"
+            <button class="btn btn-small btn-watched"
                     data-action="episode-unwatched"
                     data-media-type="show"
                     data-trakt-id="{{ trakt_id }}"
-                    data-ids='{{ ep.ids | tojson }}'>Unwatch</button>
+                    data-ids='{{ ep.ids | tojson }}'
+                    title="Click to unwatch">Watched</button>
           {% else %}
-            <button class="btn btn-small btn-primary"
+            <button class="btn btn-small btn-watch"
                     data-action="episode-watched"
                     data-media-type="show"
                     data-trakt-id="{{ trakt_id }}"
-                    data-ids='{{ ep.ids | tojson }}'>Watched</button>
+                    data-ids='{{ ep.ids | tojson }}'>Watch</button>
           {% endif %}
         </div>
       </div>

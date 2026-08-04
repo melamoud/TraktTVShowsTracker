@@ -192,20 +192,32 @@ def _updates_path(media_type: str, start_date: str) -> str:
     return f'/{media_type}s/updates/{start_date}'
 
 
-def probe_updates_pagination(media_type: str, start_date: str) -> dict:
+def probe_updates_pagination(
+    media_type: str,
+    start_date: str,
+    *,
+    extended: str | None = None,
+) -> dict:
     """
     Probe Trakt /updates pagination for a start_date window.
 
     Returns dict: page_count, item_count, limit. Page 1 is oldest; page_count is newest.
     start_date must be within ~29 days or Trakt returns [].
+
+    Keep ``extended`` off here — we only need headers. Fetching page 1 with
+    extended=full pulls 100 *oldest* full titles and was a major Refresh stall.
     """
     path = _updates_path(media_type, start_date)
     base = current_app.config['TRAKT_API_BASE'].rstrip('/')
     headers = _headers()
+    # Tiny page-1 request just to read X-Pagination-Page-Count.
+    params: dict = {'limit': 1, 'page': 1}
+    if extended:
+        params['extended'] = extended
     resp = requests.get(
         f'{base}{path}',
         headers=headers,
-        params={'limit': 100, 'page': 1},
+        params=params,
         timeout=45,
     )
     if resp.status_code >= 400:
@@ -218,7 +230,8 @@ def probe_updates_pagination(media_type: str, start_date: str) -> dict:
         'page_count': max(1, int(resp.headers.get('X-Pagination-Page-Count') or 1)),
         'item_count': int(resp.headers.get('X-Pagination-Item-Count') or 0),
         'limit': int(resp.headers.get('X-Pagination-Limit') or 100),
-        'page1': resp.json() if resp.content else [],
+        # Do not reuse as a full page cache — probe used limit=1.
+        'page1': None,
     }
 
 
@@ -229,11 +242,15 @@ def fetch_updates_pages(
     to_page: int,
     *,
     page1_cache: list | None = None,
+    extended: str | None = 'full',
 ) -> list:
     """
     Fetch inclusive Trakt /updates page range (1 = oldest … page_count = newest).
 
     Results are sorted newest-first by updated_at.
+    Default extended=full so genres/overview arrive without per-title summary calls
+    (needed for Matches-only filtering). Callers should request only the newest
+    page(s) for Refresh — never walk older pages here.
     """
     path = _updates_path(media_type, start_date)
     base = current_app.config['TRAKT_API_BASE'].rstrip('/')
@@ -245,10 +262,13 @@ def fetch_updates_pages(
         if page == 1 and page1_cache is not None:
             data = page1_cache
         else:
+            params: dict = {'limit': 100, 'page': page}
+            if extended:
+                params['extended'] = extended
             r = requests.get(
                 f'{base}{path}',
                 headers=headers,
-                params={'limit': 100, 'page': page},
+                params=params,
                 timeout=45,
             )
             if r.status_code >= 400:
@@ -272,7 +292,7 @@ def fetch_all_updates(media_type: str, start_date: str) -> list:
         start_date,
         1,
         meta['page_count'],
-        page1_cache=meta.get('page1'),
+        page1_cache=None,
     )
 
 
@@ -295,7 +315,7 @@ def fetch_recent_updates(media_type: str, start_date: str, pages: int | None = N
         start_date,
         start_page,
         page_count,
-        page1_cache=meta.get('page1') if start_page == 1 else None,
+        page1_cache=None,
     )
 
 def fetch_media_summary(media_type: str, trakt_id: int) -> dict:
@@ -326,15 +346,124 @@ def get_watchlist(user: User, media_type: str) -> list:
     ) or []
 
 
-def get_watched(user: User, media_type: str) -> list:
-    """Return the user's full watched list for movies or shows (all pages)."""
+def get_watched(user: User, media_type: str, *, extended: str | None = None) -> list:
+    """
+    Return the user's full watched list for movies or shows (all pages).
+
+    Do not pass extended=progress for bulk sync — it is heavy and paginated at
+    100/page. Series progress uses get_show_watched_entry() instead.
+    """
+    params: dict = {'limit': 100}
+    if extended:
+        params['extended'] = extended
     return api_request(
         'GET',
         f'/sync/watched/{media_type}s',
         user=user,
-        params={'limit': 100},
+        params=params,
         paginate_max_pages=50,
     ) or []
+
+
+def get_show_watched_entry(user: User, trakt_id: int) -> dict | None:
+    """
+    Find one show in /sync/watched/shows?extended=progress.
+
+    Pages until the show is found (or the list ends). This is the endpoint
+    Showly/Kodi use for per-episode watched plays. Returns None when the show
+    has no watched plays on Trakt.
+    """
+    tid = int(trakt_id)
+    base = current_app.config['TRAKT_API_BASE'].rstrip('/')
+    access = ensure_access_token(user)
+    headers = _headers(access)
+    page = 1
+    page_count = 1
+    while page <= page_count and page <= 50:
+        resp = requests.get(
+            f'{base}/sync/watched/shows',
+            headers=headers,
+            params={'extended': 'progress', 'limit': 100, 'page': page},
+            timeout=45,
+        )
+        if resp.status_code == 401:
+            refresh = decrypt_token(user.refresh_token_enc)
+            if not refresh:
+                raise TraktError('Unauthorized', 401, resp.text)
+            payload = refresh_tokens(refresh)
+            save_user_tokens(user, payload)
+            headers = _headers(payload['access_token'])
+            resp = requests.get(
+                f'{base}/sync/watched/shows',
+                headers=headers,
+                params={'extended': 'progress', 'limit': 100, 'page': page},
+                timeout=45,
+            )
+        if resp.status_code >= 400:
+            raise TraktError(
+                f'Trakt API error on /sync/watched/shows ({resp.status_code})',
+                resp.status_code,
+                resp.text,
+            )
+        data = resp.json() if resp.content else []
+        page_count = int(resp.headers.get('X-Pagination-Page-Count') or page)
+        for item in data or []:
+            ids = ((item.get('show') or {}).get('ids') or {})
+            if ids.get('trakt') == tid:
+                return item
+        if page >= page_count:
+            break
+        page += 1
+    return None
+
+
+def episode_watched_keys_from_trakt(
+    *,
+    history: list | None,
+    watched_entry: dict | None,
+    progress: dict | None,
+) -> set[tuple[int, int]]:
+    """
+    Build (season, episode) watched keys from Trakt sync sources.
+
+    Union of:
+    - /sync/history/shows/{id} (Showly fetchSyncShowHistory)
+    - /sync/watched/shows?extended=progress seasons[].episodes[].plays
+    - /shows/{id}/progress/watched completed / last_watched_at / play_count
+    """
+    keys: set[tuple[int, int]] = set()
+    for item in history or []:
+        ep = item.get('episode') or {}
+        s_no, e_no = ep.get('season'), ep.get('number')
+        if s_no is None or e_no is None:
+            continue
+        keys.add((int(s_no), int(e_no)))
+
+    for season in (watched_entry or {}).get('seasons') or []:
+        s_no = season.get('number')
+        if s_no is None:
+            continue
+        for ep in season.get('episodes') or []:
+            e_no = ep.get('number')
+            if e_no is None:
+                continue
+            plays = int(ep.get('plays') or 0)
+            if plays > 0 or ep.get('last_watched_at'):
+                keys.add((int(s_no), int(e_no)))
+
+    for season in (progress or {}).get('seasons') or []:
+        s_no = season.get('number')
+        if s_no is None:
+            continue
+        for ep in season.get('episodes') or []:
+            e_no = ep.get('number')
+            if e_no is None:
+                continue
+            stats = ep.get('stats') or {}
+            plays = int(stats.get('play_count') or 0)
+            if ep.get('completed') or ep.get('last_watched_at') or plays > 0:
+                keys.add((int(s_no), int(e_no)))
+    return keys
 
 
 def add_to_watchlist(user: User, media_type: str, trakt_id: int) -> dict:
@@ -362,22 +491,83 @@ def mark_unwatched(user: User, media_type: str, trakt_id: int) -> dict:
 
 
 def get_show_progress(user: User, trakt_id: int) -> dict:
-    """Return watched progress for a show."""
+    """Return watched progress for a show (aired window; completed flags can be stale)."""
     return api_request('GET', f'/shows/{trakt_id}/progress/watched', user=user) or {}
 
 
+def get_show_watch_history(user: User, trakt_id: int) -> list:
+    """
+    Episode watch history for one show (all pages).
+
+    Prefer this over progress.completed — Trakt's progress totals/flags are often
+    wrong while history + episode checkmarks stay correct.
+    """
+    return api_request(
+        'GET',
+        f'/sync/history/shows/{trakt_id}',
+        user=user,
+        params={'limit': 100},
+        paginate_max_pages=50,
+    ) or []
+
+
 def get_show_seasons(trakt_id: int) -> list:
-    """Return seasons/episodes metadata for a show."""
-    return api_request('GET', f'/shows/{trakt_id}/seasons', params={'extended': 'episodes'}) or []
+    """Return seasons/episodes metadata (includes first_aired when using episodes,full)."""
+    return api_request(
+        'GET',
+        f'/shows/{trakt_id}/seasons',
+        params={'extended': 'episodes,full'},
+    ) or []
+
+
+def sanitize_episode_ids(episode_ids: dict | None) -> dict:
+    """
+    Keep only scalar Trakt episode id fields.
+
+    Season metadata often includes nested objects (e.g. plex.guid). Sending those
+    in /sync/history can return HTTP 200 with added.episodes=0 (silent no-op).
+    """
+    if not episode_ids:
+        return {}
+    clean: dict = {}
+    for key in ('trakt', 'tvdb', 'tmdb', 'imdb'):
+        val = episode_ids.get(key)
+        if val is None or isinstance(val, (dict, list)):
+            continue
+        clean[key] = val
+    return clean
 
 
 def mark_episode_watched(user: User, episode_ids: dict) -> dict:
     """Mark one episode watched via Trakt history sync."""
-    body = {'episodes': [{'ids': episode_ids}]}
-    return api_request('POST', '/sync/history', user=user, json_body=body) or {}
+    ids = sanitize_episode_ids(episode_ids)
+    if not ids:
+        raise TraktError('Episode ids required', 400)
+    body = {'episodes': [{'ids': ids}]}
+    result = api_request('POST', '/sync/history', user=user, json_body=body) or {}
+    not_found = (result.get('not_found') or {}).get('episodes') or []
+    if not_found:
+        raise TraktError(
+            'Trakt could not find that episode to mark watched',
+            400,
+            result,
+        )
+    return result
 
 
 def mark_episode_unwatched(user: User, episode_ids: dict) -> dict:
     """Remove one episode from Trakt history."""
-    body = {'episodes': [{'ids': episode_ids}]}
-    return api_request('POST', '/sync/history/remove', user=user, json_body=body) or {}
+    ids = sanitize_episode_ids(episode_ids)
+    if not ids:
+        raise TraktError('Episode ids required', 400)
+    body = {'episodes': [{'ids': ids}]}
+    result = api_request('POST', '/sync/history/remove', user=user, json_body=body) or {}
+    not_found = (result.get('not_found') or {}).get('episodes') or []
+    deleted = int(((result.get('deleted') or {}).get('episodes')) or 0)
+    if not_found or deleted < 1:
+        raise TraktError(
+            'Trakt did not remove the watch (episode not found in history)',
+            400,
+            result,
+        )
+    return result

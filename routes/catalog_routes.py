@@ -21,7 +21,6 @@ from services.sync_jobs import (
     refresh_catalog_newest,
     sync_catalog,
     sync_providers_for_media,
-    sync_user_media_state,
 )
 
 catalog_bp = Blueprint('catalog', __name__)
@@ -213,23 +212,96 @@ def _latest_feed_query(media_type: str):
     )
 
 
-def _latest_visible_rows(media_type: str, hide_watched: bool) -> list[dict]:
-    """Decorate feed rows and apply hide-watched + review-marker dimming."""
-    items_all = _latest_feed_query(media_type).all()
-    rows_all = _decorate(media_type, items_all)
+def _latest_visible_rows(
+    media_type: str,
+    hide_watched: bool,
+    match_only: bool,
+    *,
+    min_year: int | None = None,
+) -> tuple[list[dict], dict]:
+    """
+    Decorate feed rows and apply filters. Returns (rows, stats).
+
+    Year is applied in SQL first so we do not decorate thousands of old stubs.
+    """
+    from sqlalchemy import or_
+
+    from services.streaming_matcher import media_passes_discovery_year
+
+    cached_total = feed_count(media_type)
+    query = _latest_feed_query(media_type)
+    if min_year is not None:
+        # Keep unknown year (NULL) for stubs; drop clearly-old years in SQL.
+        query = query.filter(or_(
+            CachedMedia.year.is_(None),
+            CachedMedia.year >= int(min_year),
+        ))
+    items = query.all()
+    # released_at-only years (year NULL) still need the Python check.
+    if min_year is not None:
+        items = [m for m in items if media_passes_discovery_year(m, min_year)]
+    after_year = len(items)
+
+    rows_all = _decorate(media_type, items)
     if hide_watched:
         rows_all = [r for r in rows_all if not r['watched']]
+    after_watched = len(rows_all)
+    if match_only:
+        rows_all = [r for r in rows_all if r.get('match') and r['match'].get('matched')]
     _apply_marker_to_visible_rows(rows_all, media_type)
-    return rows_all
+    stats = {
+        'cached_total': cached_total,
+        'after_year': after_year,
+        'after_watched': after_watched,
+        'visible': len(rows_all),
+    }
+    return rows_all, stats
 
 
 def _latest_page(media_type: str):
     """Shared latest-movies / latest-shows listing (Trakt DB updates feed)."""
+    from services.streaming_matcher import discovery_year_cutoff, user_has_match_prefs
+
     view = f'latest_{media_type}s'
     per_page = _per_page(view)
     page = max(int(request.args.get('page', 1) or 1), 1)
     # Default: hide titles already watched on Trakt (still “in DB”, just less noise).
     hide_watched = request.args.get('hide_watched', '1') != '0'
+    # Default: preference matches only (purple). Session remembers the toggle.
+    match_key = f'match_only_{media_type}'
+    if 'match_only' in request.args:
+        match_only = request.args.get('match_only') != '0'
+        session[match_key] = match_only
+    elif match_key in session:
+        match_only = bool(session[match_key])
+    else:
+        # No prefs yet → show all so the page isn't empty before onboarding.
+        match_only = user_has_match_prefs(current_user)
+
+    # Default: hide old production years (Trakt /updates is mostly metadata noise).
+    year_key = f'recent_years_{media_type}'
+    if 'recent_years' in request.args:
+        recent_years = request.args.get('recent_years') != '0'
+        session[year_key] = recent_years
+    elif year_key in session:
+        recent_years = bool(session[year_key])
+    else:
+        recent_years = True
+    min_year = discovery_year_cutoff() if recent_years else None
+
+    # Explicit older-page load only (never invent empty UI pages).
+    if request.args.get('load_older') == '1':
+        try:
+            ensure_catalog_for_offset(media_type)
+        except Exception as exc:
+            current_app.logger.warning('Manual older catalog fetch failed: %s', exc)
+            flash('Could not load an older Trakt page right now.', 'warning')
+        args = request.args.to_dict(flat=True)
+        args.pop('load_older', None)
+        return redirect(url_for(
+            'catalog.latest_movies' if media_type == 'movie' else 'catalog.latest_shows',
+            **args,
+        ))
 
     try:
         if feed_count(media_type) == 0:
@@ -246,53 +318,25 @@ def _latest_page(media_type: str):
     from services.sync_jobs import enrich_media_list_for_display
     from services.tmdb_client import is_configured as tmdb_is_configured
 
-    rows_all = _latest_visible_rows(media_type, hide_watched)
-    # Lazy-load older Trakt pages when the UI page needs more rows, or when the
-    # user is on/past the last filled page (so Next reveals older than "today").
-    needed = page * per_page
-    filled_pages = max((len(rows_all) + per_page - 1) // per_page, 1) if rows_all else 1
-    lazy_rounds = 0
-    while catalog_has_more_older(media_type) and lazy_rounds < 5:
-        need_more_rows = len(rows_all) < needed
-        on_tail = page >= filled_pages
-        if not need_more_rows and not on_tail:
-            break
-        # Prefetch only a couple older API pages when merely sitting on the tail.
-        if not need_more_rows and on_tail and lazy_rounds >= 2:
-            break
-        try:
-            if not ensure_catalog_for_offset(media_type):
-                break
-        except Exception as exc:
-            current_app.logger.warning('Lazy older catalog fetch failed: %s', exc)
-            break
-        rows_all = _latest_visible_rows(media_type, hide_watched)
-        filled_pages = max((len(rows_all) + per_page - 1) // per_page, 1) if rows_all else 1
-        lazy_rounds += 1
+    rows_all, filter_stats = _latest_visible_rows(
+        media_type, hide_watched, match_only, min_year=min_year,
+    )
+    # Do NOT auto-fetch older Trakt pages when the filtered list is short — that
+    # made every Matches-only load walk the cache slowly. Use "Load older" instead.
 
     total = len(rows_all)
-    filled_pages = max((total + per_page - 1) // per_page, 1) if total else 1
-    pages = filled_pages
-    # If more older Trakt pages exist, expose one extra page so Next can lazy-load.
-    if catalog_has_more_older(media_type):
-        pages = max(filled_pages + 1, page)
-    else:
-        page = min(page, pages)
+    # Only real pages from filtered rows — never a phantom empty "next" page.
+    pages = max((total + per_page - 1) // per_page, 1) if total else 1
+    page = min(page, pages)
     rows = rows_all[(page - 1) * per_page: page * per_page]
-    # Trakt /updates stubs have no plot/art — fetch for the visible page only.
-    # Keep marker flags from the full-list pass above (do not re-apply on the slice).
+    has_more_older = catalog_has_more_older(media_type)
+
+    # Posters only when missing; skip TMDB streaming lookups on the list (detail page).
     try:
         import json
-        enrich_media_list_for_display([r['media'] for r in rows])
-        # Streaming availability comes from TMDB (same JustWatch source Trakt uses).
-        provider_fetches = 0
+        enrich_media_list_for_display([r['media'] for r in rows], max_fetches=8)
         for r in rows:
             media = r['media']
-            has_providers = bool(media.providers)
-            if tmdb_is_configured() and media.tmdb_id and not has_providers and provider_fetches < 20:
-                sync_providers_for_media(media)
-                provider_fetches += 1
-                db.session.refresh(media)
             try:
                 genres = json.loads(media.genres_json or '[]')
             except json.JSONDecodeError:
@@ -302,9 +346,21 @@ def _latest_page(media_type: str):
                 p.provider_name for p in (media.providers or [])
                 if p.offer_type in ('flatrate', 'ads', 'free')
             ]
+            r['match'] = match_preferences(media, current_user)
     except Exception as exc:
         current_app.logger.warning('Visible-page enrich failed: %s', exc)
     marker = _marker(media_type)
+    has_match_prefs = user_has_match_prefs(current_user)
+    current_app.logger.info(
+        'Latest %s filters: cached=%s after_year=%s after_watched=%s visible=%s page=%s/%s',
+        media_type,
+        filter_stats['cached_total'],
+        filter_stats['after_year'],
+        filter_stats['after_watched'],
+        filter_stats['visible'],
+        page,
+        pages,
+    )
 
     return render_template(
         'latest_media.html',
@@ -315,9 +371,14 @@ def _latest_page(media_type: str):
         page_links=_pagination_pages(page, pages),
         per_page=per_page,
         total=total,
+        filter_stats=filter_stats,
         marker=marker,
         hide_watched=hide_watched,
-        has_more_older=catalog_has_more_older(media_type),
+        match_only=match_only,
+        recent_years=recent_years,
+        min_discovery_year=min_year,
+        has_match_prefs=has_match_prefs,
+        has_more_older=has_more_older,
         tmdb_configured=tmdb_is_configured(),
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='Latest Movies' if media_type == 'movie' else 'Latest Shows',
@@ -326,7 +387,8 @@ def _latest_page(media_type: str):
             '(official /updates API). Trakt does not publish a separate “first inserted” '
             'timestamp, so first inserts and later metadata edits both appear here. '
             'This is NOT the public release calendar. '
-            'Newest pages load first; older activity loads as you page. '
+            'By default we hide older production years (metadata-edit noise). '
+            'Older Trakt update pages load only when you click Load older. '
             '“Streaming” uses TMDB/JustWatch availability (Trakt does not expose that in its API).'
         ),
     )
@@ -352,7 +414,7 @@ def media_detail(media_type, trakt_id):
             flash('Title not found.', 'warning')
             return redirect(url_for('catalog.home'))
 
-    media = enrich_media_details_for_display(media)
+    enrich_media_details_for_display(media)
     sync_providers_for_media(media)
     db.session.refresh(media)
     rows = _decorate(media_type, [media])
@@ -445,6 +507,61 @@ def api_review_marker(media_type, trakt_id):
     return jsonify({'success': True, 'title': media.title, 'listed_at': media.trakt_listed_at.isoformat()})
 
 
+@catalog_bp.route('/api/review-marker/<media_type>/clear', methods=['POST'])
+@login_required
+def api_review_marker_clear(media_type):
+    """Remove the review marker for movies or shows (or both when media_type=all)."""
+    types = ('movie', 'show') if media_type == 'all' else (media_type,)
+    if media_type != 'all' and media_type not in ('movie', 'show'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    deleted = 0
+    for mt in types:
+        rows = ReviewMarker.query.filter_by(user_id=current_user.id, media_type=mt).all()
+        for row in rows:
+            db.session.delete(row)
+            deleted += 1
+    db.session.commit()
+    return jsonify({'success': True, 'deleted': deleted})
+
+
+@catalog_bp.route('/api/review-marker/<media_type>/caught-up', methods=['POST'])
+@login_required
+def api_review_marker_caught_up(media_type):
+    """
+    Set the marker on the newest feed title (= “caught up as of now”).
+
+    Everything currently in the feed becomes dimmed; only newer Trakt updates
+    stay undimmed. Useful after changing genres/keywords.
+    """
+    types = ('movie', 'show') if media_type == 'all' else (media_type,)
+    if media_type != 'all' and media_type not in ('movie', 'show'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    results = {}
+    for mt in types:
+        newest = _latest_feed_query(mt).first()
+        if not newest or not newest.trakt_listed_at:
+            results[mt] = None
+            continue
+        marker = ReviewMarker.query.filter_by(user_id=current_user.id, media_type=mt).first()
+        if not marker:
+            marker = ReviewMarker(
+                user_id=current_user.id,
+                media_type=mt,
+                trakt_id=newest.trakt_id,
+                trakt_listed_at=newest.trakt_listed_at,
+                title=newest.title,
+            )
+            db.session.add(marker)
+        else:
+            marker.trakt_id = newest.trakt_id
+            marker.trakt_listed_at = newest.trakt_listed_at
+            marker.title = newest.title
+            marker.created_at = datetime.utcnow()
+        results[mt] = {'title': newest.title, 'trakt_id': newest.trakt_id}
+    db.session.commit()
+    return jsonify({'success': True, 'markers': results})
+
+
 @catalog_bp.route('/api/found-on/<media_type>/<int:trakt_id>', methods=['POST'])
 @login_required
 def api_found_on(media_type, trakt_id):
@@ -509,7 +626,7 @@ def api_release_watch(media_type, trakt_id):
 @catalog_bp.route('/api/sync-catalog/<media_type>', methods=['POST'])
 @login_required
 def api_sync_catalog(media_type):
-    """Manually refresh newest Latest activity from Trakt (keeps older cache)."""
+    """Manually refresh newest Latest page from Trakt (keeps older cache; no bulk enrich)."""
     if media_type not in ('movie', 'show'):
         return jsonify({'success': False, 'message': 'bad type'}), 400
     try:
@@ -517,8 +634,8 @@ def api_sync_catalog(media_type):
             from services.sync_jobs import bootstrap_catalog_initial
             count = bootstrap_catalog_initial(media_type)
         else:
-            count = refresh_catalog_newest(media_type, pages=2)
-        sync_user_media_state(current_user)
+            count = refresh_catalog_newest(media_type, pages=1)
+        # Skip watchlist/watched sync — full library pagination often dominates Refresh time.
         return jsonify({'success': True, 'count': count})
     except Exception as exc:
         return jsonify({'success': False, 'message': str(exc)}), 400

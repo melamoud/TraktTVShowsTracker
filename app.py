@@ -77,8 +77,10 @@ def create_app(config_object=Config):
         unread = 0
         user_service_names = []
         found_on_service_choices = []
+        show_prefs_reminder = False
         if getattr(current_user, 'is_authenticated', False):
             from models import Notification, StreamingService, UserStreamingService
+            from services.streaming_matcher import user_needs_prefs_reminder
             unread = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
             owned = (
                 UserStreamingService.query
@@ -95,11 +97,15 @@ def create_app(config_object=Config):
                 if svc.name and svc.name.lower() not in seen:
                     found_on_service_choices.append(svc.name)
                     seen.add(svc.name.lower())
+            # Skip reminder on the setup wizard itself.
+            if request.endpoint != 'user.preferences_setup':
+                show_prefs_reminder = user_needs_prefs_reminder(current_user)
         return {
             'app_name': 'TraktTV Shows Tracker',
             'unread_notifications': unread,
             'user_streaming_service_names': user_service_names,
             'found_on_service_choices': found_on_service_choices,
+            'show_prefs_reminder': show_prefs_reminder,
         }
 
     from routes import register_routes
@@ -122,15 +128,36 @@ def _ensure_schema(app):
 
     try:
         insp = inspect(db.engine)
-        if 'cached_media' not in insp.get_table_names():
-            return
-        cols = {c['name'] for c in insp.get_columns('cached_media')}
-        if 'feed_source' not in cols:
-            with db.engine.begin() as conn:
-                conn.execute(text(
-                    'ALTER TABLE cached_media ADD COLUMN feed_source VARCHAR(32)'
-                ))
-            app.logger.info('Added cached_media.feed_source column')
+        tables = set(insp.get_table_names())
+        if 'cached_media' in tables:
+            cols = {c['name'] for c in insp.get_columns('cached_media')}
+            if 'feed_source' not in cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(
+                        'ALTER TABLE cached_media ADD COLUMN feed_source VARCHAR(32)'
+                    ))
+                app.logger.info('Added cached_media.feed_source column')
+        if 'user_preferences' in tables:
+            cols = {c['name'] for c in insp.get_columns('user_preferences')}
+            alters = []
+            if 'onboarding_completed_at' not in cols:
+                alters.append(
+                    'ALTER TABLE user_preferences ADD COLUMN onboarding_completed_at DATETIME'
+                )
+            if 'prefs_reminder_disabled' not in cols:
+                alters.append(
+                    'ALTER TABLE user_preferences ADD COLUMN prefs_reminder_disabled '
+                    'BOOLEAN DEFAULT 0 NOT NULL'
+                )
+            if 'prefs_reminder_snooze_until' not in cols:
+                alters.append(
+                    'ALTER TABLE user_preferences ADD COLUMN prefs_reminder_snooze_until DATETIME'
+                )
+            if alters:
+                with db.engine.begin() as conn:
+                    for stmt in alters:
+                        conn.execute(text(stmt))
+                app.logger.info('Added user_preferences onboarding/reminder columns')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
 

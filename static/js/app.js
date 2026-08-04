@@ -147,6 +147,71 @@ document.addEventListener('click', async function (ev) {
   const ctx = rowContext(btn);
   const mediaType = ctx.mediaType;
   const traktId = ctx.traktId;
+
+  if (action === 'marker-prompt-keep') {
+    const el = document.getElementById('marker-prompt');
+    if (el) el.hidden = true;
+    return;
+  }
+
+  if (action === 'prefs-reminder') {
+    const reminderAction = btn.getAttribute('data-reminder-action') || 'snooze';
+    if (reminderAction === 'disable') {
+      if (!window.confirm(
+        'Turn off prefs reminders?\n\nWithout genres/keywords, Latest cannot filter to purple matches and will stay noisy. You can re-enable reminders under Preferences.'
+      )) {
+        return;
+      }
+    }
+    btn.disabled = true;
+    try {
+      await apiPost('/api/prefs-reminder', { action: reminderAction });
+      const banner = document.getElementById('prefs-reminder');
+      if (banner) banner.hidden = true;
+      if (reminderAction === 'enable') location.reload();
+    } catch (err) {
+      alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+
+  if (action === 'review-marker-clear') {
+    const mt = mediaType || 'all';
+    if (!window.confirm('Clear review marker for ' + mt + '?')) return;
+    btn.disabled = true;
+    try {
+      await apiPost('/api/review-marker/' + mt + '/clear', {});
+      location.reload();
+    } catch (err) {
+      alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+
+  if (action === 'review-marker-caught-up') {
+    const mt = mediaType || 'all';
+    if (!window.confirm(
+      'Mark ' + mt + ' feed(s) as caught up as of now?\n\nThe newest title becomes the marker — everything currently listed will be dimmed.'
+    )) return;
+    btn.disabled = true;
+    try {
+      await apiPost('/api/review-marker/' + mt + '/caught-up', {});
+      const el = document.getElementById('marker-prompt');
+      if (el) el.hidden = true;
+      alert('Markers updated to newest feed titles.');
+      location.reload();
+    } catch (err) {
+      alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+
   if (!mediaType || traktId === null || traktId === '') return;
 
   btn.disabled = true;

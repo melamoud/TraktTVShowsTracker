@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=4">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=5">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -39,6 +39,19 @@
         </div>
       {% endif %}
     {% endwith %}
+    {% if current_user.is_authenticated and show_prefs_reminder %}
+      <div class="callout warn prefs-reminder" id="prefs-reminder">
+        <p>
+          <strong>Set genres or keywords</strong> so Latest can default to purple preference matches
+          instead of every noisy Trakt update. Without them, matching stays off and “Matches only” is empty.
+        </p>
+        <div class="actions">
+          <a class="btn btn-primary btn-small" href="{{ url_for('user.preferences_setup') }}">Set up now</a>
+          <button class="btn btn-small" type="button" data-action="prefs-reminder" data-reminder-action="snooze" data-media-type="prefs" data-trakt-id="0">Remind me tomorrow</button>
+          <button class="btn btn-small" type="button" data-action="prefs-reminder" data-reminder-action="disable" data-media-type="prefs" data-trakt-id="0">Don’t remind me</button>
+        </div>
+      </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 
@@ -73,7 +86,7 @@
     </div>
   </div>
   {% endif %}
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=4"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=5"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

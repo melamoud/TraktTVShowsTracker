@@ -2,22 +2,66 @@
 User routes: preferences, my movies/shows, series progress, notifications, help.
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import (
     Blueprint, current_app, flash, jsonify, redirect, render_template,
-    request, url_for,
+    request, session, url_for,
 )
 from flask_login import current_user, login_required
 
+
+def _parse_air_datetime(value: str | None) -> datetime | None:
+    """Parse Trakt first_aired / released timestamps to naive UTC datetime."""
+    if not value:
+        return None
+    try:
+        text = str(value).strip().replace('Z', '+00:00')
+        if len(text) == 10 and text[4] == '-' and text[7] == '-':
+            return datetime.fromisoformat(text)
+        return datetime.fromisoformat(text).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def _episode_air_info(ep: dict, *, progress_says_aired: bool | None) -> dict:
+    """
+    Build air-date display fields for an episode.
+
+    Returns aired (bool), air_date (datetime|None), air_label (str).
+    """
+    air_dt = _parse_air_datetime(ep.get('first_aired')) or _parse_air_datetime(ep.get('released'))
+    now = datetime.utcnow()
+    if air_dt is not None:
+        is_aired = air_dt <= now
+        label = air_dt.strftime('%Y-%m-%d')
+        if is_aired:
+            air_label = f'Aired {label}'
+        else:
+            air_label = f'Airs {label} · Not aired yet'
+    elif progress_says_aired is not None:
+        is_aired = bool(progress_says_aired)
+        air_label = 'Aired' if is_aired else 'Not aired yet'
+        air_dt = None
+    else:
+        is_aired = True
+        air_label = 'Air date unknown'
+        air_dt = None
+    return {'aired': is_aired, 'air_date': air_dt, 'air_label': air_label}
+
 from help_utils import get_help_toc, render_help_markdown
 from models import (
-    CachedMedia, MediaFoundOn, Notification, StreamingService, StreamingServiceSuggestion,
-    UserMediaState, UserPreference, UserStreamingService, db,
+    CachedMedia, MediaFoundOn, Notification, ReviewMarker, StreamingService,
+    StreamingServiceSuggestion, UserMediaState, UserPreference, UserStreamingService, db,
 )
 from services import trakt_client
 from services.seed import COMMON_GENRES
-from services.streaming_matcher import serialize_prefs, split_csv_terms
+from services.streaming_matcher import (
+    get_user_genres_keywords,
+    serialize_prefs,
+    split_csv_terms,
+    user_has_match_prefs,
+)
 from services.sync_jobs import (
     ensure_media_cached,
     enrich_media_list_for_display,
@@ -27,17 +71,96 @@ from services.sync_jobs import (
 user_bp = Blueprint('user', __name__)
 
 
-@user_bp.route('/preferences', methods=['GET', 'POST'])
-@login_required
-def preferences():
-    """Configure streaming services, genres, and keywords."""
+def _ensure_prefs() -> UserPreference:
+    """Return the current user's preference row, creating it if needed."""
     prefs = current_user.preferences
     if not prefs:
         prefs = UserPreference(user_id=current_user.id)
         db.session.add(prefs)
         db.session.commit()
+    return prefs
+
+
+@user_bp.route('/preferences/setup', methods=['GET', 'POST'])
+@login_required
+def preferences_setup():
+    """First-login wizard: pick genres and keywords for purple Latest filtering."""
+    prefs = _ensure_prefs()
+    if request.method == 'POST':
+        action = (request.form.get('action') or 'save').strip()
+        if action == 'skip':
+            prefs.onboarding_completed_at = datetime.utcnow()
+            prefs.prefs_reminder_snooze_until = datetime.utcnow() + timedelta(days=1)
+            db.session.commit()
+            flash(
+                'Skipped for now. Latest will show everything until you add genres/keywords. '
+                'We’ll remind you tomorrow — without filters, preference matching stays off.',
+                'warning',
+            )
+            return redirect(url_for('catalog.home'))
+
+        genres = split_csv_terms(request.form.get('genres', ''))
+        genres.extend(request.form.getlist('genre_checks'))
+        keywords = split_csv_terms(request.form.get('keywords', ''))
+        g_json, k_json = serialize_prefs(genres, keywords)
+        import json
+        if not (json.loads(g_json or '[]') or json.loads(k_json or '[]')):
+            flash('Pick at least one genre or keyword so Latest can filter to matches.', 'danger')
+            return redirect(url_for('user.preferences_setup'))
+        prefs.genres_json = g_json
+        prefs.keywords_json = k_json
+        prefs.updated_at = datetime.utcnow()
+        prefs.onboarding_completed_at = datetime.utcnow()
+        prefs.prefs_reminder_disabled = False
+        prefs.prefs_reminder_snooze_until = None
+        db.session.commit()
+        flash('Preferences saved. Latest defaults to purple matches only — use Show all anytime.', 'success')
+        return redirect(url_for('catalog.latest_movies'))
+
+    import json
+    user_genres = json.loads(prefs.genres_json or '[]')
+    user_keywords = json.loads(prefs.keywords_json or '[]')
+    return render_template(
+        'preferences_setup.html',
+        common_genres=COMMON_GENRES,
+        user_genres=user_genres,
+        user_keywords=user_keywords,
+        keywords_text=', '.join(user_keywords),
+    )
+
+
+@user_bp.route('/api/prefs-reminder', methods=['POST'])
+@login_required
+def api_prefs_reminder():
+    """Snooze or permanently disable the empty-prefs reminder banner."""
+    prefs = _ensure_prefs()
+    payload = request.json or {}
+    action = (payload.get('action') or '').strip()
+    if action == 'snooze':
+        prefs.prefs_reminder_snooze_until = datetime.utcnow() + timedelta(days=1)
+        db.session.commit()
+        return jsonify({'success': True, 'action': 'snooze'})
+    if action == 'disable':
+        prefs.prefs_reminder_disabled = True
+        prefs.onboarding_completed_at = prefs.onboarding_completed_at or datetime.utcnow()
+        db.session.commit()
+        return jsonify({'success': True, 'action': 'disable'})
+    if action == 'enable':
+        prefs.prefs_reminder_disabled = False
+        prefs.prefs_reminder_snooze_until = None
+        db.session.commit()
+        return jsonify({'success': True, 'action': 'enable'})
+    return jsonify({'success': False, 'message': 'action must be snooze, disable, or enable'}), 400
+
+
+@user_bp.route('/preferences', methods=['GET', 'POST'])
+@login_required
+def preferences():
+    """Configure streaming services, genres, and keywords."""
+    prefs = _ensure_prefs()
 
     defaults = StreamingService.query.filter_by(is_default=True).order_by(StreamingService.name).all()
+    marker_prompt = False
 
     if request.method == 'POST':
         selected_ids = set(int(x) for x in request.form.getlist('service_ids') if x.isdigit())
@@ -103,6 +226,7 @@ def preferences():
                         ))
             flash(f'Custom service "{custom_name}" saved.', 'success')
 
+        old_genres, old_keywords = get_user_genres_keywords(current_user)
         genres = split_csv_terms(request.form.get('genres', ''))
         genres.extend(request.form.getlist('genre_checks'))
         keywords = split_csv_terms(request.form.get('keywords', ''))
@@ -110,9 +234,23 @@ def preferences():
         prefs.genres_json = g_json
         prefs.keywords_json = k_json
         prefs.updated_at = datetime.utcnow()
+        import json
+        new_genres = json.loads(g_json or '[]')
+        new_keywords = json.loads(k_json or '[]')
+        match_filters_changed = (
+            sorted(x.lower() for x in old_genres) != sorted(x.lower() for x in new_genres)
+            or sorted(x.lower() for x in old_keywords) != sorted(x.lower() for x in new_keywords)
+        )
+        if new_genres or new_keywords:
+            prefs.onboarding_completed_at = prefs.onboarding_completed_at or datetime.utcnow()
+            prefs.prefs_reminder_disabled = False
+            prefs.prefs_reminder_snooze_until = None
         db.session.commit()
         db.session.expire(current_user)
         flash('Preferences saved.', 'success')
+        if match_filters_changed:
+            session['marker_prompt_after_prefs'] = True
+            return redirect(url_for('user.preferences', marker_prompt=1))
         return redirect(url_for('user.preferences'))
 
     owned = UserStreamingService.query.filter_by(user_id=current_user.id).all()
@@ -125,6 +263,12 @@ def preferences():
     import json
     user_genres = json.loads(prefs.genres_json or '[]')
     user_keywords = json.loads(prefs.keywords_json or '[]')
+    if request.args.get('marker_prompt') == '1' or session.pop('marker_prompt_after_prefs', None):
+        marker_prompt = True
+    markers = {
+        'movie': ReviewMarker.query.filter_by(user_id=current_user.id, media_type='movie').first(),
+        'show': ReviewMarker.query.filter_by(user_id=current_user.id, media_type='show').first(),
+    }
     return render_template(
         'preferences.html',
         defaults=defaults,
@@ -134,6 +278,9 @@ def preferences():
         user_genres=user_genres,
         user_keywords=user_keywords,
         keywords_text=', '.join(user_keywords),
+        marker_prompt=marker_prompt,
+        markers=markers,
+        prefs_reminder_disabled=bool(prefs.prefs_reminder_disabled),
     )
 
 
@@ -271,43 +418,87 @@ def series_progress(trakt_id):
     media = CachedMedia.query.filter_by(media_type='show', trakt_id=trakt_id).first()
     try:
         progress = trakt_client.get_show_progress(current_user, trakt_id)
-        seasons = trakt_client.get_show_seasons(trakt_id)
+        seasons_meta = trakt_client.get_show_seasons(trakt_id)
+        history = trakt_client.get_show_watch_history(current_user, trakt_id)
+        # Same source Showly/Kodi use for per-episode plays (extended=progress).
+        watched_entry = trakt_client.get_show_watched_entry(current_user, trakt_id)
     except Exception as exc:
         current_app.logger.exception('Progress load failed: %s', exc)
         flash('Could not load show progress from Trakt.', 'danger')
         return redirect(url_for('user.my_shows'))
 
-    watched_episode_ids = set()
-    next_episode = progress.get('next_episode')
-    for season in progress.get('seasons') or []:
-        for ep in season.get('episodes') or []:
-            if ep.get('completed'):
-                watched_episode_ids.add((season.get('number'), ep.get('number')))
+    watched_keys = trakt_client.episode_watched_keys_from_trakt(
+        history=history,
+        watched_entry=watched_entry,
+        progress=progress,
+    )
 
-    # Build season/episode view model
-    season_views = []
-    for season in seasons:
-        number = season.get('number')
-        if number is None or number == 0:
-            # Skip specials by default unless they have unwatched content
-            pass
-        episodes = []
-        all_watched = True
+    # Which episodes Trakt considers aired (for counts / next-up only).
+    aired_keys: set[tuple[int, int]] = set()
+    for season in progress.get('seasons') or []:
+        s_no = season.get('number')
+        if s_no is None:
+            continue
         for ep in season.get('episodes') or []:
+            e_no = ep.get('number')
+            if e_no is not None:
+                aired_keys.add((int(s_no), int(e_no)))
+
+    # Full season lists from metadata so unaired/future eps still appear.
+    season_views = []
+    next_episode = None
+    total_aired = 0
+    total_completed = 0
+    for season in seasons_meta or []:
+        number = season.get('number')
+        if number is None:
+            continue
+        number = int(number)
+        raw_eps = season.get('episodes') or []
+        if number == 0 and not raw_eps:
+            continue
+        episodes = []
+        completed = 0
+        aired_count = 0
+        for ep in raw_eps:
             ep_no = ep.get('number')
-            watched = (number, ep_no) in watched_episode_ids
-            if not watched:
-                all_watched = False
+            if ep_no is None:
+                continue
+            ep_no = int(ep_no)
+            key = (number, ep_no)
+            watched = key in watched_keys
+            progress_flag = (key in aired_keys) if aired_keys else None
+            air = _episode_air_info(ep, progress_says_aired=progress_flag)
+            is_aired = air['aired']
+            if is_aired:
+                aired_count += 1
+                if watched:
+                    completed += 1
+                elif next_episode is None:
+                    next_episode = {
+                        'season': number,
+                        'number': ep_no,
+                        'title': ep.get('title'),
+                        'ids': trakt_client.sanitize_episode_ids(ep.get('ids') or {}),
+                    }
             episodes.append({
                 'number': ep_no,
                 'title': ep.get('title'),
-                'ids': ep.get('ids') or {},
+                'ids': trakt_client.sanitize_episode_ids(ep.get('ids') or {}),
                 'watched': watched,
+                'aired': is_aired,
+                'air_label': air['air_label'],
             })
+        if not episodes:
+            continue
+        total_aired += aired_count
+        total_completed += completed
         season_views.append({
             'number': number,
             'episodes': episodes,
-            'all_watched': all_watched and bool(episodes),
+            'all_watched': aired_count > 0 and completed == aired_count,
+            'aired': aired_count,
+            'completed': completed,
         })
 
     return render_template(
@@ -316,6 +507,8 @@ def series_progress(trakt_id):
         trakt_id=trakt_id,
         seasons=season_views,
         next_episode=next_episode,
+        progress_aired=total_aired,
+        progress_completed=total_completed,
         title=media.title if media else f'Show {trakt_id}',
     )
 
@@ -325,7 +518,7 @@ def series_progress(trakt_id):
 def api_episode_watched():
     """Mark an episode watched or unwatched on Trakt."""
     payload = request.json or {}
-    ids = payload.get('ids') or {}
+    ids = trakt_client.sanitize_episode_ids(payload.get('ids') or {})
     action = payload.get('action') or 'add'
     if not ids:
         return jsonify({'success': False, 'message': 'ids required'}), 400

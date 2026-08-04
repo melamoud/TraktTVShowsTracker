@@ -131,6 +131,13 @@ def auth_callback():
         current_app.logger.warning('Initial media sync failed: %s', exc)
 
     flash(f'Welcome, {user.username}!', 'success')
+    # First-run: send users without genres/keywords through the match-filter wizard.
+    prefs = user.preferences
+    if prefs is None:
+        return redirect(url_for('user.preferences_setup'))
+    from services.streaming_matcher import user_has_match_prefs
+    if not user_has_match_prefs(user) and not prefs.onboarding_completed_at:
+        return redirect(url_for('user.preferences_setup'))
     return redirect(url_for('catalog.home'))
 
 

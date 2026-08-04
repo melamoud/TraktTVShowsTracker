@@ -62,6 +62,21 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 650; letter-spacing:
 .flash.warning { border-color: #7a5b20; }
 .flash.info { border-color: #35507a; }
 
+.callout {
+  margin: 0 0 1.1rem;
+  padding: .9rem 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: var(--bg1);
+}
+.callout.warn {
+  border-color: #7a5b20;
+  background: rgba(240, 180, 41, 0.08);
+}
+.callout h2 { margin: 0 0 .5rem; font-size: 1.1rem; }
+.callout .actions { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .65rem; }
+.prefs-reminder { margin-top: .25rem; }
+
 .btn {
   display: inline-flex; align-items: center; gap: .4rem;
   border: 1px solid var(--line); background: var(--bg2); color: var(--text);
@@ -72,6 +87,21 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 650; letter-spacing:
 .btn-warn { border-color: #8a6a20; color: var(--accent-2); }
 .btn-danger { border-color: #8a3040; color: var(--danger); }
 .btn-small { padding: .25rem .55rem; font-size: .85rem; }
+.btn-watch {
+  background: linear-gradient(180deg, #2bb9ab, #1f8f84);
+  border-color: #1f8f84;
+  color: #041210;
+  min-width: 5.5rem;
+  justify-content: center;
+}
+.btn-watched {
+  background: rgba(34, 197, 94, 0.18);
+  border-color: #22c55e;
+  color: #bbf7d0;
+  min-width: 5.5rem;
+  justify-content: center;
+}
+.btn-watched:hover { border-color: #4ade80; color: #dcfce7; }
 
 .toolbar {
   display: flex; flex-wrap: wrap; gap: .75rem; align-items: center;
@@ -167,10 +197,26 @@ input[type=text], input[type=url], textarea, select {
 .season.dimmed summary { opacity: .55; }
 .episode {
   display: flex; justify-content: space-between; gap: 1rem; align-items: center;
-  padding: .55rem 1rem; border-top: 1px solid var(--line);
+  padding: .45rem 1rem; border-top: 1px solid var(--line);
 }
-.episode.watched { opacity: .45; }
+.episode-main { min-width: 0; flex: 1; }
+.episode-line {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.35;
+}
+.episode-air { color: var(--muted); font-weight: 500; font-size: .92em; }
+.episode-air.air-aired { color: #86efac; }
+.episode-air.air-future { color: #93c5fd; }
+.episode.is-watched { opacity: .75; background: rgba(34, 197, 94, 0.06); }
+.episode.is-future {
+  background: rgba(96, 165, 250, 0.07);
+  box-shadow: inset 3px 0 0 #60a5fa;
+}
 .episode.next { box-shadow: inset 3px 0 0 var(--accent); background: rgba(61,214,198,.06); }
+.episode-actions { flex-shrink: 0; }
 
 .help-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.25rem; }
 .help-toc { border: 1px solid var(--line); border-radius: 12px; padding: .75rem; background: var(--bg1); }

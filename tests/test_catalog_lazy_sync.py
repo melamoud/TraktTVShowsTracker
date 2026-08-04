@@ -30,11 +30,11 @@ def test_bootstrap_initial_fetches_newest_pages_only(app):
             return {
                 'page_count': 10,
                 'item_count': 10,
-                'limit': 100,
-                'page1': pages[1],
+                'limit': 1,
+                'page1': None,
             }
 
-        def fake_pages(media_type, start_date, from_page, to_page, page1_cache=None):
+        def fake_pages(media_type, start_date, from_page, to_page, page1_cache=None, extended='full'):
             out = []
             for p in range(from_page, to_page + 1):
                 out.extend(pages[p])
@@ -47,11 +47,11 @@ def test_bootstrap_initial_fetches_newest_pages_only(app):
 
         assert count == sync_jobs.INITIAL_BOOTSTRAP_PAGES
         mocked_pages.assert_called()
-        # Newest 3 of 10 => pages 8-10
-        assert mocked_pages.call_args.args[2:4] == (8, 10)
+        # Newest 1 of 10 => page 10 only
+        assert mocked_pages.call_args.args[2:4] == (10, 10)
         cursor = db.session.get(CatalogFeedSync, 'movie')
         assert cursor is not None
-        assert cursor.oldest_fetched_page == 8
+        assert cursor.oldest_fetched_page == 10
         assert cursor.newest_fetched_page == 10
         assert cursor.bootstrapped_at is not None
         assert sync_jobs.catalog_has_more_older('movie') is True
@@ -89,8 +89,8 @@ def test_reconcile_feed_cursor_reopens_lazy_older_path(app):
         assert sync_jobs.catalog_has_more_older('movie') is True
 
 
-def test_ensure_through_marker_walks_older_pages(app, user):
-    """With a marker not yet cached, sync walks from newest toward older pages."""
+def test_ensure_through_marker_does_not_walk_older_pages(app, user):
+    """Page load must not eagerly walk Trakt pages down to the review marker."""
     with app.app_context():
         u = db.session.get(User, user)
         db.session.add(ReviewMarker(
@@ -100,23 +100,13 @@ def test_ensure_through_marker_walks_older_pages(app, user):
             trakt_listed_at=datetime(2026, 7, 15, 12, 0, 0),
             title='Marker Movie',
         ))
-        # Newest edge already cached (two dates so oldest-window seed does not short-circuit).
-        db.session.add_all([
-            CachedMedia(
-                media_type='movie',
-                trakt_id=99,
-                title='Newest Only',
-                feed_source='trakt_db_updates',
-                trakt_listed_at=datetime(2026, 8, 1, 12, 0, 0),
-            ),
-            CachedMedia(
-                media_type='movie',
-                trakt_id=98,
-                title='Also Recent',
-                feed_source='trakt_db_updates',
-                trakt_listed_at=datetime(2026, 7, 31, 12, 0, 0),
-            ),
-        ])
+        db.session.add(CachedMedia(
+            media_type='movie',
+            trakt_id=99,
+            title='Newest Only',
+            feed_source='trakt_db_updates',
+            trakt_listed_at=datetime(2026, 8, 1, 12, 0, 0),
+        ))
         db.session.add(CatalogFeedSync(
             media_type='movie',
             start_date=sync_jobs._updates_start_date(),
@@ -124,30 +114,20 @@ def test_ensure_through_marker_walks_older_pages(app, user):
             oldest_fetched_page=3,
             newest_fetched_page=3,
             bootstrapped_at=datetime(2026, 8, 1, 0, 0, 0),
+            updated_at=datetime.utcnow(),  # fresh — skip throttled refresh
         ))
         db.session.commit()
 
-        page2 = [_update_item(10, 'Marker Movie', '2026-07-15T12:00:00.000Z')]
-        page1 = [_update_item(1, 'Oldest', '2026-07-10T00:00:00.000Z')]
-
-        def fake_probe(media_type, start_date):
-            return {'page_count': 3, 'item_count': 3, 'limit': 100, 'page1': page1}
-
-        def fake_pages(media_type, start_date, from_page, to_page, page1_cache=None):
-            mapping = {1: page1, 2: page2, 3: [_update_item(99, 'Newest Only', '2026-08-01T12:00:00.000Z')]}
-            out = []
-            for p in range(from_page, to_page + 1):
-                out.extend(mapping[p])
-            return out
-
-        with patch('services.sync_jobs.trakt_client.probe_updates_pagination', side_effect=fake_probe), patch(
-            'services.sync_jobs.trakt_client.fetch_updates_pages', side_effect=fake_pages
-        ), patch('services.sync_jobs.enrich_media_details', return_value=0):
+        with patch('services.sync_jobs.trakt_client.fetch_updates_pages') as mocked_pages, patch(
+            'services.sync_jobs.trakt_client.probe_updates_pagination',
+            return_value={'page_count': 3, 'item_count': 3, 'limit': 100, 'page1': []},
+        ):
             sync_jobs.ensure_catalog_through_marker('movie', u)
 
-        assert CachedMedia.query.filter_by(trakt_id=10, media_type='movie').first() is not None
+        mocked_pages.assert_not_called()
+        assert CachedMedia.query.filter_by(trakt_id=10, media_type='movie').first() is None
         cursor = db.session.get(CatalogFeedSync, 'movie')
-        assert cursor.oldest_fetched_page <= 2
+        assert cursor.oldest_fetched_page == 3
 
 
 def test_ensure_catalog_for_offset_fetches_one_older_page(app):
