@@ -2,7 +2,7 @@
 
 Movies from your Trakt **Wishlist**, **personal lists** (the ones you show in Preferences), and/or **watched** history, with local metadata (poster, description, genres).
 
-Opening this page refreshes watchlist, watched history, and membership for shown personal lists. Order follows last local sync activity, not Trakt’s website sort.
+Opening this page uses the local cache (fast). Use **Refresh from Trakt** to re-download watchlist, watched history, and personal-list membership (slow). Sorted by in-progress first, then most recently watched; not-started titles last.
 
 ## Filters
 

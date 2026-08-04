@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-04 — My movies/shows: sort + no auto full-sync
+
+- Sort by in-progress, then `last_watched_at` (newest first); never-started last
+- Opening My pages uses local cache only; **Refresh from Trakt** does the slow full pull
+- Watchlist fetch via `/users/me/watchlist/{type}/{sort_by}/{sort_how}` (`added/desc`)
+
 ## 2026-08-04 — Add to lists (Wishlist + personal Trakt lists)
 
 - Replaced Add/Remove watchlist with **Add to lists…** multi-select (Wishlist first, then personal lists)

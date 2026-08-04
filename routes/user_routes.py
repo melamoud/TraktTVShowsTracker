@@ -9,6 +9,7 @@ from flask import (
     request, session, url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy import and_, case
 
 
 def _parse_air_datetime(value: str | None) -> datetime | None:
@@ -414,10 +415,14 @@ def _my_media(media_type: str):
     if filt not in ('lists', 'watched', 'both', 'unwatched_episodes'):
         filt = 'lists'
 
-    try:
-        sync_user_media_state(current_user)
-    except Exception as exc:
-        current_app.logger.warning('Sync before my-media failed: %s', exc)
+    # Do NOT full-sync Trakt on every page view — that walks all watchlist /
+    # watched / personal-list pages and is what made My Shows take 10s+.
+    # Serve the local cache; sync only when the user asks (?refresh=1).
+    if request.args.get('refresh') == '1':
+        try:
+            sync_user_media_state(current_user, media_types=(media_type,))
+        except Exception as exc:
+            current_app.logger.warning('Sync before my-media failed: %s', exc)
 
     filter_lists = _my_filter_lists(current_user)
     selected_lists = _resolve_selected_lists(current_user, filter_lists)
@@ -458,9 +463,25 @@ def _my_media(media_type: str):
     if page > pages:
         page = pages
 
-    # Load / enrich only the current page of rows.
+    # Meaningful DB sort (page-only; no full fetch):
+    # 0 = in progress, 1 = has watch history, 2 = never started.
+    # Within those: most recently watched first.
+    in_progress = and_(
+        UserMediaState.progress_percent.isnot(None),
+        UserMediaState.progress_percent > 0,
+        UserMediaState.progress_percent < 100,
+    )
+    sort_bucket = case(
+        (in_progress, 0),
+        (UserMediaState.last_watched_at.isnot(None), 1),
+        else_=2,
+    )
     states = (
-        q.order_by(UserMediaState.updated_at.desc())
+        q.order_by(
+            sort_bucket.asc(),
+            UserMediaState.last_watched_at.desc(),
+            UserMediaState.id.desc(),
+        )
         .offset((page - 1) * per_page)
         .limit(per_page)
         .all()

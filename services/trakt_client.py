@@ -335,14 +335,32 @@ def fetch_media_summary(media_type: str, trakt_id: int) -> dict:
     ) or {}
 
 
-def get_watchlist(user: User, media_type: str) -> list:
-    """Return the user's full Trakt watchlist for movies or shows (all pages)."""
+def get_watchlist(
+    user: User,
+    media_type: str,
+    *,
+    sort_by: str = 'added',
+    sort_how: str = 'desc',
+    max_pages: int = 50,
+) -> list:
+    """
+    Return the user's Trakt watchlist for movies or shows.
+
+    Uses ``/users/me/watchlist/{type}/{sort_by}/{sort_how}`` (same items as
+    ``/sync/watchlist/...``, but with server-side sort + pagination). Default
+    ``max_pages=50`` is a full sync; pass ``max_pages=1`` for first page only.
+    """
+    kind = f'{media_type}s'
+    by = (sort_by or 'added').strip() or 'added'
+    how = (sort_how or 'desc').strip().lower()
+    if how not in ('asc', 'desc'):
+        how = 'desc'
     return api_request(
         'GET',
-        f'/sync/watchlist/{media_type}s',
+        f'/users/me/watchlist/{kind}/{by}/{how}',
         user=user,
         params={'limit': 100},
-        paginate_max_pages=50,
+        paginate_max_pages=max(1, int(max_pages)),
     ) or []
 
 
