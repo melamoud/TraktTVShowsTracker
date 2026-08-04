@@ -8,6 +8,21 @@ Pick from the default list (Netflix, Prime, …) and/or add a custom service (na
 - Check **Remove** next to a custom service, then save, to delete it
 - Optionally check **Suggest this service to admin** so it can be added to the shared defaults list
 
+## Trakt lists in Add to lists
+
+Your Trakt **Wishlist** (watchlist) is always first. Personal lists follow.
+
+These settings apply to both **Add to lists…** and **My movies / My shows** filters:
+
+| Setting | Meaning |
+|--------|---------|
+| **Show in menu** | List appears in Add to lists… and in the My-page **Lists…** filter menu (Wishlist cannot be hidden; default for personal lists = shown) |
+| **Auto-select** | Pre-checked in Add to lists… and in My **Lists…** until you change the filter (default = Wishlist only) |
+
+Example: show three lists, but only Wishlist + List 1 auto-selected — Add to lists… and My movies open with those two checked.
+
+On Add to lists…, titles already on a list stay checked even if Auto-select is off for that list.
+
 ## Genres & keywords
 
 These drive the purple **Preference match** highlight and the default Latest **Matches only** filter (genre overlap, keyword hits in title/overview/network). Your streaming services do **not** count toward that highlight — they are for Found-on / release alerts only.

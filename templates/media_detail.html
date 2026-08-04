@@ -72,11 +72,11 @@
     {% endif %}
 
     <div class="actions">
-      {% if row.on_watchlist %}
-        <button class="btn" type="button" data-action="watchlist-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Remove watchlist</button>
-      {% else %}
-        <button class="btn" type="button" data-action="watchlist-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Add watchlist</button>
-      {% endif %}
+      <button class="btn{% if not row.on_watchlist %} btn-primary{% endif %}" type="button"
+              data-action="lists-edit"
+              data-media-type="{{ media_type }}"
+              data-trakt-id="{{ m.trakt_id }}"
+              data-title="{{ m.title|e }}">Add to lists…</button>
       {% if row.watched %}
         <button class="btn" type="button" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
       {% else %}

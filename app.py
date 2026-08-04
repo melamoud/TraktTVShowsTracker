@@ -153,11 +153,20 @@ def _ensure_schema(app):
                 alters.append(
                     'ALTER TABLE user_preferences ADD COLUMN prefs_reminder_snooze_until DATETIME'
                 )
+            if 'hidden_list_ids_json' not in cols:
+                alters.append(
+                    "ALTER TABLE user_preferences ADD COLUMN hidden_list_ids_json TEXT DEFAULT '[]'"
+                )
+            if 'default_selected_list_ids_json' not in cols:
+                alters.append(
+                    "ALTER TABLE user_preferences ADD COLUMN default_selected_list_ids_json "
+                    "TEXT DEFAULT '[\"watchlist\"]'"
+                )
             if alters:
                 with db.engine.begin() as conn:
                     for stmt in alters:
                         conn.execute(text(stmt))
-                app.logger.info('Added user_preferences onboarding/reminder columns')
+                app.logger.info('Added user_preferences preference columns')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
 

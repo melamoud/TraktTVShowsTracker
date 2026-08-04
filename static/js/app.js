@@ -23,6 +23,21 @@ async function apiPost(url, body) {
   return data;
 }
 
+async function apiGet(url) {
+  const resp = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'X-Requested-With': 'XMLHttpRequest',
+      'Accept': 'application/json',
+    },
+  });
+  const data = await resp.json().catch(function () { return {}; });
+  if (!resp.ok || data.success === false) {
+    throw new Error(data.message || 'Request failed');
+  }
+  return data;
+}
+
 function splitPipeList(raw) {
   if (!raw) return [];
   return String(raw).split('|').map(function (s) { return s.trim(); }).filter(Boolean);
@@ -33,6 +48,150 @@ function namesMatch(a, b) {
   const y = String(b || '').toLowerCase();
   if (!x || !y) return false;
   return x === y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1;
+}
+
+function renderListsOptions(optionsEl, lists) {
+  optionsEl.innerHTML = '';
+  if (!lists.length) {
+    optionsEl.innerHTML = '<p class="muted">No lists available.</p>';
+    return;
+  }
+  lists.forEach(function (lst) {
+    const label = document.createElement('label');
+    if (lst.kind === 'watchlist') {
+      label.classList.add('provider-listed');
+    }
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    input.name = 'list_membership';
+    input.value = lst.id;
+    input.checked = !!lst.selected;
+    const name = document.createElement('span');
+    name.className = 'found-on-name';
+    name.textContent = lst.name || lst.id;
+    label.appendChild(input);
+    label.appendChild(name);
+    optionsEl.appendChild(label);
+  });
+}
+
+function openListsDialog(opts) {
+  opts = opts || {};
+  const mode = opts.mode || 'membership';
+  const mediaType = opts.mediaType;
+  const traktId = opts.traktId;
+  const title = opts.title || '';
+  const presetLists = opts.lists || null;
+
+  const modal = document.getElementById('lists-modal');
+  const headingEl = document.getElementById('lists-heading');
+  const titleEl = document.getElementById('lists-title');
+  const hintEl = document.getElementById('lists-hint');
+  const options = document.getElementById('lists-options');
+  const loadingEl = document.getElementById('lists-loading');
+  const errorEl = document.getElementById('lists-error');
+  const saveBtn = document.getElementById('lists-save');
+  const cancelBtn = document.getElementById('lists-cancel');
+
+  if (!modal || !options || !saveBtn || !cancelBtn) {
+    return Promise.resolve(null);
+  }
+  if (mode === 'membership' && (!mediaType || traktId === null || traktId === '')) {
+    return Promise.resolve(null);
+  }
+
+  if (headingEl) {
+    headingEl.textContent = mode === 'filter' ? 'Filter by lists' : 'Add to lists';
+  }
+  if (hintEl) {
+    hintEl.textContent = mode === 'filter'
+      ? 'Choose which lists to show on this page. Same lists as Preferences (Show in menu).'
+      : 'Select one or more. Pre-checked from your Preferences defaults and current membership — change freely before Save.';
+  }
+  if (titleEl) {
+    titleEl.textContent = mode === 'filter'
+      ? (opts.subtitle || '')
+      : (title ? ('Title: ' + title) : '');
+  }
+  options.innerHTML = '';
+  if (errorEl) {
+    errorEl.hidden = true;
+    errorEl.textContent = '';
+  }
+  if (loadingEl) loadingEl.hidden = mode !== 'membership';
+  saveBtn.disabled = mode === 'membership';
+  modal.hidden = false;
+  document.body.classList.add('modal-open');
+
+  return new Promise(function (resolve) {
+    let settled = false;
+
+    function cleanup(result) {
+      if (settled) return;
+      settled = true;
+      modal.hidden = true;
+      document.body.classList.remove('modal-open');
+      saveBtn.removeEventListener('click', onSave);
+      cancelBtn.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+      resolve(result);
+    }
+
+    function onSave(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const checked = options.querySelectorAll('input[name="list_membership"]:checked');
+      const selected = [];
+      checked.forEach(function (el) {
+        if (el.value) selected.push(el.value);
+      });
+      cleanup(selected);
+    }
+
+    function onCancel(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      cleanup(null);
+    }
+
+    function onBackdrop(ev) {
+      if (ev.target === modal) cleanup(null);
+    }
+
+    function onKey(ev) {
+      if (ev.key === 'Escape') cleanup(null);
+    }
+
+    saveBtn.addEventListener('click', onSave);
+    cancelBtn.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+
+    if (mode === 'filter') {
+      if (loadingEl) loadingEl.hidden = true;
+      renderListsOptions(options, presetLists || []);
+      saveBtn.disabled = false;
+      return;
+    }
+
+    apiGet('/api/lists/membership/' + mediaType + '/' + traktId)
+      .then(function (data) {
+        if (settled) return;
+        if (loadingEl) loadingEl.hidden = true;
+        renderListsOptions(options, data.lists || []);
+        saveBtn.disabled = false;
+      })
+      .catch(function (err) {
+        if (settled) return;
+        if (loadingEl) loadingEl.hidden = true;
+        if (errorEl) {
+          errorEl.hidden = false;
+          errorEl.textContent = err.message || String(err);
+        }
+        saveBtn.disabled = true;
+      });
+  });
 }
 
 function openFoundOnDialog(opts) {
@@ -140,7 +299,7 @@ function rowContext(btn) {
 document.addEventListener('click', async function (ev) {
   const btn = ev.target.closest('[data-action]');
   if (!btn) return;
-  if (btn.closest('#found-on-modal')) return;
+  if (btn.closest('#found-on-modal') || btn.closest('#lists-modal')) return;
   ev.preventDefault();
 
   const action = btn.getAttribute('data-action');
@@ -212,15 +371,56 @@ document.addEventListener('click', async function (ev) {
     return;
   }
 
+  if (action === 'lists-filter') {
+    let lists = [];
+    try {
+      lists = JSON.parse(btn.getAttribute('data-filter-lists') || '[]');
+    } catch (err) {
+      lists = [];
+    }
+    const currentFilter = btn.getAttribute('data-filter') || 'lists';
+    btn.disabled = true;
+    try {
+      const selected = await openListsDialog({
+        mode: 'filter',
+        lists: lists,
+        subtitle: btn.getAttribute('data-subtitle') || '',
+      });
+      if (selected === null) return;
+      const params = new URLSearchParams();
+      params.set('lists_set', '1');
+      params.set('page', '1');
+      const perPage = btn.getAttribute('data-per-page');
+      if (perPage) params.set('per_page', perPage);
+      // Choosing lists implies viewing those lists (not watched-only).
+      params.set('filter', 'lists');
+      selected.forEach(function (id) { params.append('lists', id); });
+      // Keep status if user opened the menu while on Both / Unwatched.
+      if (currentFilter === 'both' || currentFilter === 'unwatched_episodes') {
+        params.set('filter', currentFilter);
+      }
+      location.search = params.toString();
+    } catch (err) {
+      alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+
   if (!mediaType || traktId === null || traktId === '') return;
 
   btn.disabled = true;
   try {
-    if (action === 'watchlist-add') {
-      await apiPost('/api/watchlist/' + mediaType + '/' + traktId, { action: 'add' });
-      location.reload();
-    } else if (action === 'watchlist-remove') {
-      await apiPost('/api/watchlist/' + mediaType + '/' + traktId, { action: 'remove' });
+    if (action === 'lists-edit' || action === 'watchlist-add' || action === 'watchlist-remove') {
+      const selected = await openListsDialog({
+        mode: 'membership',
+        mediaType: mediaType,
+        traktId: traktId,
+        title: ctx.title || '',
+      });
+      if (selected === null) return;
+      await apiPost('/api/lists/membership/' + mediaType + '/' + traktId, { selected: selected });
       location.reload();
     } else if (action === 'watched-add') {
       await apiPost('/api/watched/' + mediaType + '/' + traktId, { action: 'add' });

@@ -530,6 +530,140 @@ def remove_from_watchlist(user: User, media_type: str, trakt_id: int) -> dict:
     return api_request('POST', '/sync/watchlist/remove', user=user, json_body=body) or {}
 
 
+def get_personal_lists(user: User) -> list[dict]:
+    """
+    Return the user's Trakt personal/custom lists (not watchlist).
+
+    Each item is normalized to ``{id, slug, name, item_count}`` where ``id`` is
+    the Trakt list id as a string (stable for prefs + membership APIs).
+    """
+    raw = api_request(
+        'GET',
+        '/users/me/lists',
+        user=user,
+        params={'limit': 100},
+        paginate_max_pages=10,
+    ) or []
+    out: list[dict] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        ids = item.get('ids') or {}
+        list_id = ids.get('trakt')
+        if list_id is None:
+            continue
+        out.append({
+            'id': str(int(list_id)),
+            'slug': (ids.get('slug') or '') or '',
+            'name': (item.get('name') or f'List {list_id}').strip() or f'List {list_id}',
+            'item_count': int(item.get('item_count') or 0),
+        })
+    out.sort(key=lambda x: x['name'].lower())
+    return out
+
+
+def _list_item_trakt_id(item: dict, media_type: str) -> int | None:
+    """Extract the movie/show Trakt id from a list-items row."""
+    entity = item.get(media_type) or {}
+    ids = entity.get('ids') or {}
+    try:
+        return int(ids.get('trakt'))
+    except (TypeError, ValueError):
+        return None
+
+
+def get_list_items(user: User, list_id: str, media_type: str) -> list:
+    """
+    Return all movie/show rows on a personal Trakt list (paginated).
+
+    Each row is the raw Trakt list-items object (includes nested movie/show).
+    """
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    lid = str(list_id).strip()
+    if not lid:
+        return []
+    # Manual pagination: api_request(paginate_max_pages=1) always hits page 1.
+    base = current_app.config['TRAKT_API_BASE'].rstrip('/')
+    access = ensure_access_token(user)
+    headers = _headers(access)
+    path = f'/users/me/lists/{lid}/items/{media_type}s'
+    collected: list = []
+    page = 1
+    page_count = 1
+    while page <= page_count and page <= 50:
+        resp = requests.get(
+            f'{base}{path}',
+            headers=headers,
+            params={'limit': 100, 'page': page},
+            timeout=45,
+        )
+        if resp.status_code == 401:
+            refresh = decrypt_token(user.refresh_token_enc)
+            if not refresh:
+                raise TraktError('Unauthorized', 401, resp.text)
+            payload = refresh_tokens(refresh)
+            save_user_tokens(user, payload)
+            headers = _headers(payload['access_token'])
+            resp = requests.get(
+                f'{base}{path}',
+                headers=headers,
+                params={'limit': 100, 'page': page},
+                timeout=45,
+            )
+        if resp.status_code >= 400:
+            raise TraktError(
+                f'Trakt API error on {path} ({resp.status_code})',
+                resp.status_code,
+                resp.text,
+            )
+        data = resp.json() if resp.content else []
+        page_count = int(resp.headers.get('X-Pagination-Page-Count') or page)
+        if isinstance(data, list):
+            collected.extend(data)
+        if page >= page_count:
+            break
+        page += 1
+    return collected
+
+
+def list_contains_item(user: User, list_id: str, media_type: str, trakt_id: int) -> bool:
+    """True when the movie/show is already on the given personal list."""
+    tid = int(trakt_id)
+    for item in get_list_items(user, list_id, media_type):
+        if _list_item_trakt_id(item, media_type) == tid:
+            return True
+    return False
+
+
+def add_to_list(user: User, list_id: str, media_type: str, trakt_id: int) -> dict:
+    """Add a movie/show to a personal Trakt list."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    lid = str(list_id).strip()
+    body = {f'{media_type}s': [{'ids': {'trakt': int(trakt_id)}}]}
+    return api_request(
+        'POST',
+        f'/users/me/lists/{lid}/items',
+        user=user,
+        json_body=body,
+    ) or {}
+
+
+def remove_from_list(user: User, list_id: str, media_type: str, trakt_id: int) -> dict:
+    """Remove a movie/show from a personal Trakt list."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    lid = str(list_id).strip()
+    body = {f'{media_type}s': [{'ids': {'trakt': int(trakt_id)}}]}
+    return api_request(
+        'POST',
+        f'/users/me/lists/{lid}/items/remove',
+        user=user,
+        json_body=body,
+    ) or {}
+
+
 def mark_watched(user: User, media_type: str, trakt_id: int) -> dict:
     """Mark a movie/show as watched on Trakt."""
     body = {f'{media_type}s': [{'ids': {'trakt': trakt_id}}]}

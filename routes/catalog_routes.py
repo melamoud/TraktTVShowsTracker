@@ -10,15 +10,23 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
-from models import CachedMedia, MediaFoundOn, ReviewMarker, ReleaseWatch, UserMediaState, db
+from models import (
+    CachedMedia, MediaFoundOn, ReviewMarker, ReleaseWatch, UserListMembership, UserMediaState, db,
+)
 from services import trakt_client
-from services.streaming_matcher import match_preferences
+from services.streaming_matcher import (
+    WATCHLIST_LIST_ID,
+    get_default_selected_list_ids,
+    get_hidden_list_ids,
+    match_preferences,
+)
 from services.sync_jobs import (
     catalog_has_more_older,
     ensure_catalog_for_offset,
     ensure_catalog_through_marker,
     feed_count,
     refresh_catalog_newest,
+    set_list_membership,
     sync_catalog,
     sync_providers_for_media,
 )
@@ -620,6 +628,142 @@ def api_watchlist(media_type, trakt_id):
         return jsonify({'success': True, 'on_watchlist': on})
     except Exception as exc:
         current_app.logger.exception('Watchlist action failed: %s', exc)
+        return jsonify({'success': False, 'message': str(exc)}), 400
+
+
+@catalog_bp.route('/api/lists/membership/<media_type>/<int:trakt_id>', methods=['GET', 'POST'])
+@login_required
+def api_lists_membership(media_type, trakt_id):
+    """
+    Read or update Wishlist + personal-list membership for one title.
+
+    Wishlist is always first. Personal lists respect Preferences → show/hide.
+    Initial checks = already on the list OR marked as default-selected in prefs.
+    """
+    if media_type not in ('movie', 'show'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+
+    st = UserMediaState.query.filter_by(
+        user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
+    ).first()
+    media = CachedMedia.query.filter_by(media_type=media_type, trakt_id=trakt_id).first()
+    title = media.title if media else f'{media_type} {trakt_id}'
+
+    try:
+        personal = trakt_client.get_personal_lists(current_user)
+    except Exception as exc:
+        current_app.logger.exception('Failed loading Trakt lists: %s', exc)
+        return jsonify({'success': False, 'message': str(exc)}), 400
+
+    hidden = set(get_hidden_list_ids(current_user))
+    visible = [lst for lst in personal if lst['id'] not in hidden]
+    default_selected = set(get_default_selected_list_ids(current_user))
+
+    if request.method == 'GET':
+        try:
+            on_watchlist = bool(st and st.on_watchlist)
+            lists_out = [{
+                'id': WATCHLIST_LIST_ID,
+                'name': 'Wishlist',
+                'kind': 'watchlist',
+                'selected': on_watchlist or (WATCHLIST_LIST_ID in default_selected),
+                'on_list': on_watchlist,
+            }]
+            for lst in visible:
+                on_list = UserListMembership.query.filter_by(
+                    user_id=current_user.id,
+                    list_id=lst['id'],
+                    media_type=media_type,
+                    trakt_id=trakt_id,
+                ).first() is not None
+                if not on_list:
+                    # Fall back to live Trakt when local cache is cold.
+                    on_list = trakt_client.list_contains_item(
+                        current_user, lst['id'], media_type, trakt_id
+                    )
+                    if on_list:
+                        set_list_membership(
+                            current_user.id, lst['id'], media_type, trakt_id, on_list=True
+                        )
+                        db.session.commit()
+                lists_out.append({
+                    'id': lst['id'],
+                    'name': lst['name'],
+                    'kind': 'list',
+                    'slug': lst.get('slug') or '',
+                    'selected': on_list or (lst['id'] in default_selected),
+                    'on_list': on_list,
+                })
+            return jsonify({
+                'success': True,
+                'title': title,
+                'lists': lists_out,
+            })
+        except Exception as exc:
+            current_app.logger.exception('List membership read failed: %s', exc)
+            return jsonify({'success': False, 'message': str(exc)}), 400
+
+    payload = request.json or {}
+    selected_raw = payload.get('selected')
+    if not isinstance(selected_raw, list):
+        return jsonify({'success': False, 'message': 'selected must be a list'}), 400
+
+    selected = {str(x).strip() for x in selected_raw if str(x).strip()}
+    visible_ids = {lst['id'] for lst in visible}
+    # Ignore ids for hidden lists or unknown values (except watchlist).
+    wanted_lists = {lid for lid in selected if lid in visible_ids}
+    want_watchlist = WATCHLIST_LIST_ID in selected
+
+    try:
+        on_watchlist = bool(st and st.on_watchlist)
+        if want_watchlist and not on_watchlist:
+            trakt_client.add_to_watchlist(current_user, media_type, trakt_id)
+            on_watchlist = True
+        elif not want_watchlist and on_watchlist:
+            trakt_client.remove_from_watchlist(current_user, media_type, trakt_id)
+            on_watchlist = False
+
+        for lst in visible:
+            lid = lst['id']
+            currently = UserListMembership.query.filter_by(
+                user_id=current_user.id,
+                list_id=lid,
+                media_type=media_type,
+                trakt_id=trakt_id,
+            ).first() is not None
+            if not currently:
+                currently = trakt_client.list_contains_item(
+                    current_user, lid, media_type, trakt_id
+                )
+            want = lid in wanted_lists
+            if want and not currently:
+                trakt_client.add_to_list(current_user, lid, media_type, trakt_id)
+                set_list_membership(
+                    current_user.id, lid, media_type, trakt_id, on_list=True
+                )
+            elif not want and currently:
+                trakt_client.remove_from_list(current_user, lid, media_type, trakt_id)
+                set_list_membership(
+                    current_user.id, lid, media_type, trakt_id, on_list=False
+                )
+
+        if not st:
+            st = UserMediaState(
+                user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
+            )
+            db.session.add(st)
+        st.on_watchlist = on_watchlist
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'on_watchlist': on_watchlist,
+            'selected': (
+                ([WATCHLIST_LIST_ID] if on_watchlist else [])
+                + sorted(wanted_lists)
+            ),
+        })
+    except Exception as exc:
+        current_app.logger.exception('List membership update failed: %s', exc)
         return jsonify({'success': False, 'message': str(exc)}), 400
 
 

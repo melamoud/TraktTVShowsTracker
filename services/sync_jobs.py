@@ -19,10 +19,12 @@ from models import (
     ReleaseWatch,
     ReviewMarker,
     User,
+    UserListMembership,
     UserMediaState,
     db,
 )
 from services import trakt_client
+from services.streaming_matcher import get_hidden_list_ids
 from services.tmdb_client import get_watch_providers, is_configured as tmdb_configured
 
 logger = logging.getLogger('app')
@@ -684,8 +686,127 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
             if row.trakt_id not in watched_ids:
                 row.watched = False
 
+    try:
+        sync_user_list_memberships(user, media_types=types)
+    except Exception as exc:
+        logger.warning('List membership sync failed for user %s: %s', user.id, exc)
+
     user.last_sync_at = datetime.utcnow()
     db.session.commit()
+
+
+def sync_user_list_memberships(
+    user: User,
+    media_types: tuple[str, ...] | None = None,
+) -> None:
+    """
+    Refresh local cache of personal-list membership for lists shown in Preferences.
+
+    Hidden lists are skipped (and their cached rows cleared). Wishlist is handled
+    separately via ``UserMediaState.on_watchlist``.
+    """
+    types = media_types or ('movie', 'show')
+    hidden = set(get_hidden_list_ids(user))
+    try:
+        personal = trakt_client.get_personal_lists(user)
+    except Exception as exc:
+        logger.warning('Could not load personal lists for user %s: %s', user.id, exc)
+        return
+
+    shown = [lst for lst in personal if lst['id'] not in hidden]
+    shown_ids = {lst['id'] for lst in shown}
+
+    # Drop cache for lists no longer shown / deleted on Trakt.
+    stale = UserListMembership.query.filter(
+        UserListMembership.user_id == user.id,
+        UserListMembership.list_id.notin_(shown_ids or ['__none__']),
+    ).all()
+    for row in stale:
+        db.session.delete(row)
+
+    for lst in shown:
+        lid = lst['id']
+        for media_type in types:
+            try:
+                items = trakt_client.get_list_items(user, lid, media_type)
+            except Exception as exc:
+                logger.warning(
+                    'List items sync failed user=%s list=%s %s: %s',
+                    user.id, lid, media_type, exc,
+                )
+                continue
+            current_ids: set[int] = set()
+            for entry in items:
+                entity = entry.get(media_type) or {}
+                tid = (entity.get('ids') or {}).get('trakt')
+                if not tid:
+                    continue
+                tid = int(tid)
+                current_ids.add(tid)
+                _upsert_list_membership(user.id, lid, media_type, tid)
+                _upsert_state(user.id, media_type, tid)
+                upsert_cached_media(media_type, entry)
+
+            existing = UserListMembership.query.filter_by(
+                user_id=user.id, list_id=lid, media_type=media_type
+            ).all()
+            for row in existing:
+                if row.trakt_id not in current_ids:
+                    db.session.delete(row)
+
+
+def _upsert_list_membership(
+    user_id: int,
+    list_id: str,
+    media_type: str,
+    trakt_id: int,
+) -> None:
+    """Ensure a personal-list membership row exists."""
+    row = UserListMembership.query.filter_by(
+        user_id=user_id,
+        list_id=str(list_id),
+        media_type=media_type,
+        trakt_id=int(trakt_id),
+    ).first()
+    if not row:
+        db.session.add(UserListMembership(
+            user_id=user_id,
+            list_id=str(list_id),
+            media_type=media_type,
+            trakt_id=int(trakt_id),
+        ))
+    else:
+        row.updated_at = datetime.utcnow()
+
+
+def set_list_membership(
+    user_id: int,
+    list_id: str,
+    media_type: str,
+    trakt_id: int,
+    *,
+    on_list: bool,
+) -> None:
+    """Add or remove one cached personal-list membership row."""
+    lid = str(list_id).strip()
+    if not lid:
+        return
+    row = UserListMembership.query.filter_by(
+        user_id=user_id,
+        list_id=lid,
+        media_type=media_type,
+        trakt_id=int(trakt_id),
+    ).first()
+    if on_list and not row:
+        db.session.add(UserListMembership(
+            user_id=user_id,
+            list_id=lid,
+            media_type=media_type,
+            trakt_id=int(trakt_id),
+        ))
+        _upsert_state(user_id, media_type, int(trakt_id))
+    elif not on_list and row:
+        db.session.delete(row)
 
 
 def ensure_media_cached(media_type: str, trakt_ids: list[int]) -> None:

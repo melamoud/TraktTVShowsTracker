@@ -22,7 +22,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 
 - **Purple** tags — which of your genres/keywords matched (same as Latest)  
 - **Plays on your services** — teal highlight for services you own that list the title (needs `TMDB_API_KEY`)  
-- **Add to wishlist** — writes to your Trakt watchlist  
+- **Add to lists…** — multi-select Wishlist + your Trakt personal lists (hide unused lists under Preferences)  
 - **Hide recommendation** — same as Trakt.tv “Not interested”; removes it from future Trakt recommendations  
 
 Set services and genres under Preferences for the best experience.

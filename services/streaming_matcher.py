@@ -33,6 +33,63 @@ def get_user_genres_keywords(user: User) -> tuple[list[str], list[str]]:
     return _parse_json_list(prefs.genres_json), _parse_json_list(prefs.keywords_json)
 
 
+def get_hidden_list_ids(user: User) -> list[str]:
+    """Return Trakt personal list ids the user hid from the Add to lists menu."""
+    prefs = user.preferences
+    if not prefs:
+        return []
+    return _parse_json_list(getattr(prefs, 'hidden_list_ids_json', None))
+
+
+WATCHLIST_LIST_ID = 'watchlist'
+
+
+def get_default_selected_list_ids(user: User) -> list[str]:
+    """
+    Return list ids pre-checked when opening Add to lists / My list filters.
+
+    Includes ``watchlist`` and/or personal list ids. Missing/unset prefs default
+    to Wishlist only; an explicit empty JSON list means nothing is pre-checked.
+    """
+    prefs = user.preferences
+    if not prefs:
+        return [WATCHLIST_LIST_ID]
+    raw = getattr(prefs, 'default_selected_list_ids_json', None)
+    if raw is None or str(raw).strip() == '':
+        return [WATCHLIST_LIST_ID]
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return [WATCHLIST_LIST_ID]
+    if not isinstance(data, list):
+        return [WATCHLIST_LIST_ID]
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in data:
+        lid = str(item or '').strip()
+        if not lid or lid in seen:
+            continue
+        seen.add(lid)
+        out.append(lid)
+    return out
+
+
+def filter_visible_list_ids(user: User, list_ids: Iterable[str]) -> list[str]:
+    """Keep Wishlist + personal ids that are not hidden in Preferences."""
+    hidden = set(get_hidden_list_ids(user))
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in list_ids:
+        lid = str(raw or '').strip()
+        if not lid or lid in seen:
+            continue
+        if lid != WATCHLIST_LIST_ID and lid in hidden:
+            continue
+        seen.add(lid)
+        out.append(lid)
+    return out
+
+
 def user_has_match_prefs(user: User) -> bool:
     """True when the user has at least one genre or keyword for purple matching."""
     genres, keywords = get_user_genres_keywords(user)

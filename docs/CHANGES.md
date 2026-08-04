@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-04 — Add to lists (Wishlist + personal Trakt lists)
+
+- Replaced Add/Remove watchlist with **Add to lists…** multi-select (Wishlist first, then personal lists)
+- Preferences: **Show in menu** vs **Auto-select** (Wishlist always shown; auto-select optional)
+- My movies/shows: **Lists…** checklist filter (same prefs), paged 10/50/100 (current page only)
+- Caches personal-list membership; syncs to Trakt watchlist + `/users/me/lists/…/items`
+
 ## 2026-08-04 — Trakt recommendations pages
 
 - **Rec movies / Rec shows** — personalized Trakt `/recommendations` feed (same source as Trakt.tv)

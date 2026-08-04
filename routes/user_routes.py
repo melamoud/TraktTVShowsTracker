@@ -52,16 +52,22 @@ def _episode_air_info(ep: dict, *, progress_says_aired: bool | None) -> dict:
 from help_utils import get_help_toc, render_help_markdown
 from models import (
     CachedMedia, MediaFoundOn, Notification, ReviewMarker, StreamingService,
-    StreamingServiceSuggestion, UserMediaState, UserPreference, UserStreamingService, db,
+    StreamingServiceSuggestion, UserListMembership, UserMediaState, UserPreference,
+    UserStreamingService, db,
 )
 from services import trakt_client
 from services.seed import COMMON_GENRES
 from services.streaming_matcher import (
+    WATCHLIST_LIST_ID,
+    filter_visible_list_ids,
+    get_default_selected_list_ids,
+    get_hidden_list_ids,
     get_user_genres_keywords,
     serialize_prefs,
     split_csv_terms,
     user_has_match_prefs,
 )
+from routes.catalog_routes import _pagination_pages, _per_page
 from services.sync_jobs import (
     ensure_media_cached,
     enrich_media_list_for_display,
@@ -233,8 +239,40 @@ def preferences():
         g_json, k_json = serialize_prefs(genres, keywords)
         prefs.genres_json = g_json
         prefs.keywords_json = k_json
-        prefs.updated_at = datetime.utcnow()
+
+        # Two list prefs: show in menu (personal only) + default-checked (incl. Wishlist).
         import json
+        if request.form.get('lists_prefs_present') == '1':
+            known_list_ids = {
+                str(x).strip()
+                for x in request.form.getlist('known_list_ids')
+                if str(x).strip()
+            }
+            shown_list_ids = {
+                str(x).strip()
+                for x in request.form.getlist('show_list_ids')
+                if str(x).strip()
+            }
+            default_raw = {
+                str(x).strip()
+                for x in request.form.getlist('default_list_ids')
+                if str(x).strip()
+            }
+            if known_list_ids:
+                hidden_ids = sorted(known_list_ids - shown_list_ids)
+                prefs.hidden_list_ids_json = json.dumps(hidden_ids)
+                # Auto-select only applies to Wishlist + lists still shown in the menu.
+                allowed_defaults = {WATCHLIST_LIST_ID} | shown_list_ids
+            else:
+                allowed_defaults = {WATCHLIST_LIST_ID} | set(
+                    lid for lid in default_raw if lid != WATCHLIST_LIST_ID
+                )
+            default_ids = sorted(
+                lid for lid in default_raw
+                if lid in allowed_defaults
+            )
+            prefs.default_selected_list_ids_json = json.dumps(default_ids)
+        prefs.updated_at = datetime.utcnow()
         new_genres = json.loads(g_json or '[]')
         new_keywords = json.loads(k_json or '[]')
         match_filters_changed = (
@@ -263,6 +301,15 @@ def preferences():
     import json
     user_genres = json.loads(prefs.genres_json or '[]')
     user_keywords = json.loads(prefs.keywords_json or '[]')
+    hidden_list_ids = set(get_hidden_list_ids(current_user))
+    default_selected_list_ids = set(get_default_selected_list_ids(current_user))
+    trakt_lists = []
+    trakt_lists_error = None
+    try:
+        trakt_lists = trakt_client.get_personal_lists(current_user)
+    except Exception as exc:
+        current_app.logger.warning('Could not load Trakt lists for preferences: %s', exc)
+        trakt_lists_error = str(exc)
     if request.args.get('marker_prompt') == '1' or session.pop('marker_prompt_after_prefs', None):
         marker_prompt = True
     markers = {
@@ -281,6 +328,11 @@ def preferences():
         marker_prompt=marker_prompt,
         markers=markers,
         prefs_reminder_disabled=bool(prefs.prefs_reminder_disabled),
+        trakt_lists=trakt_lists,
+        hidden_list_ids=hidden_list_ids,
+        default_selected_list_ids=default_selected_list_ids,
+        watchlist_list_id=WATCHLIST_LIST_ID,
+        trakt_lists_error=trakt_lists_error,
     )
 
 
@@ -298,37 +350,121 @@ def my_shows():
     return _my_media('show')
 
 
+def _my_filter_lists(user) -> list[dict]:
+    """Wishlist + personal lists shown in Preferences (for My page filter buttons)."""
+    hidden = set(get_hidden_list_ids(user))
+    out = [{'id': WATCHLIST_LIST_ID, 'name': 'Wishlist', 'kind': 'watchlist'}]
+    try:
+        for lst in trakt_client.get_personal_lists(user):
+            if lst['id'] in hidden:
+                continue
+            out.append({
+                'id': lst['id'],
+                'name': lst['name'],
+                'kind': 'list',
+                'slug': lst.get('slug') or '',
+            })
+    except Exception as exc:
+        current_app.logger.warning('Could not load lists for my-media filters: %s', exc)
+    return out
+
+
+def _resolve_selected_lists(user, filter_lists: list[dict]) -> list[str]:
+    """Selected list ids from query args, or Preferences defaults."""
+    shown_ids = {lst['id'] for lst in filter_lists}
+    if request.args.get('lists_set') == '1':
+        selected = [
+            str(x).strip()
+            for x in request.args.getlist('lists')
+            if str(x).strip() in shown_ids
+        ]
+    else:
+        selected = filter_visible_list_ids(user, get_default_selected_list_ids(user))
+        selected = [lid for lid in selected if lid in shown_ids]
+    return selected
+
+
+def _trakt_ids_for_lists(user_id: int, media_type: str, selected_lists: list[str]) -> set[int]:
+    """Union of title ids on the selected Wishlist / personal lists."""
+    ids: set[int] = set()
+    if WATCHLIST_LIST_ID in selected_lists:
+        for tid, in UserMediaState.query.filter_by(
+            user_id=user_id, media_type=media_type, on_watchlist=True
+        ).with_entities(UserMediaState.trakt_id).all():
+            ids.add(int(tid))
+    personal_ids = [lid for lid in selected_lists if lid != WATCHLIST_LIST_ID]
+    if personal_ids:
+        for tid, in UserListMembership.query.filter(
+            UserListMembership.user_id == user_id,
+            UserListMembership.media_type == media_type,
+            UserListMembership.list_id.in_(personal_ids),
+        ).with_entities(UserListMembership.trakt_id).all():
+            ids.add(int(tid))
+    return ids
+
+
 def _my_media(media_type: str):
-    """Shared my-movies / my-shows listing with wishlist/watched filters."""
+    """Shared my-movies / my-shows listing with multi-list + watched filters."""
     import json
 
-    filt = (request.args.get('filter') or 'wishlist').lower()
-    if filt not in ('wishlist', 'watched', 'both', 'unwatched_episodes'):
-        filt = 'wishlist'
+    filt = (request.args.get('filter') or 'lists').lower()
+    # Legacy bookmark: wishlist → lists mode.
+    if filt == 'wishlist':
+        filt = 'lists'
+    if filt not in ('lists', 'watched', 'both', 'unwatched_episodes'):
+        filt = 'lists'
 
     try:
         sync_user_media_state(current_user)
     except Exception as exc:
         current_app.logger.warning('Sync before my-media failed: %s', exc)
 
+    filter_lists = _my_filter_lists(current_user)
+    selected_lists = _resolve_selected_lists(current_user, filter_lists)
+    list_trakt_ids = _trakt_ids_for_lists(current_user.id, media_type, selected_lists)
+
     q = UserMediaState.query.filter_by(user_id=current_user.id, media_type=media_type)
-    if filt == 'wishlist':
-        q = q.filter_by(on_watchlist=True)
+    if filt == 'lists':
+        if list_trakt_ids:
+            q = q.filter(UserMediaState.trakt_id.in_(list_trakt_ids))
+        else:
+            q = q.filter(UserMediaState.trakt_id == -1)
     elif filt == 'watched':
         q = q.filter_by(watched=True)
     elif filt == 'unwatched_episodes':
-        # Shows with progress not complete (or on watchlist and not fully watched)
-        q = q.filter(
-            (UserMediaState.on_watchlist.is_(True)) |
-            ((UserMediaState.watched.is_(True)) & (UserMediaState.progress_percent < 100)) |
-            ((UserMediaState.on_watchlist.is_(True)) & (UserMediaState.watched.is_(False)))
+        # Titles on selected lists, or watched with incomplete progress.
+        clauses = []
+        if list_trakt_ids:
+            clauses.append(UserMediaState.trakt_id.in_(list_trakt_ids))
+        clauses.append(
+            (UserMediaState.watched.is_(True)) & (UserMediaState.progress_percent < 100)
         )
-    else:
-        q = q.filter(
-            (UserMediaState.on_watchlist.is_(True)) | (UserMediaState.watched.is_(True))
-        )
+        from sqlalchemy import or_
+        q = q.filter(or_(*clauses))
+    else:  # both
+        clauses = [UserMediaState.watched.is_(True)]
+        if list_trakt_ids:
+            clauses.append(UserMediaState.trakt_id.in_(list_trakt_ids))
+        from sqlalchemy import or_
+        q = q.filter(or_(*clauses))
 
-    states = q.order_by(UserMediaState.updated_at.desc()).all()
+    total = q.count()
+    per_page = _per_page(f'my_{media_type}')
+    pages = max((total + per_page - 1) // per_page, 1) if total else 1
+    try:
+        page = max(int(request.args.get('page', 1)), 1)
+    except (TypeError, ValueError):
+        page = 1
+    if page > pages:
+        page = pages
+
+    # Load / enrich only the current page of rows.
+    states = (
+        q.order_by(UserMediaState.updated_at.desc())
+        .offset((page - 1) * per_page)
+        .limit(per_page)
+        .all()
+    )
     trakt_ids = [s.trakt_id for s in states]
     try:
         ensure_media_cached(media_type, trakt_ids)
@@ -348,14 +484,14 @@ def _my_media(media_type: str):
 
     try:
         to_enrich = [media_rows[tid] for tid in trakt_ids if tid in media_rows]
-        enrich_media_list_for_display(to_enrich, max_fetches=max(len(to_enrich), 25))
+        enrich_media_list_for_display(to_enrich, max_fetches=len(to_enrich))
         provider_fetches = 0
         for media in to_enrich:
             if (
                 tmdb_is_configured()
                 and media.tmdb_id
                 and not media.providers
-                and provider_fetches < 25
+                and provider_fetches < per_page
             ):
                 sync_providers_for_media(media)
                 provider_fetches += 1
@@ -370,6 +506,8 @@ def _my_media(media_type: str):
         current_app.logger.warning('Detail enrich for my-media failed: %s', exc)
 
     found_map: dict[int, list[str]] = {}
+    membership_names: dict[int, list[str]] = {}
+    list_name_by_id = {lst['id']: lst['name'] for lst in filter_lists}
     if trakt_ids:
         for fo in MediaFoundOn.query.filter(
             MediaFoundOn.user_id == current_user.id,
@@ -377,6 +515,14 @@ def _my_media(media_type: str):
             MediaFoundOn.trakt_id.in_(trakt_ids),
         ).all():
             found_map.setdefault(fo.trakt_id, []).append(fo.service_label)
+        for mem in UserListMembership.query.filter(
+            UserListMembership.user_id == current_user.id,
+            UserListMembership.media_type == media_type,
+            UserListMembership.trakt_id.in_(trakt_ids),
+        ).all():
+            name = list_name_by_id.get(mem.list_id)
+            if name:
+                membership_names.setdefault(mem.trakt_id, []).append(name)
 
     rows = []
     for st in states:
@@ -400,13 +546,35 @@ def _my_media(media_type: str):
             'genres': genres,
             'providers': providers,
             'found_on': found_map.get(st.trakt_id, []),
+            'list_names': membership_names.get(st.trakt_id, []),
         })
+
+    selected_set = set(selected_lists)
+    filter_lists_payload = [
+        {
+            'id': lst['id'],
+            'name': lst['name'],
+            'kind': lst.get('kind') or 'list',
+            'selected': lst['id'] in selected_set,
+        }
+        for lst in filter_lists
+    ]
+    selected_names = [lst['name'] for lst in filter_lists if lst['id'] in selected_set]
 
     return render_template(
         'my_media.html',
         media_type=media_type,
         rows=rows,
         filt=filt,
+        filter_lists=filter_lists,
+        filter_lists_payload=filter_lists_payload,
+        selected_lists=selected_lists,
+        selected_names=selected_names,
+        page=page,
+        pages=pages,
+        per_page=per_page,
+        total=total,
+        page_links=_pagination_pages(page, pages),
         title='My Movies' if media_type == 'movie' else 'My Shows',
     )
 

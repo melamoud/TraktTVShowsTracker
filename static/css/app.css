@@ -116,6 +116,17 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 650; letter-spacing:
 .pill.disabled { opacity: .35; cursor: default; }
 .pill.ellipsis { border-style: dashed; min-width: 2rem; text-align: center; }
 .pill.meta-pill { font-weight: 500; }
+button.pill-btn {
+  font: inherit;
+  cursor: pointer;
+  background: transparent;
+}
+button.pill-btn.on { color: #041210; background: var(--accent); border-color: var(--accent); }
+.tag.list {
+  background: rgba(110, 168, 254, 0.16);
+  color: #b7d0ff;
+  border-color: rgba(110, 168, 254, 0.45);
+}
 .pager { margin: .35rem 0 1rem; }
 
 .media-list { display: grid; gap: .85rem; }
@@ -195,6 +206,49 @@ input[type=text], input[type=url], textarea, select {
 }
 .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .35rem .75rem; }
 .checks label { font-weight: 500; display: flex; gap: .4rem; align-items: center; }
+
+.list-prefs {
+  display: grid;
+  gap: .4rem;
+  margin-top: .75rem;
+  max-width: 36rem;
+}
+.list-prefs-head,
+.list-prefs-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 6.5rem 6.5rem;
+  gap: .5rem .75rem;
+  align-items: center;
+}
+.list-prefs-head {
+  color: var(--muted);
+  font-size: .85rem;
+  font-weight: 700;
+  padding: 0 .15rem .25rem;
+  border-bottom: 1px solid var(--line);
+}
+.list-prefs-row {
+  padding: .45rem .15rem;
+  border-bottom: 1px solid rgba(42, 51, 69, 0.55);
+}
+.list-prefs-name { font-weight: 600; }
+.list-prefs-check,
+.list-prefs-fixed {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0;
+  font-weight: 500;
+  color: var(--muted);
+}
+@media (max-width: 560px) {
+  .list-prefs-head,
+  .list-prefs-row {
+    grid-template-columns: minmax(0, 1fr) 4.75rem 4.75rem;
+    gap: .35rem;
+  }
+  .list-prefs-head { font-size: .78rem; }
+}
 
 .season { margin: 1rem 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
 .season summary {

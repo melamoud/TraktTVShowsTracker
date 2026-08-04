@@ -104,6 +104,60 @@
   </section>
 
   <section>
+    <h2>Trakt lists in Add to lists</h2>
+    <p class="meta">
+      Two settings per list (used by <em>Add to lists…</em> and <em>My movies / My shows</em> filters):
+      <strong>Show in menu</strong> — appears as a filter/menu option (Wishlist is always shown).
+      <strong>Auto-select</strong> — pre-checked by default (you can still change before applying/saving).
+      On Add to lists…, titles already on a list stay checked even if Auto-select is off.
+    </p>
+    <input type="hidden" name="lists_prefs_present" value="1">
+    {% if trakt_lists_error %}
+      <p class="meta" style="color:var(--danger, #e85d5d);">Couldn’t load your Trakt lists: {{ trakt_lists_error }}</p>
+    {% endif %}
+    <div class="list-prefs">
+      <div class="list-prefs-head">
+        <span>List</span>
+        <span>Show in menu</span>
+        <span>Auto-select</span>
+      </div>
+      <div class="list-prefs-row">
+        <span class="list-prefs-name">Wishlist <span class="muted">(always in menu)</span></span>
+        <span class="list-prefs-fixed" title="Wishlist cannot be hidden">Always</span>
+        <label class="list-prefs-check">
+          <input type="checkbox" name="default_list_ids" value="{{ watchlist_list_id }}"
+            {% if watchlist_list_id in default_selected_list_ids %}checked{% endif %}>
+        </label>
+      </div>
+      {% if trakt_lists %}
+        {% for lst in trakt_lists %}
+          {% set shown = lst.id not in hidden_list_ids %}
+          <input type="hidden" name="known_list_ids" value="{{ lst.id }}">
+          <div class="list-prefs-row" data-list-id="{{ lst.id }}">
+            <span class="list-prefs-name">
+              {{ lst.name }}
+              {% if lst.item_count %}<span class="muted">({{ lst.item_count }})</span>{% endif %}
+            </span>
+            <label class="list-prefs-check">
+              <input type="checkbox" name="show_list_ids" value="{{ lst.id }}"
+                class="list-show-toggle"
+                {% if shown %}checked{% endif %}>
+            </label>
+            <label class="list-prefs-check">
+              <input type="checkbox" name="default_list_ids" value="{{ lst.id }}"
+                class="list-default-toggle"
+                {% if lst.id in default_selected_list_ids and shown %}checked{% endif %}
+                {% if not shown %}disabled{% endif %}>
+            </label>
+          </div>
+        {% endfor %}
+      {% elif not trakt_lists_error %}
+        <p class="meta">No personal Trakt lists yet. Create lists on Trakt.tv, then refresh this page.</p>
+      {% endif %}
+    </div>
+  </section>
+
+  <section>
     <h2>Reminders</h2>
     {% if prefs_reminder_disabled %}
       <p class="meta">Empty-prefs reminders are off.</p>
@@ -115,4 +169,19 @@
 
   <button class="btn btn-primary" type="submit">Save preferences</button>
 </form>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  document.querySelectorAll('.list-prefs-row[data-list-id]').forEach(function (row) {
+    const show = row.querySelector('.list-show-toggle');
+    const auto = row.querySelector('.list-default-toggle');
+    if (!show || !auto) return;
+    show.addEventListener('change', function () {
+      auto.disabled = !show.checked;
+      if (!show.checked) auto.checked = false;
+    });
+  });
+})();
+</script>
 {% endblock %}

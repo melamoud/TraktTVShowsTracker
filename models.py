@@ -58,6 +58,12 @@ class UserPreference(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
     genres_json = db.Column(db.Text, default='[]')  # JSON list of genre strings
     keywords_json = db.Column(db.Text, default='[]')  # JSON list of keyword strings
+    # Trakt personal list ids (stringified trakt ids) hidden from Add to lists menu.
+    # Empty/default = all lists shown (Wishlist is always shown).
+    hidden_list_ids_json = db.Column(db.Text, default='[]')
+    # List ids pre-checked when opening Add to lists (includes "watchlist").
+    # Default: Wishlist only. Empty array = nothing pre-checked.
+    default_selected_list_ids_json = db.Column(db.Text, default='["watchlist"]')
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     # Onboarding / reminder for empty match filters (genres + keywords).
     onboarding_completed_at = db.Column(db.DateTime)  # finished wizard or skipped
@@ -242,6 +248,25 @@ class UserMediaState(db.Model):
     plays = db.Column(db.Integer, default=0)
     last_watched_at = db.Column(db.DateTime)
     progress_percent = db.Column(db.Float)  # shows: approx watched episode ratio
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserListMembership(db.Model):
+    """Cached membership of a title on a Trakt personal list (not watchlist)."""
+
+    __tablename__ = 'user_list_memberships'
+    __table_args__ = (
+        db.UniqueConstraint(
+            'user_id', 'list_id', 'media_type', 'trakt_id',
+            name='uq_user_list_membership',
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    list_id = db.Column(db.String(64), nullable=False, index=True)  # Trakt list id as string
+    media_type = db.Column(db.String(16), nullable=False)
+    trakt_id = db.Column(db.Integer, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

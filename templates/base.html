@@ -87,8 +87,25 @@
       </div>
     </div>
   </div>
+
+  <div id="lists-modal" class="modal-overlay" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="lists-heading">
+      <div class="modal-panel">
+        <h2 id="lists-heading">Add to lists</h2>
+        <p class="muted" id="lists-title"></p>
+        <p class="meta" id="lists-hint">Select one or more. Pre-checked from your Preferences defaults and current membership — change freely before Save.</p>
+        <p class="meta" id="lists-loading" hidden>Loading your lists…</p>
+        <p class="meta" id="lists-error" hidden></p>
+        <div id="lists-options" class="found-on-options"></div>
+        <div class="actions" style="margin-top:1rem;">
+          <button class="btn btn-primary" type="button" id="lists-save">Save</button>
+          <button class="btn" type="button" id="lists-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
   {% endif %}
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=7"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=10"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -1,22 +1,81 @@
 {% extends "base.html" %}
 {% block title %}{{ title }} — {{ app_name }}{% endblock %}
 {% block content %}
+{% macro lists_qs() -%}
+lists_set=1{% for lid in selected_lists %}&lists={{ lid }}{% endfor %}
+{%- endmacro %}
+{% macro qs(page_n=None, per=None, filter_v=None) -%}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&filter={{ filter_v if filter_v is not none else filt }}&{{ lists_qs() }}
+{%- endmacro %}
+{% macro pager(position) %}
+  {% if pages > 1 %}
+  <nav class="pager pill-row" aria-label="Pagination {{ position }}">
+    {% if page > 1 %}
+      <a class="pill" href="?{{ qs(page_n=page - 1) }}" aria-label="Previous page">&lt;</a>
+    {% else %}
+      <span class="pill disabled" aria-disabled="true">&lt;</span>
+    {% endif %}
+    {% for p in page_links %}
+      {% if p is none %}
+        <span class="pill ellipsis" aria-hidden="true">…</span>
+      {% elif p == page %}
+        <span class="pill on" aria-current="page">{{ p }}</span>
+      {% else %}
+        <a class="pill" href="?{{ qs(page_n=p) }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page < pages %}
+      <a class="pill" href="?{{ qs(page_n=page + 1) }}" aria-label="Next page">&gt;</a>
+    {% else %}
+      <span class="pill disabled" aria-disabled="true">&gt;</span>
+    {% endif %}
+  </nav>
+  {% endif %}
+{% endmacro %}
 <h1>{{ title }}</h1>
 <p class="muted">
-  Synced from your TraktTV watchlist and watched history.
+  Synced from your TraktTV Wishlist, personal lists (shown in Preferences), and watched history.
   “Found on” is your local choice of where you actually have it — independent of the Streaming list from TMDB/JustWatch.
 </p>
 
-<div class="toolbar">
-  <div class="pill-row">
-    {% for key, label in [('wishlist','Wishlist'), ('watched','Watched'), ('both','Both')] %}
-      <a class="pill {% if filt == key %}on{% endif %}" href="?filter={{ key }}">{{ label }}</a>
-    {% endfor %}
-    {% if media_type == 'show' %}
-      <a class="pill {% if filt == 'unwatched_episodes' %}on{% endif %}" href="?filter=unwatched_episodes">Unwatched episodes</a>
+<div class="toolbar my-filters">
+  <div class="pill-row" style="align-items:center;">
+    <button class="pill pill-btn {% if filt == 'lists' %}on{% endif %}"
+            type="button"
+            data-action="lists-filter"
+            data-filter="{{ filt }}"
+            data-per-page="{{ per_page }}"
+            data-subtitle="{% if selected_names %}Currently: {{ selected_names|join(', ') }}{% else %}No lists selected{% endif %}"
+            data-filter-lists='{{ filter_lists_payload|tojson }}'>
+      Lists…
+    </button>
+    {% if selected_names %}
+      <span class="meta">{{ selected_names|join(' · ') }}</span>
+    {% else %}
+      <span class="meta">No lists selected</span>
     {% endif %}
   </div>
+  <div class="pill-row" style="margin-top:.55rem;">
+    <a class="pill {% if filt == 'watched' %}on{% endif %}"
+       href="?{{ qs(page_n=1, filter_v='watched') }}">Watched</a>
+    <a class="pill {% if filt == 'both' %}on{% endif %}"
+       href="?{{ qs(page_n=1, filter_v='both') }}">Both</a>
+    {% if media_type == 'show' %}
+      <a class="pill {% if filt == 'unwatched_episodes' %}on{% endif %}"
+         href="?{{ qs(page_n=1, filter_v='unwatched_episodes') }}">Unwatched episodes</a>
+    {% endif %}
+    {% for n in (10, 50, 100) %}
+      <a class="pill {% if per_page == n %}on{% endif %}"
+         href="?{{ qs(page_n=1, per=n) }}">{{ n }} / page</a>
+    {% endfor %}
+  </div>
 </div>
+
+<p class="meta">
+  Showing <strong>{{ rows|length }}</strong> of <strong>{{ total }}</strong> title{{ '' if total == 1 else 's' }}
+  {% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}.
+</p>
+{{ pager('top') }}
 
 <div class="media-list">
   {% for row in rows %}
@@ -54,7 +113,8 @@
           {% endif %}
         {% endif %}
         <div class="tags">
-          {% if st.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
+          {% if st.on_watchlist %}<span class="tag watchlist">Wishlist</span>{% endif %}
+          {% for name in row.list_names %}<span class="tag list">{{ name }}</span>{% endfor %}
           {% if st.watched %}<span class="tag watched">Watched</span>{% endif %}
           {% if st.progress_percent and st.progress_percent < 100 %}<span class="tag partial">{{ '%.0f'|format(st.progress_percent) }}%</span>{% endif %}
           {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
@@ -69,11 +129,11 @@
           {% if media_type == 'show' %}
             <a class="btn btn-small btn-primary" href="{{ url_for('user.series_progress', trakt_id=st.trakt_id) }}">Progress</a>
           {% endif %}
-          {% if st.on_watchlist %}
-            <button class="btn btn-small" data-action="watchlist-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Remove watchlist</button>
-          {% else %}
-            <button class="btn btn-small" data-action="watchlist-add" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Add watchlist</button>
-          {% endif %}
+          <button class="btn btn-small{% if not st.on_watchlist %} btn-primary{% endif %}" type="button"
+                  data-action="lists-edit"
+                  data-media-type="{{ media_type }}"
+                  data-trakt-id="{{ st.trakt_id }}"
+                  data-title="{{ (m.title if m else st.trakt_id)|e }}">Add to lists…</button>
           {% if st.watched %}
             <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Unwatch</button>
           {% else %}
@@ -97,7 +157,9 @@
       </div>
     </article>
   {% else %}
-    <p class="muted">Nothing here yet. Add titles from Latest pages or sync after login.</p>
+    <p class="muted">Nothing here for the current filters. Open <strong>Lists…</strong> to change which lists are included, or add titles from Latest / Recs.</p>
   {% endfor %}
 </div>
+
+{{ pager('bottom') }}
 {% endblock %}

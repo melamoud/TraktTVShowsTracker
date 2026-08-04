@@ -6,8 +6,8 @@ TraktTV Shows Tracker helps you review newly listed movies and shows on Trakt, h
 
 - **Latest movies / shows** — browse Trakt DB updates; defaults to **preference matches**; review marker
 - **Recommended movies / shows** — personalized Trakt picks; genre categories; highlight services you own
-- **Preferences** — your services, genres, keywords (first-login setup + optional daily reminder)
-- **My movies / My shows** — watchlist (default) / watched; local **Found on…**; mark watched ↔ watchlist
+- **Preferences** — your services, genres, keywords, which Trakt lists show in **Add to lists…**
+- **My movies / My shows** — multi-select Wishlist + personal lists (from Preferences) / watched; local **Found on…**
 - **Series progress** — mark episodes; updates Trakt
 - **Alerts** — in-app notifications (including “now streaming”)
 
