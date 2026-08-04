@@ -30,7 +30,6 @@ desktop.ini
 .env.test
 config_local.py
 .flask_secret_key
-instance/*.db
 instance/poster_cache/
 *.db-shm
 *.db-wal
