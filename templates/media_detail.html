@@ -37,15 +37,31 @@
 
     <div class="tags" style="margin:1rem 0;">
       {% if row.match.matched %}<span class="tag match">Preference match</span>{% endif %}
+      {% for g in row.match.genres %}<span class="tag match">{{ g }}</span>{% endfor %}
+      {% for k in row.match.keywords %}<span class="tag match">{{ k }}</span>{% endfor %}
       {% if row.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
       {% if row.watched %}<span class="tag watched">Watched</span>{% endif %}
     </div>
+    {% if row.my_providers %}
+      <div class="streaming-line mine">
+        <span class="streaming-label mine">Plays on your services:</span>
+        {% for p in row.my_providers %}<span class="tag stream mine">{{ p }}</span>{% endfor %}
+      </div>
+    {% endif %}
     <div class="streaming-line meta">
-      <span class="streaming-label">Streaming:</span>
-      {% if row.providers %}
-        {% for p in row.providers %}<span class="tag stream">{{ p }}</span>{% endfor %}
+      {% if row.my_providers %}
+        <span class="streaming-label">Also streaming:</span>
       {% else %}
+        <span class="streaming-label">Streaming:</span>
+      {% endif %}
+      {% if row.other_providers %}
+        {% for p in row.other_providers %}<span class="tag stream">{{ p }}</span>{% endfor %}
+      {% elif row.providers and not row.my_providers %}
+        {% for p in row.providers %}<span class="tag stream">{{ p }}</span>{% endfor %}
+      {% elif not row.my_providers %}
         <span class="muted">No subscription streaming listed</span>
+      {% else %}
+        <span class="muted">Only listed on your services above</span>
       {% endif %}
     </div>
     {% if row.found_on %}

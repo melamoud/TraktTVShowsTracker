@@ -107,6 +107,71 @@ def user_service_names(user: User) -> set[str]:
     return names
 
 
+def user_service_display_names(user: User) -> list[str]:
+    """Ordered display names of streaming services the user marked as owned."""
+    names: list[str] = []
+    seen: set[str] = set()
+    for row in user.streaming_services:
+        name = (row.display_name or '').strip()
+        if not name:
+            continue
+        key = name.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        names.append(name)
+    return names
+
+
+def names_match(a: str | None, b: str | None) -> bool:
+    """Loose name equality (same heuristic as static/js/app.js namesMatch)."""
+    x = (a or '').strip().lower()
+    y = (b or '').strip().lower()
+    if not x or not y:
+        return False
+    return x == y or x in y or y in x
+
+
+def genre_to_trakt_slug(genre: str) -> str:
+    """Convert a preference genre label to a Trakt genre filter slug."""
+    raw = (genre or '').strip().lower()
+    if not raw:
+        return ''
+    # Trakt uses hyphens: science-fiction, not "science fiction".
+    return re.sub(r'[\s_]+', '-', raw)
+
+
+def split_providers_for_user(
+    providers: list[str],
+    user: User,
+) -> tuple[list[str], list[str]]:
+    """
+    Split TMDB provider names into (on_my_services, other).
+
+    Matching is fuzzy (substring either way) so “Prime Video” ↔ “Amazon Prime Video”.
+    """
+    mine_names = user_service_display_names(user)
+    if not providers:
+        return [], []
+    if not mine_names:
+        return [], list(providers)
+
+    on_mine: list[str] = []
+    other: list[str] = []
+    seen_mine: set[str] = set()
+    for provider in providers:
+        matched = next((s for s in mine_names if names_match(provider, s)), None)
+        if matched:
+            key = matched.lower()
+            if key not in seen_mine:
+                # Prefer the user's Preference label for clarity.
+                on_mine.append(matched)
+                seen_mine.add(key)
+        else:
+            other.append(provider)
+    return on_mine, other
+
+
 def media_genres(media: CachedMedia) -> list[str]:
     """Return genre list for cached media."""
     return _parse_json_list(media.genres_json)

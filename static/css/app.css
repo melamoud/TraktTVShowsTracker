@@ -125,6 +125,12 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 650; letter-spacing:
   background: linear-gradient(180deg, rgba(28,34,48,.9), rgba(20,24,33,.9));
 }
 .media-row.match { box-shadow: inset 3px 0 0 var(--match); }
+.media-row.on-my-services {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.media-row.match.on-my-services {
+  box-shadow: inset 3px 0 0 var(--match), inset 6px 0 0 var(--accent);
+}
 .media-row.marker-line {
   outline: 1px dashed var(--accent-2);
   box-shadow: inset 0 0 0 1px rgba(240, 180, 41, 0.25);
@@ -322,10 +328,25 @@ body.modal-open { overflow: hidden; }
   margin-top: .45rem;
 }
 .streaming-label { font-weight: 700; color: var(--muted); margin-right: .15rem; }
+.streaming-label.mine { color: var(--accent); }
+.streaming-line.mine {
+  margin-top: .55rem;
+  padding: .45rem .55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(61, 214, 198, 0.45);
+  background: rgba(61, 214, 198, 0.1);
+}
 .tag.stream {
   color: #ccfbf1;
   border-color: #14b8a6;
   background: rgba(20, 184, 166, 0.12);
+}
+.tag.stream.mine {
+  color: #041210;
+  border-color: var(--accent);
+  background: var(--accent);
+  font-weight: 800;
+  letter-spacing: .02em;
 }
 
 @media (max-width: 800px) {

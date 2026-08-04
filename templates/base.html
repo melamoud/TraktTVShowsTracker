@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=5">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=6">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -17,6 +17,8 @@
     <a class="brand" href="{{ url_for('catalog.home') }}">TraktTV <span>Shows Tracker</span></a>
     <a href="{{ url_for('catalog.latest_movies') }}">Latest movies</a>
     <a href="{{ url_for('catalog.latest_shows') }}">Latest shows</a>
+    <a href="{{ url_for('catalog.recommended_movies') }}">Rec movies</a>
+    <a href="{{ url_for('catalog.recommended_shows') }}">Rec shows</a>
     <a href="{{ url_for('user.my_movies') }}">My movies</a>
     <a href="{{ url_for('user.my_shows') }}">My shows</a>
     <a href="{{ url_for('user.preferences') }}">Preferences</a>
@@ -86,7 +88,7 @@
     </div>
   </div>
   {% endif %}
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=5"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=7"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

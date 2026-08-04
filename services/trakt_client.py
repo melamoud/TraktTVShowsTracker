@@ -470,6 +470,54 @@ def episode_watched_keys_from_trakt(
     return keys
 
 
+def get_recommendations(
+    user: User,
+    media_type: str,
+    *,
+    limit: int = 100,
+    genres: str | None = None,
+    ignore_watched: bool = True,
+    ignore_collected: bool = True,
+    ignore_watchlisted: bool = False,
+    extended: str = 'full',
+) -> list:
+    """
+    Personalized Trakt recommendations for movies or shows.
+
+    ``genres`` is a Trakt genre slug (or comma-separated slugs), e.g. ``action``
+    or ``science-fiction``.
+    """
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    params: dict = {
+        'limit': max(1, min(int(limit), 100)),
+        'ignore_watched': 'true' if ignore_watched else 'false',
+        'ignore_collected': 'true' if ignore_collected else 'false',
+        'ignore_watchlisted': 'true' if ignore_watchlisted else 'false',
+    }
+    if extended:
+        params['extended'] = extended
+    if genres:
+        params['genres'] = genres
+    return api_request(
+        'GET',
+        f'/recommendations/{media_type}s',
+        user=user,
+        params=params,
+    ) or []
+
+
+def hide_recommendation(user: User, media_type: str, trakt_id: int) -> None:
+    """Hide a title from future Trakt recommendations for this user."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    api_request(
+        'DELETE',
+        f'/recommendations/{media_type}s/{int(trakt_id)}',
+        user=user,
+    )
+
+
 def add_to_watchlist(user: User, media_type: str, trakt_id: int) -> dict:
     """Add a movie/show to the user's Trakt watchlist."""
     body = {f'{media_type}s': [{'ids': {'trakt': trakt_id}}]}

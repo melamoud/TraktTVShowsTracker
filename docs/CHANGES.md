@@ -1,5 +1,14 @@
 # Changes log
 
+## 2026-08-04 — Trakt recommendations pages
+
+- **Rec movies / Rec shows** — personalized Trakt `/recommendations` feed (same source as Trakt.tv)
+- Genre category tabs from Preferences; hide wishlist / watched; “On my services” filter
+- Clear **Plays on your services** highlight for owned streaming services (TMDB overlap)
+- Purple genre/keyword match tags + Add to wishlist
+- **Hide recommendation** (Trakt Not interested) removes a title from future picks
+- Help docs + tests
+
 ## 2026-08-04 — Series progress specials vs watched counts
 
 - Progress header counts / next-up ignore season 0 specials so finished season 1 no longer looks like “0 watched”

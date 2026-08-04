@@ -13,6 +13,14 @@
     <h2 class="media-title">Latest shows</h2>
     <div class="meta">Newest series entries on Trakt with the same review workflow.</div>
   </a>
+  <a class="media-row" href="{{ url_for('catalog.recommended_movies') }}">
+    <h2 class="media-title">Recommended movies</h2>
+    <div class="meta">Personalized Trakt picks — genre categories, your services highlighted, wishlist actions.</div>
+  </a>
+  <a class="media-row" href="{{ url_for('catalog.recommended_shows') }}">
+    <h2 class="media-title">Recommended shows</h2>
+    <div class="meta">Same recommendation feed for series, filterable like Trakt.tv.</div>
+  </a>
   <a class="media-row" href="{{ url_for('user.preferences') }}">
     <h2 class="media-title">Preferences</h2>
     <div class="meta">Your streaming services, genres, and keywords used for highlighting.</div>

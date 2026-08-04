@@ -44,6 +44,10 @@ Product intent: browse what was **added/changed in Trakt’s database** (not the
 
 **Honest limits:** Trakt has no public `created_at` / “first inserted” field — first inserts and later metadata edits share this feed. Window is ~30 days. Watched titles are hidden by default to cut noise. Review markers use this Trakt DB timeline.
 
+## Recommendations
+
+Personalized picks via Trakt `/recommendations/movies|shows` (OAuth). Genre category tabs map to Trakt’s `genres` filter using Preferences genres. Wishlist/watched filters use Trakt ignore flags plus local `UserMediaState`. “Plays on your services” compares TMDB watch providers to the user’s marked streaming services (fuzzy name match) — streaming ownership is never purple preference matching.
+
 ## Security
 
 - HttpOnly / Secure / SameSite session cookies

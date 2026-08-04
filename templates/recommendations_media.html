@@ -2,10 +2,11 @@
 {% block title %}{{ title }} — {{ app_name }}{% endblock %}
 {% block content %}
 {% set hw = 1 if hide_watched else 0 %}
+{% set hwish = 1 if hide_wishlist else 0 %}
+{% set oms = 1 if on_my_services else 0 %}
 {% set mo = 1 if match_only else 0 %}
-{% set ry = 1 if recent_years else 0 %}
-{% macro qs(page_n=None, per=None, hw_v=None, mo_v=None, ry_v=None) -%}
-page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&match_only={{ mo_v if mo_v is not none else mo }}&recent_years={{ ry_v if ry_v is not none else ry }}
+{% macro qs(page_n=None, per=None, hw_v=None, hwish_v=None, oms_v=None, mo_v=None, cat=None) -%}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_wishlist={{ hwish_v if hwish_v is not none else hwish }}&on_my_services={{ oms_v if oms_v is not none else oms }}&match_only={{ mo_v if mo_v is not none else mo }}&category={{ cat if cat is not none else category }}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 %}
@@ -34,19 +35,46 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
 {% endmacro %}
 <h1>{{ title }}</h1>
 <p class="muted">
-  {{ feed_blurb }}
-  By default: <strong>recent years</strong> + <strong>preference matches</strong> (purple) to cut Trakt metadata-edit noise.
-  Dimmed rows are at or older than your review marker. Watched titles are hidden by default.
+  Personalized picks from Trakt based on your watch history (same source as Trakt.tv Recommendations).
+  Split by genre category like Trakt. Purple tags show which of <em>your</em> genres/keywords matched.
+  Streaming services you marked in Preferences are highlighted when TMDB lists them for a title.
 </p>
 
 <div class="toolbar">
+  <div class="pill-row" role="tablist" aria-label="Recommendation categories">
+    {% for c in categories %}
+      <a class="pill {% if category == c.slug %}on{% endif %}"
+         href="?{{ qs(page_n=1, cat=c.slug) }}">{{ c.label }}</a>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="toolbar">
   <div class="pill-row">
-    {% if recent_years %}
-      <span class="pill on" title="Hide titles older than {{ min_discovery_year }}">Years ≥ {{ min_discovery_year }}</span>
-      <a class="pill" href="?{{ qs(page_n=1, ry_v=0) }}">Include older years</a>
+    {% for n in (10, 50, 100) %}
+      <a class="pill {% if per_page == n %}on{% endif %}"
+         href="?{{ qs(page_n=1, per=n) }}">{{ n }} / page</a>
+    {% endfor %}
+    {% if hide_wishlist %}
+      <span class="pill on">Hiding wishlist</span>
+      <a class="pill" href="?{{ qs(page_n=1, hwish_v=0) }}">Show wishlist</a>
     {% else %}
-      <a class="pill" href="?{{ qs(page_n=1, ry_v=1) }}">Recent years only</a>
-      <span class="pill on">All years</span>
+      <span class="pill on">Showing wishlist</span>
+      <a class="pill" href="?{{ qs(page_n=1, hwish_v=1) }}">Hide wishlist</a>
+    {% endif %}
+    {% if hide_watched %}
+      <span class="pill on">Hiding watched</span>
+      <a class="pill" href="?{{ qs(page_n=1, hw_v=0) }}">Show watched</a>
+    {% else %}
+      <span class="pill on">Showing watched</span>
+      <a class="pill" href="?{{ qs(page_n=1, hw_v=1) }}">Hide watched</a>
+    {% endif %}
+    {% if on_my_services %}
+      <span class="pill on">On my services</span>
+      <a class="pill" href="?{{ qs(page_n=1, oms_v=0) }}">Any streaming</a>
+    {% else %}
+      <a class="pill" href="?{{ qs(page_n=1, oms_v=1) }}">On my services</a>
+      <span class="pill on">Any streaming</span>
     {% endif %}
     {% if match_only %}
       <span class="pill on">Matches only</span>
@@ -55,64 +83,46 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <a class="pill" href="?{{ qs(page_n=1, mo_v=1) }}">Matches only</a>
       <span class="pill on">All titles</span>
     {% endif %}
-    {% for n in (10, 50, 100) %}
-      <a class="pill {% if per_page == n %}on{% endif %}"
-         href="?{{ qs(page_n=1, per=n) }}">{{ n }} / page</a>
-    {% endfor %}
-    {% if hide_watched %}
-      <a class="pill" href="?{{ qs(page_n=1, hw_v=0) }}">Show watched</a>
-      <span class="pill on">Hiding watched</span>
-    {% else %}
-      <a class="pill on" href="?{{ qs(page_n=1, hw_v=0) }}">Showing watched</a>
-      <a class="pill" href="?{{ qs(page_n=1, hw_v=1) }}">Hide watched</a>
-    {% endif %}
   </div>
   <div class="actions">
-    <button class="btn btn-small" data-action="sync-catalog" data-media-type="{{ media_type }}" data-trakt-id="0">Refresh from Trakt</button>
-    {% if has_more_older %}
-      <a class="btn btn-small" href="?{{ qs(page_n=1) }}&load_older=1">Load older Trakt page</a>
-    {% endif %}
+    <a class="btn btn-small" href="?{{ qs(page_n=1) }}">Refresh</a>
   </div>
 </div>
-<p class="meta">
-  Showing <strong>{{ total }}</strong>{% if match_only %} match{{ '' if total == 1 else 'es' }}{% else %} title{{ '' if total == 1 else 's' }}{% endif %}
-  from <strong>{{ filter_stats.cached_total }}</strong> cached Trakt updates
-  {% if recent_years and min_discovery_year %}
-    · after year filter (≥{{ min_discovery_year }}): {{ filter_stats.after_year }}
-  {% endif %}
-  {% if hide_watched %}
-    · after hiding watched: {{ filter_stats.after_watched }}
-  {% endif %}
-  {% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}.
-  {% if has_more_older %}
-    Older Trakt pages are not loaded until you click <strong>Load older Trakt page</strong>.
-  {% endif %}
-</p>
-{{ pager('top') }}
 
-{% if match_only and not has_match_prefs %}
+{% if user_service_names %}
+  <p class="meta">
+    Your services:
+    {% for s in user_service_names %}
+      <span class="tag stream mine">{{ s }}</span>
+    {% endfor %}
+    — titles available on these get a strong highlight below.
+  </p>
+{% else %}
   <div class="callout warn">
-    <p><strong>No genres or keywords yet</strong> — Matches only is empty until you set them.</p>
+    <p><strong>No streaming services marked yet</strong> — set them in Preferences so we can highlight where you can play a title.</p>
     <p class="actions">
-      <a class="btn btn-primary btn-small" href="{{ url_for('user.preferences_setup') }}">Set up preferences</a>
-      <a class="btn btn-small" href="?{{ qs(page_n=1, mo_v=0) }}">Show all titles</a>
+      <a class="btn btn-primary btn-small" href="{{ url_for('user.preferences') }}">Preferences</a>
     </p>
   </div>
 {% endif %}
 
-{% if marker %}
-  <p class="meta">Review marker: <strong>{{ marker.title }}</strong>
-    ({{ marker.trakt_listed_at }}) — items at/older than this are dimmed.
-    <button class="btn btn-small" type="button" data-action="review-marker-clear" data-media-type="{{ media_type }}" data-trakt-id="0">Clear marker</button>
+{% if categories|length == 1 %}
+  <p class="meta">
+    Genre categories come from your Preferences genres.
+    <a href="{{ url_for('user.preferences') }}">Add genres</a> to split recommendations like Trakt.
   </p>
-{% else %}
-  <p class="meta">No review marker yet. Use “Reviewed older than this” on a row when you catch up.</p>
 {% endif %}
+
+<p class="meta">
+  Showing <strong>{{ total }}</strong> recommendation{{ '' if total == 1 else 's' }}
+  {% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}.
+</p>
+{{ pager('top') }}
 
 <div class="media-list">
   {% for row in rows %}
     {% set m = row.media %}
-    <article class="media-row {% if row.match.matched %}match{% endif %} {% if row.older_than_marker %}dimmed{% endif %} {% if row.is_marker %}marker-line{% endif %}"
+    <article class="media-row {% if row.match.matched %}match{% endif %} {% if row.my_providers %}on-my-services{% endif %}"
              data-media-type="{{ media_type }}"
              data-trakt-id="{{ m.trakt_id }}"
              data-title="{{ m.title|e }}">
@@ -130,10 +140,10 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           </a>
         </h2>
         <div class="meta">
-          Trakt DB added/updated: {{ m.trakt_listed_at or 'unknown' }}
-          {% if m.released_at %} · Public release: {{ m.released_at }}{% endif %}
+          Trakt recommendation
           {% if m.network %} · Network: {{ m.network }}{% endif %}
           {% if m.runtime %} · {{ m.runtime }} min{% endif %}
+          {% if m.released_at %} · Released: {{ m.released_at }}{% endif %}
         </div>
         {% if m.overview %}
           <div class="row-overview">{{ m.overview[:320] }}{% if m.overview|length > 320 %}…{% endif %}</div>
@@ -141,15 +151,17 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           <div class="meta">No description loaded yet — open the title for details.</div>
         {% endif %}
         <div class="tags">
-          {% if row.is_marker %}<span class="tag">Marker — dimmed from here down</span>{% endif %}
           {% if row.match.matched %}<span class="tag match">Preference match</span>{% endif %}
+          {% for g in row.match.genres %}<span class="tag match">{{ g }}</span>{% endfor %}
+          {% for k in row.match.keywords %}<span class="tag match">{{ k }}</span>{% endfor %}
           {% if row.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
           {% if row.watched %}<span class="tag watched">Watched</span>{% endif %}
-          {% if row.partial %}<span class="tag partial">Partial</span>{% endif %}
-          {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
+          {% for g in row.genres[:6] %}
+            {% if g not in row.match.genres %}<span class="tag">{{ g }}</span>{% endif %}
+          {% endfor %}
         </div>
         {% if row.my_providers %}
-          <div class="streaming-line mine">
+          <div class="streaming-line mine" title="Services you marked in Preferences that list this title">
             <span class="streaming-label mine">Plays on your services:</span>
             {% for p in row.my_providers %}<span class="tag stream mine">{{ p }}</span>{% endfor %}
           </div>
@@ -181,37 +193,39 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% if row.on_watchlist %}
             <button class="btn btn-small" data-action="watchlist-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Remove watchlist</button>
           {% else %}
-            <button class="btn btn-small" data-action="watchlist-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Add watchlist</button>
+            <button class="btn btn-small btn-primary" data-action="watchlist-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Add to wishlist</button>
           {% endif %}
           {% if row.watched %}
             <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
           {% else %}
             <button class="btn btn-small" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Mark watched</button>
           {% endif %}
-          <button class="btn btn-small btn-warn" type="button"
-                  data-action="review-marker"
+          <button class="btn btn-small" data-action="release-watch" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Alert when streaming</button>
+          <button class="btn btn-small btn-danger" type="button"
+                  data-action="recommendation-hide"
                   data-media-type="{{ media_type }}"
                   data-trakt-id="{{ m.trakt_id }}"
-                  data-title="{{ m.title|e }}">Reviewed older than this</button>
-          <button class="btn btn-small" data-action="release-watch" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Alert when streaming</button>
+                  data-title="{{ m.title|e }}"
+                  title="Hide from Trakt recommendations (Not interested)">Hide recommendation</button>
           {% if m.imdb_id %}<a class="btn btn-small" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>{% endif %}
           {% if m.trailer_url %}<a class="btn btn-small" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>{% endif %}
         </div>
       </div>
     </article>
   {% else %}
-    {% if match_only %}
-      <p class="muted">No preference matches in the loaded cache yet
-        ({{ filter_stats.cached_total }} cached titles scanned).
-        {% if has_more_older %}
-          <a href="?{{ qs(page_n=1) }}&load_older=1">Load older Trakt page</a>
-          or
-        {% endif %}
-        <a href="?{{ qs(page_n=1, mo_v=0) }}">show all titles</a>.
-      </p>
-    {% else %}
-      <p class="muted">No cached titles yet. Click “Refresh from Trakt” (requires valid API credentials).</p>
-    {% endif %}
+    <p class="muted">
+      {% if fetch_error %}
+        Trakt recommendations could not be loaded. Try Refresh later.
+      {% elif on_my_services %}
+        None of these recommendations are listed on your marked services yet.
+        <a href="?{{ qs(page_n=1, oms_v=0) }}">Show any streaming</a>.
+      {% elif match_only %}
+        No preference matches in this recommendation set.
+        <a href="?{{ qs(page_n=1, mo_v=0) }}">Show all titles</a>.
+      {% else %}
+        No recommendations returned. Watch and rate more on Trakt to improve picks, or try another genre category.
+      {% endif %}
+    </p>
   {% endfor %}
 </div>
 

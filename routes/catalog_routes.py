@@ -123,6 +123,8 @@ def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
     """Attach preference match, list/watched, found-on flags (marker applied later)."""
     import json
 
+    from services.streaming_matcher import split_providers_for_user
+
     ids = [m.trakt_id for m in items]
     states = _state_map(media_type, ids)
     found = _found_map(media_type, ids)
@@ -137,6 +139,11 @@ def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
             genres = []
         if not isinstance(genres, list):
             genres = []
+        providers = [
+            p.provider_name for p in (m.providers or [])
+            if p.offer_type in ('flatrate', 'ads', 'free')
+        ]
+        my_providers, other_providers = split_providers_for_user(providers, current_user)
         decorated.append({
             'media': m,
             'match': match,
@@ -145,7 +152,9 @@ def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
             'partial': bool(st and st.progress_percent and 0 < st.progress_percent < 100),
             'found_on': found.get(m.trakt_id, []),
             'genres': genres,
-            'providers': [p.provider_name for p in (m.providers or []) if p.offer_type in ('flatrate', 'ads', 'free')],
+            'providers': providers,
+            'my_providers': my_providers,
+            'other_providers': other_providers,
             'older_than_marker': False,
             'is_marker': bool(marker and int(marker.trakt_id) == int(m.trakt_id)),
         })
@@ -198,6 +207,159 @@ def latest_movies():
 def latest_shows():
     """Latest shows ordered by Trakt listing/update date."""
     return _latest_page('show')
+
+
+@catalog_bp.route('/recommendations/movies')
+@login_required
+def recommended_movies():
+    """Personalized Trakt movie recommendations."""
+    return _recommendations_page('movie')
+
+
+@catalog_bp.route('/recommendations/shows')
+@login_required
+def recommended_shows():
+    """Personalized Trakt show recommendations."""
+    return _recommendations_page('show')
+
+
+def _recommendations_page(media_type: str):
+    """Shared recommended-movies / recommended-shows listing."""
+    from services.streaming_matcher import (
+        genre_to_trakt_slug,
+        get_user_genres_keywords,
+        split_providers_for_user,
+    )
+    from services.sync_jobs import enrich_media_list_for_display, upsert_cached_media
+    from services.tmdb_client import is_configured as tmdb_is_configured
+
+    view = f'rec_{media_type}s'
+    per_page = _per_page(view)
+    page = max(int(request.args.get('page', 1) or 1), 1)
+
+    hide_watched = request.args.get('hide_watched', '1') != '0'
+    hide_wishlist = request.args.get('hide_wishlist', '1') != '0'
+    on_my_services = request.args.get('on_my_services', '0') == '1'
+    match_only = request.args.get('match_only', '0') == '1'
+
+    user_genres, _keywords = get_user_genres_keywords(current_user)
+    category = (request.args.get('category') or 'all').strip().lower()
+    category_slugs = {genre_to_trakt_slug(g): g for g in user_genres if genre_to_trakt_slug(g)}
+    genre_filter = None
+    if category != 'all':
+        if category not in category_slugs:
+            category = 'all'
+        else:
+            genre_filter = category
+
+    fetch_limit = 100
+    items: list[CachedMedia] = []
+    fetch_error = None
+    try:
+        payload = trakt_client.get_recommendations(
+            current_user,
+            media_type,
+            limit=fetch_limit,
+            genres=genre_filter,
+            ignore_watched=hide_watched,
+            ignore_collected=True,
+            # Prefer server-side ignore when hiding wishlist; still filter locally
+            # in case Trakt returns a watchlisted title.
+            ignore_watchlisted=hide_wishlist,
+        )
+        for entry in payload or []:
+            row = upsert_cached_media(media_type, entry)
+            if row:
+                items.append(row)
+        db.session.commit()
+    except Exception as exc:
+        fetch_error = str(exc)
+        current_app.logger.warning('Recommendations fetch failed: %s', exc)
+        flash('Could not load recommendations from Trakt right now.', 'warning')
+
+    # Deduplicate while preserving Trakt order.
+    seen_ids: set[int] = set()
+    unique_items: list[CachedMedia] = []
+    for m in items:
+        tid = int(m.trakt_id)
+        if tid in seen_ids:
+            continue
+        seen_ids.add(tid)
+        unique_items.append(m)
+
+    rows_all = _decorate(media_type, unique_items)
+    if hide_wishlist:
+        rows_all = [r for r in rows_all if not r['on_watchlist']]
+    if hide_watched:
+        rows_all = [r for r in rows_all if not r['watched']]
+    if match_only:
+        rows_all = [r for r in rows_all if r.get('match') and r['match'].get('matched')]
+
+    total_before_services = len(rows_all)
+
+    # Providers are required for "on my services" — fetch for this page's candidates.
+    # Cap lookups so a cold cache does not stall the whole list.
+    try:
+        enrich_media_list_for_display(unique_items, max_fetches=20)
+        provider_fetches = 0
+        for r in rows_all:
+            media = r['media']
+            if not media.providers and provider_fetches < 40 and media.tmdb_id:
+                sync_providers_for_media(media)
+                provider_fetches += 1
+                db.session.refresh(media)
+            providers = [
+                p.provider_name for p in (media.providers or [])
+                if p.offer_type in ('flatrate', 'ads', 'free')
+            ]
+            r['providers'] = providers
+            r['my_providers'], r['other_providers'] = split_providers_for_user(
+                providers, current_user,
+            )
+            r['match'] = match_preferences(media, current_user)
+        db.session.commit()
+    except Exception as exc:
+        current_app.logger.warning('Recommendations enrich/providers failed: %s', exc)
+
+    if on_my_services:
+        rows_all = [r for r in rows_all if r.get('my_providers')]
+
+    total = len(rows_all)
+    pages = max((total + per_page - 1) // per_page, 1) if total else 1
+    page = min(page, pages)
+    rows = rows_all[(page - 1) * per_page: page * per_page]
+
+    categories = [{'slug': 'all', 'label': 'All'}]
+    for slug, label in sorted(category_slugs.items(), key=lambda kv: kv[1].lower()):
+        categories.append({'slug': slug, 'label': label})
+
+    return render_template(
+        'recommendations_media.html',
+        media_type=media_type,
+        rows=rows,
+        page=page,
+        pages=pages,
+        page_links=_pagination_pages(page, pages),
+        per_page=per_page,
+        total=total,
+        total_before_services=total_before_services,
+        hide_watched=hide_watched,
+        hide_wishlist=hide_wishlist,
+        on_my_services=on_my_services,
+        match_only=match_only,
+        category=category,
+        categories=categories,
+        has_match_prefs=bool(user_genres or _keywords),
+        user_service_names=list(
+            dict.fromkeys(
+                (r.display_name for r in current_user.streaming_services if r.display_name)
+            )
+        ),
+        tmdb_configured=tmdb_is_configured(),
+        streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
+        fetch_error=fetch_error,
+        title='Recommended Movies' if media_type == 'movie' else 'Recommended Shows',
+    )
 
 
 def _latest_feed_query(media_type: str):
@@ -334,6 +496,8 @@ def _latest_page(media_type: str):
     # Posters only when missing; skip TMDB streaming lookups on the list (detail page).
     try:
         import json
+        from services.streaming_matcher import split_providers_for_user
+
         enrich_media_list_for_display([r['media'] for r in rows], max_fetches=8)
         for r in rows:
             media = r['media']
@@ -346,6 +510,9 @@ def _latest_page(media_type: str):
                 p.provider_name for p in (media.providers or [])
                 if p.offer_type in ('flatrate', 'ads', 'free')
             ]
+            r['my_providers'], r['other_providers'] = split_providers_for_user(
+                r['providers'], current_user,
+            )
             r['match'] = match_preferences(media, current_user)
     except Exception as exc:
         current_app.logger.warning('Visible-page enrich failed: %s', exc)
@@ -621,6 +788,20 @@ def api_release_watch(media_type, trakt_id):
         row.title = title
     db.session.commit()
     return jsonify({'success': True})
+
+
+@catalog_bp.route('/api/recommendations/<media_type>/<int:trakt_id>/hide', methods=['POST'])
+@login_required
+def api_hide_recommendation(media_type, trakt_id):
+    """Hide a title from Trakt recommendations (same as Trakt.tv Not interested)."""
+    if media_type not in ('movie', 'show'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    try:
+        trakt_client.hide_recommendation(current_user, media_type, trakt_id)
+        return jsonify({'success': True, 'hidden': True, 'trakt_id': int(trakt_id)})
+    except Exception as exc:
+        current_app.logger.exception('Hide recommendation failed: %s', exc)
+        return jsonify({'success': False, 'message': str(exc)}), 400
 
 
 @catalog_bp.route('/api/sync-catalog/<media_type>', methods=['POST'])

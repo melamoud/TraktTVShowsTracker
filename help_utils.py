@@ -45,6 +45,8 @@ def get_help_toc(role: str = 'user') -> list[dict]:
         {'title': 'Login with Trakt', 'slug': 'login'},
             {'title': 'Latest movies', 'slug': 'latest_movies'},
             {'title': 'Latest shows', 'slug': 'latest_shows'},
+            {'title': 'Recommended movies', 'slug': 'recommended_movies'},
+            {'title': 'Recommended shows', 'slug': 'recommended_shows'},
             {'title': 'Trakt 30-day limit', 'slug': 'trakt_sync_limit'},
             {'title': 'Review markers', 'slug': 'review_markers'},
             {'title': 'Preferences', 'slug': 'preferences'},

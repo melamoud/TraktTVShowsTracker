@@ -241,6 +241,20 @@ document.addEventListener('click', async function (ev) {
     } else if (action === 'release-watch') {
       await apiPost('/api/release-watch/' + mediaType + '/' + traktId, {});
       btn.textContent = 'Watching release';
+    } else if (action === 'recommendation-hide') {
+      const expected = ctx.title || '';
+      if (expected && !window.confirm(
+        'Hide from Trakt recommendations?\n\n"' + expected + '"\n\nSame as Not interested on Trakt.tv — it will stop appearing here.'
+      )) {
+        return;
+      }
+      await apiPost('/api/recommendations/' + mediaType + '/' + traktId + '/hide', {});
+      const row = btn.closest('.media-row');
+      if (row) {
+        row.remove();
+      } else {
+        location.reload();
+      }
     } else if (action === 'found-on') {
       const labels = await openFoundOnDialog({
         title: ctx.title || '',
