@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-05 — My movies/shows: auto cache invalidation
+
+- Opening My pages checks Trakt `/sync/last_activities` and re-syncs watchlist/watched/lists when they changed (no manual Refresh required for Trakt.tv edits)
+- Latest + Recs also run that user-state check so Hide watched / wishlist tags stay accurate
+- **Refresh from Trakt** remains as a force full pull
+
 ## 2026-08-05 — My movies/shows: streaming lines on cards
 
 - My movies & My shows cards show **Streaming** / **Plays on your services** like Latest (TMDB providers)

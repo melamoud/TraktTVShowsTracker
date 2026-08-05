@@ -36,7 +36,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
 <p class="muted">
   Shows your local cache of TraktTV Wishlist, personal lists (shown in Preferences), and watched history.
   Sorted by in-progress first, then most recently watched; titles you haven’t started are last.
-  Changes made on Trakt’s website won’t appear until you click <strong>Refresh from Trakt</strong>.
+  Wishlist / watched / list changes on Trakt are picked up automatically when this page opens (via Trakt activity timestamps). Use <strong>Refresh from Trakt</strong> only to force a full re-pull.
   “Found on” is your local choice of where you actually have it — independent of the Streaming list from TMDB/JustWatch.
 </p>
 
@@ -73,7 +73,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <a class="pill {% if per_page == n %}on{% endif %}"
          href="?{{ qs(page_n=1, per=n) }}">{{ n }} / page</a>
     {% endfor %}
-    <a class="pill" href="?{{ qs(page_n=1) }}&refresh=1" title="Re-download watchlist/watched/lists from Trakt (slow)">
+    <a class="pill" href="?{{ qs(page_n=1) }}&refresh=1" title="Force full re-download of watchlist/watched/lists from Trakt">
       Refresh from Trakt
     </a>
   </div>

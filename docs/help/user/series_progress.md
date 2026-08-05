@@ -31,6 +31,6 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 - **Mark series watched** — next to the header counts; marks **all** aired episodes of the show (every remaining season). Confirm carefully — this is not the same as marking one season.  
 - Counts at the top are `watched / aired` from history (+ progress plays when history lags)  
 
-**Refresh from Trakt** (My shows) only re-reads watchlist/watched into the local cache. It never writes episode history.
+My shows auto-syncs watchlist/watched when Trakt activity advances; **Refresh from Trakt** forces a full pull. Neither writes episode history.
 
 If Trakt’s website shows a checkmark but this page still says **Watch**, Trakt has no history for that episode on this account. Click **Watch** here once — after a successful write the button becomes **Watched**.

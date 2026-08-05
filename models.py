@@ -30,6 +30,8 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     last_login_at = db.Column(db.DateTime)
     last_sync_at = db.Column(db.DateTime)
+    # Fingerprint of Trakt /sync/last_activities used to auto-invalidate My cache.
+    trakt_activities_json = db.Column(db.Text, default='{}')
 
     preferences = db.relationship('UserPreference', backref='user', uselist=False, cascade='all, delete-orphan')
     streaming_services = db.relationship('UserStreamingService', backref='user', cascade='all, delete-orphan')

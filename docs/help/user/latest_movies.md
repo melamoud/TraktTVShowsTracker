@@ -28,9 +28,10 @@ This is **not** the public release / “coming soon” calendar.
 
 ## How sync works
 
-1. **First time** / **Refresh**: light pagination probe (`limit=1`), then **one newest** Trakt `/updates` page with `extended=full` (genres/overview for Matches-only). Does **not** sync your whole watchlist.  
-2. **Later visits**: uses your local cache; at most a throttled 1-page newest refresh.  
+1. **First time** / **Refresh**: light pagination probe (`limit=1`), then **one newest** Trakt `/updates` page with `extended=full` (genres/overview for Matches-only).  
+2. **Later visits**: uses your local catalog cache; at most a throttled 1-page newest refresh (~every 15 minutes).  
 3. **Older pages**: loaded **only** when you click **Load older Trakt page** — never invent empty UI pages.  
+4. **Hide watched**: also auto-syncs your watched/wishlist cache via Trakt `last_activities` when those changed.  
 
 The review marker only **dims** titles already in cache; it is not a sync depth target anymore.
 

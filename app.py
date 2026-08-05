@@ -188,6 +188,14 @@ def _ensure_schema(app):
                         'ALTER TABLE notifications ADD COLUMN alert_type VARCHAR(32)'
                     ))
                 app.logger.info('Added notifications.alert_type column')
+        if 'users' in tables:
+            user_cols = {c['name'] for c in insp.get_columns('users')}
+            if 'trakt_activities_json' not in user_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(
+                        "ALTER TABLE users ADD COLUMN trakt_activities_json TEXT DEFAULT '{}'"
+                    ))
+                app.logger.info('Added users.trakt_activities_json column')
         if 'user_media_state' in tables:
             ucols = {c['name'] for c in insp.get_columns('user_media_state')}
             u_alters = []

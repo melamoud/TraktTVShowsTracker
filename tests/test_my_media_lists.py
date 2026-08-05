@@ -1,5 +1,6 @@
 """My movies/shows multi-list filter tests."""
 
+import json
 from datetime import datetime
 from unittest.mock import patch
 
@@ -16,6 +17,7 @@ def _seed_state(
     watched=False,
     last_watched_at=None,
     progress_percent=None,
+    progress_detail_at=None,
 ):
     db.session.add(UserMediaState(
         user_id=user_id,
@@ -25,6 +27,7 @@ def _seed_state(
         watched=watched,
         last_watched_at=last_watched_at,
         progress_percent=progress_percent,
+        progress_detail_at=progress_detail_at,
     ))
 
 
@@ -50,13 +53,15 @@ def test_my_movies_defaults_to_auto_selected_lists(app, client, user):
         {'id': '10', 'slug': 'a', 'name': 'List 1', 'item_count': 1},
         {'id': '99', 'slug': 'h', 'name': 'Hidden', 'item_count': 1},
     ]
-    with patch('routes.user_routes.sync_user_media_state') as sync, \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False) as sync, \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=personal), \
          patch('routes.user_routes.ensure_media_cached'), \
          patch('routes.user_routes.enrich_media_list_for_display'):
         resp = client.get('/my/movies')
     assert resp.status_code == 200
-    sync.assert_not_called()
+    # Auto cache check always runs; full Trakt pull only when activities changed.
+    sync.assert_called_once()
+    assert sync.call_args.kwargs.get('force') is False
     html = resp.get_data(as_text=True)
     assert 'List 1' in html
     assert 'Hidden' not in html
@@ -66,8 +71,8 @@ def test_my_movies_defaults_to_auto_selected_lists(app, client, user):
     assert 'data-trakt-id="3"' not in html
 
 
-def test_my_movies_refresh_triggers_sync(app, client, user):
-    """?refresh=1 is the only path that full-syncs Trakt on My pages."""
+def test_my_movies_refresh_forces_sync(app, client, user):
+    """?refresh=1 forces ensure_user_media_fresh(..., force=True)."""
     with app.app_context():
         prefs = UserPreference.query.filter_by(user_id=user).one()
         prefs.default_selected_list_ids_json = '["watchlist"]'
@@ -75,7 +80,7 @@ def test_my_movies_refresh_triggers_sync(app, client, user):
         db.session.commit()
 
     login_client(client, app, user)
-    with patch('routes.user_routes.sync_user_media_state') as sync, \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=True) as sync, \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached'), \
          patch('routes.user_routes.enrich_media_list_for_display'):
@@ -83,6 +88,73 @@ def test_my_movies_refresh_triggers_sync(app, client, user):
     assert resp.status_code == 200
     sync.assert_called_once()
     assert sync.call_args.kwargs.get('media_types') == ('movie',)
+    assert sync.call_args.kwargs.get('force') is True
+
+
+def test_my_movies_auto_syncs_when_activities_change(app, user):
+    """Stale last_activities fingerprint triggers a watchlist/watched sync."""
+    from models import User
+    from services.user_media_sync import ensure_user_media_fresh
+
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        user_obj.last_sync_at = datetime(2026, 8, 1)
+        user_obj.trakt_activities_json = json.dumps({
+            'watchlist': '2026-08-01T00:00:00.000Z',
+            'lists': '2026-08-01T00:00:00.000Z',
+            'movies_watched': '2026-08-01T00:00:00.000Z',
+            'movies_watchlisted': '2026-08-01T00:00:00.000Z',
+        })
+        db.session.commit()
+
+        activities = {
+            'watchlist': {'updated_at': '2026-08-05T13:02:01.000Z'},
+            'lists': {'updated_at': '2026-08-01T00:00:00.000Z'},
+            'movies': {
+                'watched_at': '2026-08-01T00:00:00.000Z',
+                'watchlisted_at': '2026-08-05T13:02:01.000Z',
+            },
+        }
+        with patch('services.user_media_sync.get_last_activities', return_value=activities), \
+             patch('services.user_media_sync.sync_user_media_state') as sync:
+            ran = ensure_user_media_fresh(user_obj, media_types=('movie',), force=False)
+        assert ran is True
+        sync.assert_called_once()
+        db.session.refresh(user_obj)
+        stored = json.loads(user_obj.trakt_activities_json or '{}')
+        assert stored.get('watchlist') == '2026-08-05T13:02:01.000Z'
+
+
+def test_my_movies_skips_sync_when_activities_unchanged(app, user):
+    """Matching fingerprint serves cache without a full Trakt pull."""
+    from models import User
+    from services.user_media_sync import ensure_user_media_fresh
+
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        fp = {
+            'watchlist': '2026-08-05T13:02:01.000Z',
+            'lists': '2026-08-05T13:01:57.000Z',
+            'movies_watched': '2026-08-05T03:02:56.000Z',
+            'movies_watchlisted': '2026-08-03T19:09:59.000Z',
+        }
+        user_obj.last_sync_at = datetime(2026, 8, 5, 12, 0, 0)
+        user_obj.trakt_activities_json = json.dumps(fp)
+        db.session.commit()
+
+        activities = {
+            'watchlist': {'updated_at': fp['watchlist']},
+            'lists': {'updated_at': fp['lists']},
+            'movies': {
+                'watched_at': fp['movies_watched'],
+                'watchlisted_at': fp['movies_watchlisted'],
+            },
+        }
+        with patch('services.user_media_sync.get_last_activities', return_value=activities), \
+             patch('services.user_media_sync.sync_user_media_state') as sync:
+            ran = ensure_user_media_fresh(user_obj, media_types=('movie',), force=False)
+        assert ran is False
+        sync.assert_not_called()
 
 
 def test_my_movies_lists_set_overrides_defaults(app, client, user):
@@ -99,7 +171,7 @@ def test_my_movies_lists_set_overrides_defaults(app, client, user):
 
     login_client(client, app, user)
     personal = [{'id': '10', 'slug': 'a', 'name': 'List 1', 'item_count': 1}]
-    with patch('routes.user_routes.sync_user_media_state'), \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=personal), \
          patch('routes.user_routes.ensure_media_cached'), \
          patch('routes.user_routes.enrich_media_list_for_display'):
@@ -120,7 +192,7 @@ def test_my_movies_pages_current_slice_only(app, client, user):
         db.session.commit()
 
     login_client(client, app, user)
-    with patch('routes.user_routes.sync_user_media_state'), \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached') as ensure, \
          patch('routes.user_routes.enrich_media_list_for_display') as enrich:
@@ -157,7 +229,7 @@ def test_my_shows_orders_by_progress_then_last_watched(app, client, user):
         db.session.commit()
 
     login_client(client, app, user)
-    with patch('routes.user_routes.sync_user_media_state'), \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
          patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached'), \
@@ -192,7 +264,7 @@ def test_my_shows_card_shows_episode_progress_and_next(app, client, user):
         db.session.commit()
 
     login_client(client, app, user)
-    with patch('routes.user_routes.sync_user_media_state'), \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
          patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached'), \
@@ -238,7 +310,7 @@ def test_my_movies_unwatched_filter(app, client, user):
         db.session.commit()
 
     login_client(client, app, user)
-    with patch('routes.user_routes.sync_user_media_state'), \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached'), \
          patch('routes.user_routes.enrich_media_list_for_display'):
@@ -259,16 +331,24 @@ def test_my_shows_unwatched_excludes_finished_list_titles(app, client, user):
         _seed_state(
             user, media_type='show', trakt_id=100, on_watchlist=True,
             watched=True, progress_percent=100.0,
+            progress_detail_at=datetime(2026, 8, 1),
             last_watched_at=datetime(2026, 8, 1),
         )
         _seed_state(
             user, media_type='show', trakt_id=101, on_watchlist=True,
             watched=True, progress_percent=40.0,
+            progress_detail_at=datetime(2026, 8, 2),
             last_watched_at=datetime(2026, 8, 2),
         )
         _seed_state(user, media_type='show', trakt_id=102, on_watchlist=True)
         _seed_state(
             user, media_type='show', trakt_id=103, on_watchlist=False,
+            watched=True, progress_percent=100.0,
+            progress_detail_at=datetime(2026, 8, 1),
+        )
+        # Fake 100% without detail stamp must still appear (untrusted).
+        _seed_state(
+            user, media_type='show', trakt_id=104, on_watchlist=True,
             watched=True, progress_percent=100.0,
         )
         db.session.add(UserListMembership(
@@ -278,7 +358,7 @@ def test_my_shows_unwatched_excludes_finished_list_titles(app, client, user):
 
     login_client(client, app, user)
     personal = [{'id': '10', 'slug': 'a', 'name': 'List 1', 'item_count': 1}]
-    with patch('routes.user_routes.sync_user_media_state'), \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
          patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=personal), \
          patch('routes.user_routes.ensure_media_cached'), \
@@ -288,8 +368,9 @@ def test_my_shows_unwatched_excludes_finished_list_titles(app, client, user):
         )
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    assert 'data-trakt-id="100"' not in html  # finished, on list
+    assert 'data-trakt-id="100"' not in html  # trusted finished, on list
     assert 'data-trakt-id="101"' in html      # partial
     assert 'data-trakt-id="102"' in html      # never started, on list
-    assert 'data-trakt-id="103"' not in html  # finished, not on list
-    assert '>2</strong> of <strong>2</strong>' in html
+    assert 'data-trakt-id="103"' not in html  # trusted finished, not on list
+    assert 'data-trakt-id="104"' in html      # fake 100% without detail
+    assert '>3</strong> of <strong>3</strong>' in html

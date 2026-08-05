@@ -18,6 +18,8 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **Matches only** — purple genre/keyword preference matches only  
 - **10 / 50 / 100** per page  
 
+The recommendation list itself is fetched live from Trakt each visit. Wishlist/watched tags used for hide filters also auto-refresh when Trakt activity timestamps advance.
+
 ## Highlights
 
 - **Purple** tags — which of your genres/keywords matched (same as Latest)  

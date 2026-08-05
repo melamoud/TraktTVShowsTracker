@@ -17,7 +17,7 @@ def test_my_shows_remembers_filter_after_bare_nav(app, client, user):
         db.session.commit()
 
     login_client(client, app, user)
-    with patch('routes.user_routes.sync_user_media_state'), \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
          patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached'), \
@@ -49,7 +49,7 @@ def test_my_shows_remembers_per_page(app, client, user):
         db.session.commit()
 
     login_client(client, app, user)
-    with patch('routes.user_routes.sync_user_media_state'), \
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
          patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached'), \

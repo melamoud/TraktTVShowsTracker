@@ -73,8 +73,8 @@ from services.sync_jobs import (
     ensure_media_cached,
     enrich_media_list_for_display,
     refresh_show_progress_for_ids,
-    sync_user_media_state,
 )
+from services.user_media_sync import ensure_user_media_fresh
 
 user_bp = Blueprint('user', __name__)
 
@@ -439,14 +439,19 @@ def _my_media(media_type: str):
     if media_type == 'show' and filt == 'unwatched':
         filt = 'unwatched_episodes'
 
-    # Do NOT full-sync Trakt on every page view — that walks all watchlist /
-    # watched / personal-list pages and is what made My Shows take 10s+.
-    # Serve the local cache; sync only when the user asks (?refresh=1).
-    if request.args.get('refresh') == '1':
-        try:
-            sync_user_media_state(current_user, media_types=(media_type,))
-        except Exception as exc:
-            current_app.logger.warning('Sync before my-media failed: %s', exc)
+    # Local DB is a cache: auto-sync when Trakt last_activities advanced
+    # (wishlist / watched / lists). Manual Refresh forces a full pull.
+    try:
+        synced = ensure_user_media_fresh(
+            current_user,
+            media_types=(media_type,),
+            force=request.args.get('refresh') == '1',
+        )
+        if synced and request.args.get('refresh') == '1':
+            flash('Updated from Trakt.', 'success')
+    except Exception as exc:
+        current_app.logger.warning('Sync before my-media failed: %s', exc)
+        flash('Could not refresh from Trakt right now. Showing cached titles.', 'warning')
 
     filter_lists = _my_filter_lists(current_user)
     selected_lists = _resolve_selected_lists(current_user, filter_lists, view)
@@ -472,12 +477,14 @@ def _my_media(media_type: str):
     elif filt == 'unwatched_episodes':
         # Still has something to watch: unfinished titles on selected lists,
         # or any watched show with known incomplete progress.
-        # Fully watched (progress >= 100) must not appear — even if on a list.
-        not_finished = or_(
-            UserMediaState.watched.is_(False),
-            UserMediaState.progress_percent.is_(None),
-            UserMediaState.progress_percent < 100,
+        # Only trust progress>=100 when progress_detail_at was set from a real
+        # episode summary (otherwise old fake 100%s hide shows like Lioness).
+        trusted_complete = and_(
+            UserMediaState.progress_percent.isnot(None),
+            UserMediaState.progress_percent >= 100,
+            UserMediaState.progress_detail_at.isnot(None),
         )
+        not_finished = ~trusted_complete
         clauses = []
         if list_trakt_ids:
             clauses.append(

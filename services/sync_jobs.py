@@ -681,6 +681,15 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
                 row.on_watchlist = False
             if row.trakt_id not in watched_ids:
                 row.watched = False
+            # Old sync invented progress=100 from play count. Without a real
+            # Progress-page / page-enrich detail stamp, that % is untrusted and
+            # hides unfinished shows from "Unwatched episodes" forever.
+            if (
+                media_type == 'show'
+                and row.progress_detail_at is None
+                and row.progress_percent is not None
+            ):
+                row.progress_percent = None
 
     try:
         sync_user_list_memberships(user, media_types=types)

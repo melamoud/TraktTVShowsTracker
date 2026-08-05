@@ -281,6 +281,13 @@ def _recommendations_page(media_type: str):
     )
     genre_filter = None if category == 'all' else category
 
+    # Local wishlist/watched tags + client-side filters need a fresh cache too.
+    try:
+        from services.user_media_sync import ensure_user_media_fresh
+        ensure_user_media_fresh(current_user, media_types=(media_type,), force=False)
+    except Exception as exc:
+        current_app.logger.warning('User-state sync before Recs failed: %s', exc)
+
     fetch_limit = 100
     items: list[CachedMedia] = []
     fetch_error = None
@@ -507,6 +514,13 @@ def _latest_page(media_type: str):
         # Cached list still renders; avoid alarming on transient Trakt 429s.
         if '429' not in str(exc):
             flash('Could not refresh catalog from Trakt right now. Showing cached items.', 'warning')
+
+    # Hide-watched uses local watched cache — keep it aligned with Trakt activity.
+    try:
+        from services.user_media_sync import ensure_user_media_fresh
+        ensure_user_media_fresh(current_user, media_types=(media_type,), force=False)
+    except Exception as exc:
+        current_app.logger.warning('User-state sync before Latest failed: %s', exc)
 
     from services.sync_jobs import enrich_media_list_for_display
     from services.tmdb_client import is_configured as tmdb_is_configured

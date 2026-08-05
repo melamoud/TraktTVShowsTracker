@@ -15,7 +15,7 @@ from models import User, UserPreference, UserSession, db
 from services.admin_bootstrap import maybe_grant_admin
 from services.crypto_tokens import encrypt_token
 from services import trakt_client
-from services.sync_jobs import sync_user_media_state
+from services.user_media_sync import ensure_user_media_fresh
 
 auth_bp = Blueprint('auth', __name__)
 
@@ -135,7 +135,7 @@ def auth_callback():
 
     login_user(user, remember=True)
     try:
-        sync_user_media_state(user)
+        ensure_user_media_fresh(user, force=True)
     except Exception as exc:
         current_app.logger.warning('Initial media sync failed: %s', exc)
 
