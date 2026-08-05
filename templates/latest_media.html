@@ -193,7 +193,6 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
                   data-media-type="{{ media_type }}"
                   data-trakt-id="{{ m.trakt_id }}"
                   data-title="{{ m.title|e }}">Reviewed older than this</button>
-          <button class="btn btn-small" data-action="release-watch" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Alert when streaming</button>
           {% if m.imdb_id %}<a class="btn btn-small" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>{% endif %}
           {% if m.trailer_url %}<a class="btn btn-small" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>{% endif %}
         </div>

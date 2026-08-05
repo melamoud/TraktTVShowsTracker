@@ -158,6 +158,47 @@
   </section>
 
   <section>
+    <h2>Alerts</h2>
+    <p class="meta">
+      In-app only, for titles on your Wishlist and personal lists.
+      Stops after you finish a movie or fully watch a show.
+    </p>
+    <input type="hidden" name="alerts_prefs_present" value="1">
+    <div class="alert-prefs">
+      <label>
+        <input type="checkbox" name="alert_release_day" value="1" {% if alert_release_day %}checked{% endif %}>
+        <span>
+          <strong>Release date</strong>
+          <span class="meta">When a listed title’s release day arrives</span>
+        </span>
+      </label>
+      <label>
+        <input type="checkbox" name="alert_new_streaming" value="1" {% if alert_new_streaming %}checked{% endif %}>
+        <span>
+          <strong>Added to a streaming service</strong>
+          <span class="meta">Each time any service starts carrying a listed title</span>
+        </span>
+      </label>
+      <label>
+        <input type="checkbox" name="alert_episode_aired" value="1" {% if alert_episode_aired %}checked{% endif %}>
+        <span>
+          <strong>New episode or season</strong>
+          <span class="meta">Episode aired; one alert if a full season drops the same day</span>
+        </span>
+      </label>
+      {% if current_user.is_admin %}
+      <label>
+        <input type="checkbox" name="alert_new_user_login" value="1" {% if alert_new_user_login %}checked{% endif %}>
+        <span>
+          <strong>New user signed up</strong>
+          <span class="meta">Admin only — first login of a new account</span>
+        </span>
+      </label>
+      {% endif %}
+    </div>
+  </section>
+
+  <section>
     <h2>Reminders</h2>
     {% if prefs_reminder_disabled %}
       <p class="meta">Empty-prefs reminders are off.</p>

@@ -1,32 +1,52 @@
 {% extends "base.html" %}
-{% block title %}Notifications — {{ app_name }}{% endblock %}
+{% block title %}Alerts — {{ app_name }}{% endblock %}
 {% block content %}
 <div class="toolbar">
-  <h1 style="margin:0;">Notifications</h1>
+  <h1 style="margin:0;">Alerts</h1>
+  {% if unread_count %}
   <form method="post" action="{{ url_for('user.notifications_read_all') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button class="btn btn-small" type="submit">Mark all read</button>
+    <button class="btn btn-small" type="submit">Mark all read ({{ unread_count }})</button>
   </form>
+  {% endif %}
 </div>
+<p class="meta" style="margin-top:.35rem;">Unread alerts are brighter. Dimmed rows are already read.</p>
 
 <div class="media-list">
   {% for n in notifications %}
     <article class="media-row {% if n.is_read %}dimmed{% endif %}">
-      <h2 class="media-title">{{ n.title }}</h2>
-      <div class="meta">{{ n.created_at }} · {{ n.message }}</div>
+      <h2 class="media-title">
+        {{ n.title }}
+        {% if n.is_read %}
+          <span class="tag">Read</span>
+        {% else %}
+          <span class="tag found">Unread</span>
+        {% endif %}
+      </h2>
+      <div class="meta">
+        {{ n.created_at }}
+        {% if n.alert_type %} · {{ n.alert_type | replace('_', ' ') }}{% endif %}
+        · {{ n.message }}
+      </div>
       <div class="actions">
-        {% if not n.is_read %}
+        {% if n.link %}
+          <a class="btn btn-small" href="{{ n.link }}">Open</a>
+        {% endif %}
+        {% if n.is_read %}
+          <form method="post" action="{{ url_for('user.notification_unread', notif_id=n.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-small" type="submit">Mark unread</button>
+          </form>
+        {% else %}
           <form method="post" action="{{ url_for('user.notification_read', notif_id=n.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-small" type="submit">Open / mark read</button>
+            <button class="btn btn-small" type="submit">Mark read</button>
           </form>
-        {% elif n.link %}
-          <a class="btn btn-small" href="{{ n.link }}">Open</a>
         {% endif %}
       </div>
     </article>
   {% else %}
-    <p class="muted">No notifications yet.</p>
+    <p class="muted">No alerts yet.</p>
   {% endfor %}
 </div>
 {% endblock %}

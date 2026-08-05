@@ -35,7 +35,7 @@ def admin_required(fn):
 @admin_required
 def dashboard():
     """Admin home dashboard."""
-    from models import ReleaseWatch
+    from models import AlertEvent
     from services.tmdb_client import is_configured as tmdb_is_configured
 
     stats = {
@@ -43,7 +43,7 @@ def dashboard():
         'active_users': User.query.filter_by(is_active_account=True).count(),
         'pending_suggestions': StreamingServiceSuggestion.query.filter_by(status='pending').count(),
         'services': StreamingService.query.count(),
-        'active_release_watches': ReleaseWatch.query.filter_by(active=True, notified_at=None).count(),
+        'alert_events': AlertEvent.query.count(),
         'tmdb_configured': tmdb_is_configured(),
     }
     return render_template('admin/dashboard.html', stats=stats)
@@ -52,15 +52,15 @@ def dashboard():
 @admin_bp.route('/run-release-check', methods=['POST'])
 @admin_required
 def run_release_check():
-    """Manually run the release-watch / streaming availability checker."""
-    from services.sync_jobs import check_release_watches
+    """Manually run auto media alerts (release / streaming / episodes)."""
+    from services.alerts import run_media_alerts
 
     try:
-        notified = check_release_watches(current_app._get_current_object())
-        flash(f'Release check finished. Notifications created: {notified}.', 'success')
+        notified = run_media_alerts(current_app._get_current_object())
+        flash(f'Alert check finished. Notifications created: {notified}.', 'success')
     except Exception as exc:
-        current_app.logger.exception('Manual release check failed: %s', exc)
-        flash(f'Release check failed: {exc}', 'danger')
+        current_app.logger.exception('Manual alert check failed: %s', exc)
+        flash(f'Alert check failed: {exc}', 'danger')
     return redirect(url_for('admin.dashboard'))
 
 
@@ -172,6 +172,7 @@ def streaming_services():
             sug.resolved_by_user_id = current_user.id
             db.session.add(Notification(
                 user_id=sug.user_id,
+                alert_type='service_suggestion',
                 title='Streaming service approved',
                 message=f'"{sug.name}" was added to the default streaming services list.',
             ))

@@ -162,11 +162,27 @@ def _ensure_schema(app):
                     "ALTER TABLE user_preferences ADD COLUMN default_selected_list_ids_json "
                     "TEXT DEFAULT '[\"watchlist\"]'"
                 )
+            for col, ddl in (
+                ('alert_release_day', 'ALTER TABLE user_preferences ADD COLUMN alert_release_day BOOLEAN DEFAULT 1 NOT NULL'),
+                ('alert_new_streaming', 'ALTER TABLE user_preferences ADD COLUMN alert_new_streaming BOOLEAN DEFAULT 1 NOT NULL'),
+                ('alert_episode_aired', 'ALTER TABLE user_preferences ADD COLUMN alert_episode_aired BOOLEAN DEFAULT 1 NOT NULL'),
+                ('alert_new_user_login', 'ALTER TABLE user_preferences ADD COLUMN alert_new_user_login BOOLEAN DEFAULT 1 NOT NULL'),
+            ):
+                if col not in cols:
+                    alters.append(ddl)
             if alters:
                 with db.engine.begin() as conn:
                     for stmt in alters:
                         conn.execute(text(stmt))
                 app.logger.info('Added user_preferences preference columns')
+        if 'notifications' in tables:
+            ncols = {c['name'] for c in insp.get_columns('notifications')}
+            if 'alert_type' not in ncols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(
+                        'ALTER TABLE notifications ADD COLUMN alert_type VARCHAR(32)'
+                    ))
+                app.logger.info('Added notifications.alert_type column')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
 

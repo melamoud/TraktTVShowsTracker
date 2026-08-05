@@ -13,16 +13,16 @@
     <div class="meta">{{ stats.pending_suggestions }} pending suggestions from users.</div>
   </a>
   <article class="media-row">
-    <h2 class="media-title">Release alerts</h2>
+    <h2 class="media-title">Media alerts</h2>
     <div class="meta">
-      Active watches waiting: {{ stats.active_release_watches }}.
-      TMDB key: {% if stats.tmdb_configured %}<strong>configured</strong>{% else %}<strong>missing</strong> (required for checks){% endif %}.
-      Background job runs every PROVIDER_SYNC_INTERVAL_HOURS.
+      Dedup events recorded: {{ stats.alert_events }}.
+      TMDB key: {% if stats.tmdb_configured %}<strong>configured</strong>{% else %}<strong>missing</strong> (needed for streaming alerts){% endif %}.
+      Auto job runs every PROVIDER_SYNC_INTERVAL_HOURS for release day, new streaming, and episode/season air.
     </div>
     <div class="actions">
       <form method="post" action="{{ url_for('admin.run_release_check') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="btn btn-small btn-primary" type="submit">Run release check now</button>
+        <button class="btn btn-small btn-primary" type="submit">Run alert check now</button>
       </form>
     </div>
   </article>

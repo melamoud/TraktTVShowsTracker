@@ -1,17 +1,30 @@
-# Release alerts
+# Alerts
 
-Use **Alert when streaming** on a title (Latest or detail) when you want a heads-up once it appears on streaming.
+In-app messages under **Alerts** in the nav (badge = unread). They cover titles on your **Wishlist** and **personal lists**.
 
-## How it works
+This is separate from **Streaming vs Found on** (where a title plays / where you found it).
 
-1. You click **Alert when streaming** — a local watch row is stored  
-2. A background job (about every `PROVIDER_SYNC_INTERVAL_HOURS`, default 12h) checks TMDB providers  
-3. When the title appears on **any** subscription-style offer (flatrate / ads / free), you get an **in-app** notification under **Alerts**  
-4. That alert fires even if you do not subscribe to the service  
+## What you can get
 
-## Requirements
+| Alert | Meaning |
+|-------|---------|
+| **Release date** | A listed title’s release day arrives |
+| **Added to a streaming service** | Any service starts carrying that title (one alert per new service) |
+| **New episode or season** | An episode aired; if a full season drops the same day, one season alert instead |
+| **New user signed up** | Admins only — first login of a new account |
 
-- Free `TMDB_API_KEY` in `.env` (without it, the checker cannot see providers)  
-- Server started with the scheduler (normal `run.bat` / `run.py`, not `--no-scheduler`)  
+## When they stop
 
-Admins can also trigger **Run release check now** from the Admin dashboard.
+- Movie marked watched  
+- Show fully watched  
+- Title no longer on Wishlist or any personal list  
+
+## Turning types off
+
+**Preferences → Alerts** — uncheck any type. Defaults are on.
+
+## How they arrive
+
+Written in the background (about every `PROVIDER_SYNC_INTERVAL_HOURS`). You see them next login or page refresh. Admins can run **Run alert check now** from the Admin dashboard.
+
+Streaming-service alerts need a free `TMDB_API_KEY` in `.env`.

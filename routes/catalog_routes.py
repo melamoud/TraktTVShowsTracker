@@ -11,7 +11,7 @@ from flask import (
 from flask_login import current_user, login_required
 
 from models import (
-    CachedMedia, MediaFoundOn, ReviewMarker, ReleaseWatch, UserListMembership, UserMediaState, db,
+    CachedMedia, MediaFoundOn, ReviewMarker, UserListMembership, UserMediaState, db,
 )
 from services import trakt_client
 from services.streaming_matcher import (
@@ -910,28 +910,6 @@ def api_found_on(media_type, trakt_id):
         ))
     db.session.commit()
     return jsonify({'success': True, 'found_on': cleaned})
-
-
-@catalog_bp.route('/api/release-watch/<media_type>/<int:trakt_id>', methods=['POST'])
-@login_required
-def api_release_watch(media_type, trakt_id):
-    """Watch a title for in-app alert when it appears on any streaming service."""
-    media = CachedMedia.query.filter_by(media_type=media_type, trakt_id=trakt_id).first()
-    title = media.title if media else f'{media_type} {trakt_id}'
-    row = ReleaseWatch.query.filter_by(
-        user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
-    ).first()
-    if not row:
-        row = ReleaseWatch(
-            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id, title=title
-        )
-        db.session.add(row)
-    else:
-        row.active = True
-        row.notified_at = None
-        row.title = title
-    db.session.commit()
-    return jsonify({'success': True})
 
 
 @catalog_bp.route('/api/recommendations/<media_type>/<int:trakt_id>/hide', methods=['POST'])

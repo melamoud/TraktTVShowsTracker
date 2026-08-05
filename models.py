@@ -36,7 +36,7 @@ class User(UserMixin, db.Model):
     review_markers = db.relationship('ReviewMarker', backref='user', cascade='all, delete-orphan')
     found_on = db.relationship('MediaFoundOn', backref='user', cascade='all, delete-orphan')
     notifications = db.relationship('Notification', backref='user', cascade='all, delete-orphan')
-    release_watches = db.relationship('ReleaseWatch', backref='user', cascade='all, delete-orphan')
+    alert_events = db.relationship('AlertEvent', backref='user', cascade='all, delete-orphan')
     sessions = db.relationship('UserSession', backref='user', cascade='all, delete-orphan')
 
     def get_id(self):
@@ -69,6 +69,11 @@ class UserPreference(db.Model):
     onboarding_completed_at = db.Column(db.DateTime)  # finished wizard or skipped
     prefs_reminder_disabled = db.Column(db.Boolean, default=False, nullable=False)
     prefs_reminder_snooze_until = db.Column(db.DateTime)  # hide banner until this time
+    # Per-type in-app alert toggles (default on).
+    alert_release_day = db.Column(db.Boolean, default=True, nullable=False)
+    alert_new_streaming = db.Column(db.Boolean, default=True, nullable=False)
+    alert_episode_aired = db.Column(db.Boolean, default=True, nullable=False)  # episodes + season drops
+    alert_new_user_login = db.Column(db.Boolean, default=True, nullable=False)  # admins only
 
 
 class StreamingService(db.Model):
@@ -270,22 +275,35 @@ class UserListMembership(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-class ReleaseWatch(db.Model):
-    """User wants an alert when an upcoming title appears on any streaming service."""
+class AlertEvent(db.Model):
+    """
+    Dedup / baseline state for auto alerts.
 
-    __tablename__ = 'release_watches'
+    payload_key examples:
+      release:2026-08-04
+      provider:Netflix
+      ep:2:5
+      season:2
+      user:42
+      baseline:streaming
+      baseline:episodes
+    """
+
+    __tablename__ = 'alert_events'
     __table_args__ = (
-        db.UniqueConstraint('user_id', 'media_type', 'trakt_id', name='uq_release_watch'),
+        db.UniqueConstraint(
+            'user_id', 'alert_type', 'media_type', 'trakt_id', 'payload_key',
+            name='uq_alert_event',
+        ),
     )
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
-    media_type = db.Column(db.String(16), nullable=False)
-    trakt_id = db.Column(db.Integer, nullable=False)
-    title = db.Column(db.String(400))
-    active = db.Column(db.Boolean, default=True, nullable=False)
-    notified_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    alert_type = db.Column(db.String(32), nullable=False, index=True)
+    media_type = db.Column(db.String(16), default='', nullable=False)  # movie|show|'' for admin
+    trakt_id = db.Column(db.Integer, default=0, nullable=False)
+    payload_key = db.Column(db.String(200), nullable=False)
+    notified_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
 class Notification(db.Model):
@@ -295,6 +313,7 @@ class Notification(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    alert_type = db.Column(db.String(32), index=True)  # release_day|new_streaming|…
     title = db.Column(db.String(300), nullable=False)
     message = db.Column(db.Text, nullable=False)
     link = db.Column(db.String(500))

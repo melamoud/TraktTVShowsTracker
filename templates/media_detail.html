@@ -84,7 +84,6 @@
       {% endif %}
       <button class="btn btn-warn" type="button" data-action="review-marker" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}">Reviewed older than this</button>
       <button class="btn" type="button" data-action="found-on" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}" data-providers="{{ row.providers|join('|') }}" data-found-on="{{ row.found_on|join('|') }}">Found on…</button>
-      <button class="btn" type="button" data-action="release-watch" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Alert when streaming</button>
       {% if media_type == 'show' %}
         <a class="btn btn-primary" href="{{ url_for('user.series_progress', trakt_id=m.trakt_id) }}">Series progress</a>
       {% endif %}

@@ -89,7 +89,9 @@ def auth_callback():
         user = User.query.filter_by(slug=slug).first()
     if not user:
         user = User.query.filter_by(username=username).first()
+    is_new_user = False
     if not user:
+        is_new_user = True
         user = User(trakt_uuid=str(trakt_uuid), username=username)
         db.session.add(user)
         db.session.flush()
@@ -113,6 +115,13 @@ def auth_callback():
         return redirect(url_for('auth.login'))
 
     maybe_grant_admin(user)
+
+    if is_new_user:
+        try:
+            from services.alerts import notify_admins_new_user
+            notify_admins_new_user(user)
+        except Exception as exc:
+            current_app.logger.warning('New-user admin alert failed: %s', exc)
 
     session_token = secrets.token_hex(32)
     db.session.add(UserSession(

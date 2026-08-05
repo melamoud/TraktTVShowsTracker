@@ -1,5 +1,13 @@
 # Changes log
 
+## 2026-08-04 — Auto collection alerts
+
+- Automatic in-app alerts for Wishlist + personal-list titles (release day, new streaming service, episode / full-season drop)
+- Admin alert on a new user’s first login
+- `AlertEvent` dedup/baselines; Preferences toggles per alert type
+- Removed opt-in “Alert when streaming” button; Alerts page: mark read/unread, hide Mark-all when none unread
+- Help: Alerts topic; Streaming vs Found on kept separate
+
 ## 2026-08-04 — My movies/shows: sort + no auto full-sync
 
 - Sort by in-progress, then `last_watched_at` (newest first); never-started last

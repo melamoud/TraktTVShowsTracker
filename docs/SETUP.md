@@ -4,7 +4,7 @@
 
 - Python 3.11+
 - A free [Trakt.tv](https://trakt.tv) account (Google login is fine on Trakt’s side)
-- A **free** [TMDB](https://www.themoviedb.org/settings/api) API key for Streaming lines + release alerts (see Admin help → TMDB API key)
+- A **free** [TMDB](https://www.themoviedb.org/settings/api) API key for Streaming lines + streaming alerts (see Admin help → TMDB API key)
 
 ## 1. Create a Trakt API application
 

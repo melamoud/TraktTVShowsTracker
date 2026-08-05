@@ -74,7 +74,7 @@ Then you may run Flask with `run.py --http` and `SESSION_COOKIE_SECURE=1` still 
 
 - [ ] Trakt redirect URI matches production  
 - [ ] `PUBLIC_HOST` / `TRAKT_REDIRECT_URI` updated  
-- [ ] `TMDB_API_KEY` set (Streaming + release alerts)  
+- [ ] `TMDB_API_KEY` set (Streaming + streaming alerts)  
 - [ ] Admin can log in; friends/family can log in  
 - [ ] Admin → **Run release check now** works after TMDB key  
 - [ ] `stop.bat` / restart verified on the host  

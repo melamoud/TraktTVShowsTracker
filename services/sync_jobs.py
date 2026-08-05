@@ -15,8 +15,6 @@ from models import (
     CachedMedia,
     CatalogFeedSync,
     MediaProviderAvailability,
-    Notification,
-    ReleaseWatch,
     ReviewMarker,
     User,
     UserListMembership,
@@ -895,41 +893,9 @@ def sync_providers_for_media(media: CachedMedia) -> list[str]:
 
 
 def check_release_watches(app: Flask) -> int:
-    """Notify users when a watched upcoming title appears on any streaming service."""
-    notified = 0
-    with app.app_context():
-        watches = ReleaseWatch.query.filter_by(active=True, notified_at=None).all()
-        for watch in watches:
-            media = CachedMedia.query.filter_by(
-                media_type=watch.media_type, trakt_id=watch.trakt_id
-            ).first()
-            if not media:
-                continue
-            names = sync_providers_for_media(media)
-            # Consider flatrate/ads/free as "available to stream"
-            streaming = (
-                MediaProviderAvailability.query
-                .filter(
-                    MediaProviderAvailability.cached_media_id == media.id,
-                    MediaProviderAvailability.offer_type.in_(('flatrate', 'ads', 'free')),
-                )
-                .all()
-            )
-            if not streaming:
-                continue
-            provider_list = ', '.join(sorted({s.provider_name for s in streaming}))
-            db.session.add(Notification(
-                user_id=watch.user_id,
-                title=f'Now streaming: {watch.title or media.title}',
-                message=f'Available on: {provider_list}',
-                link=f'/catalog/{watch.media_type}/{watch.trakt_id}',
-            ))
-            watch.notified_at = datetime.utcnow()
-            watch.active = False
-            notified += 1
-        db.session.commit()
-    logger.info('Release watch check notified %s items', notified)
-    return notified
+    """Backward-compatible entry point — runs auto media alerts."""
+    from services.alerts import run_media_alerts
+    return run_media_alerts(app)
 
 
 def run_catalog_sync_job(app: Flask) -> None:
@@ -959,9 +925,14 @@ def start_scheduler(app: Flask):
         replace_existing=True,
     )
     scheduler.add_job(
-        check_release_watches, 'interval', hours=hours, args=[app], id='release_watches',
+        check_release_watches, 'interval', hours=hours, args=[app], id='media_alerts',
         replace_existing=True,
     )
+    # Keep old job id replaced if a previous process registered it.
+    try:
+        scheduler.remove_job('release_watches')
+    except Exception:
+        pass
     scheduler.start()
-    app.logger.info('Scheduler started (catalog every %sm, providers every %sh)', minutes, hours)
+    app.logger.info('Scheduler started (catalog every %sm, alerts every %sh)', minutes, hours)
     return scheduler

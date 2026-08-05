@@ -1,6 +1,6 @@
 # TMDB API key (free)
 
-Streaming lines and release alerts need a **free** TMDB API key. Trakt’s site shows the same JustWatch-style data, but Trakt does **not** expose it in their API.
+Streaming lines and “added to a streaming service” alerts need a **free** TMDB API key. Trakt’s site shows the same JustWatch-style data, but Trakt does **not** expose it in their API.
 
 ## Get a key
 
@@ -24,4 +24,4 @@ Restart the server (`stop.bat` then `run.bat`).
 
 - Latest movie tiles show **Streaming:** services (when TMDB has data)  
 - Admin dashboard shows TMDB key: **configured**  
-- Admin → **Run release check now** after you’ve used **Alert when streaming** on a title  
+- Admin → **Run alert check now** exercises streaming / release / episode alerts for collection titles  

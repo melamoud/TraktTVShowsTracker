@@ -224,6 +224,7 @@ def preferences():
                     for admin in User.query.filter_by(is_admin=True, is_active_account=True).all():
                         db.session.add(Notification(
                             user_id=admin.id,
+                            alert_type='service_suggestion',
                             title='New streaming service suggestion',
                             message=(
                                 f'{current_user.username} suggested '
@@ -273,6 +274,14 @@ def preferences():
                 if lid in allowed_defaults
             )
             prefs.default_selected_list_ids_json = json.dumps(default_ids)
+
+        if request.form.get('alerts_prefs_present') == '1':
+            prefs.alert_release_day = request.form.get('alert_release_day') == '1'
+            prefs.alert_new_streaming = request.form.get('alert_new_streaming') == '1'
+            prefs.alert_episode_aired = request.form.get('alert_episode_aired') == '1'
+            if current_user.is_admin:
+                prefs.alert_new_user_login = request.form.get('alert_new_user_login') == '1'
+
         prefs.updated_at = datetime.utcnow()
         new_genres = json.loads(g_json or '[]')
         new_keywords = json.loads(k_json or '[]')
@@ -334,6 +343,10 @@ def preferences():
         default_selected_list_ids=default_selected_list_ids,
         watchlist_list_id=WATCHLIST_LIST_ID,
         trakt_lists_error=trakt_lists_error,
+        alert_release_day=bool(getattr(prefs, 'alert_release_day', True)),
+        alert_new_streaming=bool(getattr(prefs, 'alert_new_streaming', True)),
+        alert_episode_aired=bool(getattr(prefs, 'alert_episode_aired', True)),
+        alert_new_user_login=bool(getattr(prefs, 'alert_new_user_login', True)),
     )
 
 
@@ -765,7 +778,12 @@ def notifications():
         .limit(200)
         .all()
     )
-    return render_template('notifications.html', notifications=rows)
+    unread_count = sum(1 for n in rows if not n.is_read)
+    return render_template(
+        'notifications.html',
+        notifications=rows,
+        unread_count=unread_count,
+    )
 
 
 @user_bp.route('/notifications/read-all', methods=['POST'])
@@ -781,12 +799,22 @@ def notifications_read_all():
 @user_bp.route('/notifications/<int:notif_id>/read', methods=['POST'])
 @login_required
 def notification_read(notif_id):
-    """Mark one notification as read."""
+    """Mark one notification as read; optionally open its link."""
     row = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
     row.is_read = True
     db.session.commit()
-    if row.link:
+    if request.form.get('open') == '1' and row.link:
         return redirect(row.link)
+    return redirect(url_for('user.notifications'))
+
+
+@user_bp.route('/notifications/<int:notif_id>/unread', methods=['POST'])
+@login_required
+def notification_unread(notif_id):
+    """Mark one notification as unread."""
+    row = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
+    row.is_read = False
+    db.session.commit()
     return redirect(url_for('user.notifications'))
 
 

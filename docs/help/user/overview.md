@@ -9,12 +9,12 @@ TraktTV Shows Tracker helps you review newly listed movies and shows on Trakt, h
 - **Preferences** — your services, genres, keywords, which Trakt lists show in **Add to lists…**
 - **My movies / My shows** — multi-select Wishlist + personal lists (from Preferences) / watched; local **Found on…**
 - **Series progress** — mark episodes; updates Trakt
-- **Alerts** — in-app notifications (including “now streaming”)
+- **Alerts** — automatic in-app alerts for collection titles (release date, new streaming, episodes/seasons); toggles in Preferences
 
 You must log in with TraktTV. There are no local passwords for normal users.
 
 ## Important notes
 
 - Latest lists titles recently **added/changed in Trakt’s database** (`/updates` API). Trakt does not publish a separate “first inserted” date. See Help → Latest movies / Trakt sync limit.
-- **Streaming** (TMDB) ≠ **Found on** (your choice). See Help → Streaming.
-- Free `TMDB_API_KEY` unlocks Streaming lines and release alerts.
+- **Streaming** (TMDB) ≠ **Found on** (your choice). See Help → Streaming vs Found on.
+- Free `TMDB_API_KEY` unlocks Streaming lines and “added to a streaming service” alerts.

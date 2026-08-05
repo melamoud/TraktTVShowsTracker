@@ -25,7 +25,18 @@ On Add to lists…, titles already on a list stay checked even if Auto-select is
 
 ## Genres & keywords
 
-These drive the purple **Preference match** highlight and the default Latest **Matches only** filter (genre overlap, keyword hits in title/overview/network). Your streaming services do **not** count toward that highlight — they are for Found-on / release alerts only.
+These drive the purple **Preference match** highlight and the default Latest **Matches only** filter (genre overlap, keyword hits in title/overview/network). Your streaming services do **not** count toward that highlight — they are for Found-on / “on my services” filters only.
+
+## Alerts
+
+Toggle which in-app alerts you want for Wishlist / list titles:
+
+- **Release date**  
+- **Added to a streaming service**  
+- **New episode or season**  
+- **New user signed up** (admins)  
+
+Details: [Alerts](release_alerts).
 
 ### First login wizard
 

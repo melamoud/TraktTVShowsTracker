@@ -438,9 +438,6 @@ document.addEventListener('click', async function (ev) {
       const data = await apiPost('/api/review-marker/' + mediaType + '/' + traktId, {});
       alert('Marker set on: ' + data.title);
       location.reload();
-    } else if (action === 'release-watch') {
-      await apiPost('/api/release-watch/' + mediaType + '/' + traktId, {});
-      btn.textContent = 'Watching release';
     } else if (action === 'recommendation-hide') {
       const expected = ctx.title || '';
       if (expected && !window.confirm(

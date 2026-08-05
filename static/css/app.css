@@ -207,6 +207,24 @@ input[type=text], input[type=url], textarea, select {
 .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .35rem .75rem; }
 .checks label { font-weight: 500; display: flex; gap: .4rem; align-items: center; }
 
+.alert-prefs {
+  display: grid;
+  gap: .65rem;
+  margin-top: .5rem;
+  max-width: 36rem;
+}
+.alert-prefs label {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: .55rem .65rem;
+  align-items: start;
+  font-weight: 500;
+}
+.alert-prefs label input { margin-top: .2rem; }
+.alert-prefs label span { display: grid; gap: .15rem; }
+.alert-prefs label strong { font-weight: 650; }
+.alert-prefs .meta { margin: 0; }
+
 .list-prefs {
   display: grid;
   gap: .4rem;
