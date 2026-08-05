@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-05 — Series progress: mark season/series watched
+
+- **Mark season watched** / **Mark series watched** on the progress page (Trakt history)
+- Next-up row layout fixed so episode titles aren’t cramped beside Watch
+- Season mark button sits outside the accordion so clicks reach the handler
+
 ## 2026-08-04 — Auto collection alerts
 
 - Automatic in-app alerts for Wishlist + personal-list titles (release day, new streaming service, episode / full-season drop)

@@ -10,57 +10,92 @@
   Updates write back to Trakt immediately.
 </p>
 {% if progress_aired is not none %}
-  <p class="meta">From history: <strong>{{ progress_completed or 0 }}</strong> / {{ progress_aired }} aired episodes watched.</p>
+  <div class="progress-header">
+    <p class="meta" style="margin:0;">
+      From history: <strong>{{ progress_completed or 0 }}</strong> / {{ progress_aired }} aired episodes watched.
+    </p>
+    {% if progress_aired and (progress_completed or 0) < progress_aired %}
+      <button class="btn btn-small"
+              type="button"
+              data-action="series-watched"
+              data-media-type="show"
+              data-trakt-id="{{ trakt_id }}"
+              data-title="{{ title|e }}">
+        Mark series watched
+      </button>
+    {% endif %}
+  </div>
 {% endif %}
 
 {% if next_episode %}
-  <div class="media-row" style="margin:1rem 0;">
-    <h2 class="media-title">Next up: S{{ next_episode.get('season') }}E{{ next_episode.get('number') }} — {{ next_episode.get('title') or 'Episode' }}</h2>
-    <div class="actions">
-      <button class="btn btn-primary"
-              data-action="episode-watched"
-              data-media-type="show"
-              data-trakt-id="{{ trakt_id }}"
-              data-ids='{{ next_episode.get("ids", {}) | tojson }}'>
-        Watch
-      </button>
+  <div class="next-up">
+    <div class="next-up-body">
+      <div class="next-up-label">Next up</div>
+      <div class="next-up-ep">
+        S{{ next_episode.get('season') }}E{{ next_episode.get('number') }}
+        — {{ next_episode.get('title') or 'Episode' }}
+      </div>
     </div>
+    <button class="btn btn-primary"
+            type="button"
+            data-action="episode-watched"
+            data-media-type="show"
+            data-trakt-id="{{ trakt_id }}"
+            data-ids='{{ next_episode.get("ids", {}) | tojson }}'>
+      Watch
+    </button>
   </div>
 {% endif %}
 
 {% for season in seasons %}
-  <details class="season {% if season.all_watched %}dimmed{% endif %}{% if season.is_specials %} season-specials{% endif %}" {% if season.default_open %}open{% endif %}>
-    <summary>
-      {{ season.label or ('Season ' ~ season.number) }}
-      {% if season.aired is not none %} — {{ season.completed or 0 }}/{{ season.aired }} watched{% endif %}
-      {% if season.all_watched %} (complete){% endif %}
-    </summary>
-    {% for ep in season.episodes %}
-      <div class="episode {% if ep.watched %}is-watched{% endif %} {% if not ep.aired %}is-future{% endif %} {% if next_episode and next_episode.get('season') == season.number and next_episode.get('number') == ep.number %}next{% endif %}">
-        <div class="episode-main">
-          <span class="episode-line">
-            <strong>E{{ ep.number }}</strong> {{ ep.title or '' }}
-            <span class="episode-air {% if ep.aired %}air-aired{% else %}air-future{% endif %}">· {{ ep.air_label }}</span>
-          </span>
+  <div class="season-block {% if season.all_watched %}dimmed{% endif %}{% if season.is_specials %} season-specials{% endif %}">
+    <div class="season-header">
+      <span class="season-summary-label">
+        {{ season.label or ('Season ' ~ season.number) }}
+        {% if season.aired is not none %} — {{ season.completed or 0 }}/{{ season.aired }} watched{% endif %}
+        {% if season.all_watched %} (complete){% endif %}
+      </span>
+      {% if not season.all_watched and season.aired %}
+        <button class="btn btn-small"
+                type="button"
+                data-action="season-watched"
+                data-media-type="show"
+                data-trakt-id="{{ trakt_id }}"
+                data-season="{{ season.number }}"
+                data-title="{{ season.label or ('Season ' ~ season.number) }}">
+          Mark season watched
+        </button>
+      {% endif %}
+    </div>
+    <details class="season" {% if season.default_open %}open{% endif %}>
+      <summary>Episodes</summary>
+      {% for ep in season.episodes %}
+        <div class="episode {% if ep.watched %}is-watched{% endif %} {% if not ep.aired %}is-future{% endif %} {% if next_episode and next_episode.get('season') == season.number and next_episode.get('number') == ep.number %}next{% endif %}">
+          <div class="episode-main">
+            <span class="episode-line">
+              <strong>E{{ ep.number }}</strong> {{ ep.title or '' }}
+              <span class="episode-air {% if ep.aired %}air-aired{% else %}air-future{% endif %}">· {{ ep.air_label }}</span>
+            </span>
+          </div>
+          <div class="episode-actions">
+            {% if ep.watched %}
+              <button class="btn btn-small btn-watched"
+                      data-action="episode-unwatched"
+                      data-media-type="show"
+                      data-trakt-id="{{ trakt_id }}"
+                      data-ids='{{ ep.ids | tojson }}'
+                      title="Click to unwatch">Watched</button>
+            {% else %}
+              <button class="btn btn-small btn-watch"
+                      data-action="episode-watched"
+                      data-media-type="show"
+                      data-trakt-id="{{ trakt_id }}"
+                      data-ids='{{ ep.ids | tojson }}'>Watch</button>
+            {% endif %}
+          </div>
         </div>
-        <div class="episode-actions">
-          {% if ep.watched %}
-            <button class="btn btn-small btn-watched"
-                    data-action="episode-unwatched"
-                    data-media-type="show"
-                    data-trakt-id="{{ trakt_id }}"
-                    data-ids='{{ ep.ids | tojson }}'
-                    title="Click to unwatch">Watched</button>
-          {% else %}
-            <button class="btn btn-small btn-watch"
-                    data-action="episode-watched"
-                    data-media-type="show"
-                    data-trakt-id="{{ trakt_id }}"
-                    data-ids='{{ ep.ids | tojson }}'>Watch</button>
-          {% endif %}
-        </div>
-      </div>
-    {% endfor %}
-  </details>
+      {% endfor %}
+    </details>
+  </div>
 {% endfor %}
 {% endblock %}

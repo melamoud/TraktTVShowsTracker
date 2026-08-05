@@ -767,6 +767,19 @@ def api_episode_watched():
         return jsonify({'success': False, 'message': str(exc)}), 400
 
 
+@user_bp.route('/api/show/<int:trakt_id>/season/<int:season_number>/watched', methods=['POST'])
+@login_required
+def api_season_watched(trakt_id, season_number):
+    """Mark all aired episodes in a season as watched on Trakt."""
+    try:
+        result = trakt_client.mark_season_watched(current_user, trakt_id, season_number)
+        added = int(((result.get('added') or {}).get('episodes')) or 0)
+        return jsonify({'success': True, 'added': added, 'season': season_number})
+    except Exception as exc:
+        current_app.logger.exception('Season watched failed: %s', exc)
+        return jsonify({'success': False, 'message': str(exc)}), 400
+
+
 @user_bp.route('/notifications')
 @login_required
 def notifications():

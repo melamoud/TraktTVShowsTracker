@@ -268,11 +268,72 @@ input[type=text], input[type=url], textarea, select {
   .list-prefs-head { font-size: .78rem; }
 }
 
-.season { margin: 1rem 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
-.season summary {
-  cursor: pointer; padding: .75rem 1rem; background: var(--bg2); font-weight: 700;
+.season-block {
+  margin: 1rem 0;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg1);
 }
-.season.dimmed summary { opacity: .55; }
+.season-block.dimmed { opacity: .55; }
+.season-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+  padding: .75rem 1rem;
+  background: var(--bg2);
+  font-weight: 700;
+}
+.season-summary-label { flex: 1; min-width: 0; }
+.season-header .btn { flex-shrink: 0; font-weight: 600; }
+.season-block .season {
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  overflow: visible;
+}
+.season-block .season > summary {
+  cursor: pointer;
+  padding: .55rem 1rem;
+  background: transparent;
+  font-weight: 600;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+.progress-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: .65rem .85rem;
+  margin: .35rem 0 0;
+}
+.next-up {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 1rem 0;
+  padding: 1rem 1.1rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(28,34,48,.9), rgba(20,24,33,.9));
+}
+.next-up-body { flex: 1; min-width: 0; }
+.next-up-label {
+  font-size: .82rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.next-up-ep {
+  margin: .3rem 0 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+.next-up .btn { flex-shrink: 0; }
 .episode {
   display: flex; justify-content: space-between; gap: 1rem; align-items: center;
   padding: .45rem 1rem; border-top: 1px solid var(--line);

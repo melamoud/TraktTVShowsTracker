@@ -18,13 +18,16 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 - One line per episode: title, air date (`Aired …` / `Airs … · Not aired yet`), and the action button  
 - Future episodes use a blue highlight  
 - Buttons: **Watch** (not in history) vs **Watched** (in history; click to unwatch)  
-- **Next up** prefers the next unwatched regular-season episode, not a special  
+- **Next up** prefers the next unwatched regular-season episode, not a special; title and Watch sit side-by-side so long names stay readable  
+- Expand **Episodes** under each season header to mark individual episodes  
 
 
 ## Actions
 
 - **Watch** / next-up **Watch** — writes the episode to Trakt history (must succeed before the button flips)  
 - **Watched** (click) — removes it from Trakt history  
+- **Mark season watched** — on each incomplete season row; marks all **aired** episodes in that season on Trakt (same as marking a season on Trakt.tv)  
+- **Mark series watched** — next to the header counts; marks all aired episodes of the show  
 - Counts at the top are `watched / aired` from history (+ progress plays when history lags)  
 
 If Trakt’s website shows a checkmark but this page still says **Watch**, Trakt has no history for that episode on this account. Click **Watch** here once — after a successful write the button becomes **Watched**.

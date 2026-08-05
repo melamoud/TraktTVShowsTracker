@@ -468,6 +468,25 @@ document.addEventListener('click', async function (ev) {
         action: action === 'episode-unwatched' ? 'remove' : 'add',
       });
       location.reload();
+    } else if (action === 'season-watched') {
+      const season = btn.getAttribute('data-season');
+      const label = ctx.title || ('Season ' + season);
+      if (!window.confirm(
+        'Mark all aired episodes in ' + label + ' as watched on Trakt?'
+      )) {
+        return;
+      }
+      await apiPost('/api/show/' + traktId + '/season/' + season + '/watched', {});
+      location.reload();
+    } else if (action === 'series-watched') {
+      const expected = ctx.title || 'this show';
+      if (!window.confirm(
+        'Mark all aired episodes of "' + expected + '" as watched on Trakt?'
+      )) {
+        return;
+      }
+      await apiPost('/api/watched/show/' + traktId, { action: 'add' });
+      location.reload();
     } else if (action === 'sync-catalog') {
       await apiPost('/api/sync-catalog/' + mediaType, {});
       location.reload();

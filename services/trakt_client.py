@@ -694,6 +694,39 @@ def mark_unwatched(user: User, media_type: str, trakt_id: int) -> dict:
     return api_request('POST', '/sync/history/remove', user=user, json_body=body) or {}
 
 
+def mark_season_watched(user: User, show_trakt_id: int, season_number: int) -> dict:
+    """
+    Mark all aired episodes in a season as watched on Trakt.
+
+    Uses Trakt's season history payload (same as marking a season on Trakt.tv).
+    """
+    body = {
+        'shows': [{
+            'ids': {'trakt': int(show_trakt_id)},
+            'seasons': [{'number': int(season_number)}],
+        }]
+    }
+    result = api_request('POST', '/sync/history', user=user, json_body=body) or {}
+    not_found_shows = (result.get('not_found') or {}).get('shows') or []
+    not_found_seasons = (result.get('not_found') or {}).get('seasons') or []
+    added = int(((result.get('added') or {}).get('episodes')) or 0)
+    # Trakt may already have every episode watched → added can be 0 with empty not_found.
+    if not_found_shows or not_found_seasons:
+        raise TraktError(
+            'Trakt did not record the season watch (show/season not found)',
+            400,
+            result,
+        )
+    if added < 1 and not result.get('added'):
+        # Empty / unexpected payload — treat as failure so the UI does not lie.
+        raise TraktError(
+            'Trakt did not record the season watch',
+            400,
+            result,
+        )
+    return result
+
+
 def get_show_progress(user: User, trakt_id: int) -> dict:
     """Return watched progress for a show (aired window; completed flags can be stale)."""
     return api_request('GET', f'/shows/{trakt_id}/progress/watched', user=user) or {}
