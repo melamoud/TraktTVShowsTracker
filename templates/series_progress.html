@@ -65,6 +65,16 @@
                 data-title="{{ season.label or ('Season ' ~ season.number) }}">
           Mark season watched
         </button>
+      {% elif season.all_watched and season.aired %}
+        <button class="btn btn-small"
+                type="button"
+                data-action="season-unwatched"
+                data-media-type="show"
+                data-trakt-id="{{ trakt_id }}"
+                data-season="{{ season.number }}"
+                data-title="{{ season.label or ('Season ' ~ season.number) }}">
+          Unwatch season
+        </button>
       {% endif %}
     </div>
     <details class="season" {% if season.default_open %}open{% endif %}>

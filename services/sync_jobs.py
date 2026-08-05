@@ -659,10 +659,9 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
             watched_ids.add(tid)
             plays = entry.get('plays') or 0
             last_watched = _parse_trakt_dt(entry.get('last_watched_at'))
-            progress = None
-            if media_type == 'show':
-                # Approximate from aired/completed if present in progress endpoints later
-                progress = 100.0 if plays else 0.0
+            # Do not invent show progress_percent here. Bulk /sync/watched has
+            # plays only (no aired/completed) unless extended=progress, which is
+            # too slow for Refresh. Real % is written from the Progress page.
             _upsert_state(
                 user.id,
                 media_type,
@@ -671,7 +670,6 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
                 watched=plays > 0,
                 plays=plays,
                 last_watched_at=last_watched,
-                progress_percent=progress,
             )
             upsert_cached_media(media_type, entry)
 
@@ -858,6 +856,132 @@ def _upsert_state(
     if progress_percent is not None:
         row.progress_percent = progress_percent
     row.updated_at = datetime.utcnow()
+
+
+def apply_show_episode_progress(
+    user_id: int,
+    trakt_id: int,
+    *,
+    aired: int | None,
+    completed: int | None,
+    next_episode: dict | None = None,
+) -> UserMediaState:
+    """
+    Cache show episode summary on UserMediaState for My Shows cards.
+
+    ``aired`` / ``completed`` are regular-season counts when available.
+    ``next_episode`` is a Trakt episode object or {season, number, title}.
+    """
+    row = UserMediaState.query.filter_by(
+        user_id=user_id, media_type='show', trakt_id=int(trakt_id),
+    ).first()
+    if not row:
+        row = UserMediaState(
+            user_id=user_id, media_type='show', trakt_id=int(trakt_id),
+        )
+        db.session.add(row)
+
+    if aired is not None:
+        row.episodes_aired = int(aired)
+    if completed is not None:
+        row.episodes_completed = int(completed)
+    if aired is not None and completed is not None and int(aired) > 0:
+        row.progress_percent = round(100.0 * int(completed) / int(aired), 1)
+        if int(completed) > 0:
+            row.watched = True
+
+    if next_episode:
+        row.next_episode_season = next_episode.get('season')
+        row.next_episode_number = next_episode.get('number')
+        title = next_episode.get('title')
+        row.next_episode_title = (str(title)[:400] if title else None)
+    else:
+        row.next_episode_season = None
+        row.next_episode_number = None
+        row.next_episode_title = None
+
+    row.progress_detail_at = datetime.utcnow()
+    row.updated_at = datetime.utcnow()
+    return row
+
+
+def refresh_show_progress_for_ids(
+    user: User,
+    trakt_ids: list[int],
+    *,
+    force: bool = False,
+    max_age_hours: int = 12,
+    max_workers: int = 6,
+) -> int:
+    """
+    Fetch Trakt progress for the given show ids (typically one My Shows page).
+
+    Skips rows with fresh ``progress_detail_at`` unless ``force``. Does not run
+    on full Refresh — only for the visible page — so Refresh stays fast.
+    Returns how many shows were updated.
+    """
+    ids = [int(t) for t in trakt_ids if t]
+    if not ids:
+        return 0
+
+    cutoff = datetime.utcnow() - timedelta(hours=max(1, int(max_age_hours)))
+    rows = {
+        r.trakt_id: r
+        for r in UserMediaState.query.filter(
+            UserMediaState.user_id == user.id,
+            UserMediaState.media_type == 'show',
+            UserMediaState.trakt_id.in_(ids),
+        ).all()
+    }
+    need: list[int] = []
+    for tid in ids:
+        row = rows.get(tid)
+        if force or row is None or not row.progress_detail_at or row.progress_detail_at < cutoff:
+            need.append(tid)
+    if not need:
+        return 0
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from flask import current_app
+
+    app = current_app._get_current_object()
+    user_id = user.id
+
+    def _one(tid: int):
+        with app.app_context():
+            from models import User as UserModel
+            u = UserModel.query.get(user_id)
+            if not u:
+                return tid, None
+            try:
+                return tid, trakt_client.get_show_progress(u, tid)
+            except Exception as exc:
+                logger.warning('Show progress fetch failed for %s: %s', tid, exc)
+                return tid, None
+
+    updated = 0
+    workers = max(1, min(int(max_workers), len(need)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_one, tid) for tid in need]
+        for fut in as_completed(futures):
+            tid, progress = fut.result()
+            if not progress:
+                continue
+            aired = progress.get('aired')
+            completed = progress.get('completed')
+            if aired is None and completed is None:
+                continue
+            apply_show_episode_progress(
+                user_id,
+                tid,
+                aired=int(aired or 0),
+                completed=int(completed or 0),
+                next_episode=progress.get('next_episode'),
+            )
+            updated += 1
+    if updated:
+        db.session.commit()
+    return updated
 
 
 def sync_providers_for_media(media: CachedMedia) -> list[str]:

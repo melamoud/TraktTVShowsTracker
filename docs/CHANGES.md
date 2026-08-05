@@ -1,5 +1,35 @@
 # Changes log
 
+## 2026-08-05 — My movies/shows: streaming lines on cards
+
+- My movies & My shows cards show **Streaming** / **Plays on your services** like Latest (TMDB providers)
+
+## 2026-08-05 — My movies: Unwatched filter
+
+- **Unwatched** pill on My movies — selected-list titles not marked watched
+
+## 2026-08-05 — Remember screen filters per user
+
+- Page size, watched/unwatched, Latest/Rec toggles, and My-list selection persist per user
+- Returning via the nav (no query string) restores the last settings for that screen
+
+## 2026-08-05 — My Shows cards: x/y watched + next episode
+
+- Each show card shows episode counts and next-up (loaded for the current page only, cached ~12h)
+- Full **Refresh from Trakt** still skips per-show progress (stays fast)
+
+## 2026-08-05 — My Shows: Unwatched episodes excludes finished
+
+- **Unwatched episodes** no longer keeps fully watched list titles (e.g. The Boys at 100%)
+- Progress page writes real regular-season % into the local cache for that filter
+- Refresh no longer invents `progress_percent=100` from play count alone
+
+## 2026-08-05 — Guard whole-show Mark watched; season unwatch
+
+- **Mark watched** / **Unwatch** on lists now confirm first; for shows they warn that *all* seasons go to (or leave) history
+- Progress page: **Unwatch season** clears one season’s history without touching the rest
+- Clarified that Refresh from Trakt is read-only (never writes history)
+
 ## 2026-08-05 — Series progress: mark season/series watched
 
 - **Mark season watched** / **Mark series watched** on the progress page (Trakt history)

@@ -27,7 +27,10 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 - **Watch** / next-up **Watch** — writes the episode to Trakt history (must succeed before the button flips)  
 - **Watched** (click) — removes it from Trakt history  
 - **Mark season watched** — on each incomplete season row; marks all **aired** episodes in that season on Trakt (same as marking a season on Trakt.tv)  
-- **Mark series watched** — next to the header counts; marks all aired episodes of the show  
+- **Unwatch season** — on each complete season row; removes that season’s plays from Trakt history only  
+- **Mark series watched** — next to the header counts; marks **all** aired episodes of the show (every remaining season). Confirm carefully — this is not the same as marking one season.  
 - Counts at the top are `watched / aired` from history (+ progress plays when history lags)  
+
+**Refresh from Trakt** (My shows) only re-reads watchlist/watched into the local cache. It never writes episode history.
 
 If Trakt’s website shows a checkmark but this page still says **Watch**, Trakt has no history for that episode on this account. Click **Watch** here once — after a successful write the button becomes **Watched**.

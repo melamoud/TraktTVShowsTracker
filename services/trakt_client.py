@@ -694,18 +694,22 @@ def mark_unwatched(user: User, media_type: str, trakt_id: int) -> dict:
     return api_request('POST', '/sync/history/remove', user=user, json_body=body) or {}
 
 
+def _season_history_body(show_trakt_id: int, season_number: int) -> dict:
+    return {
+        'shows': [{
+            'ids': {'trakt': int(show_trakt_id)},
+            'seasons': [{'number': int(season_number)}],
+        }]
+    }
+
+
 def mark_season_watched(user: User, show_trakt_id: int, season_number: int) -> dict:
     """
     Mark all aired episodes in a season as watched on Trakt.
 
     Uses Trakt's season history payload (same as marking a season on Trakt.tv).
     """
-    body = {
-        'shows': [{
-            'ids': {'trakt': int(show_trakt_id)},
-            'seasons': [{'number': int(season_number)}],
-        }]
-    }
+    body = _season_history_body(show_trakt_id, season_number)
     result = api_request('POST', '/sync/history', user=user, json_body=body) or {}
     not_found_shows = (result.get('not_found') or {}).get('shows') or []
     not_found_seasons = (result.get('not_found') or {}).get('seasons') or []
@@ -721,6 +725,32 @@ def mark_season_watched(user: User, show_trakt_id: int, season_number: int) -> d
         # Empty / unexpected payload — treat as failure so the UI does not lie.
         raise TraktError(
             'Trakt did not record the season watch',
+            400,
+            result,
+        )
+    return result
+
+
+def mark_season_unwatched(user: User, show_trakt_id: int, season_number: int) -> dict:
+    """
+    Remove all watch history for one season on Trakt.
+
+    Same season payload as mark_season_watched, posted to /sync/history/remove.
+    """
+    body = _season_history_body(show_trakt_id, season_number)
+    result = api_request('POST', '/sync/history/remove', user=user, json_body=body) or {}
+    not_found_shows = (result.get('not_found') or {}).get('shows') or []
+    not_found_seasons = (result.get('not_found') or {}).get('seasons') or []
+    deleted = int(((result.get('deleted') or {}).get('episodes')) or 0)
+    if not_found_shows or not_found_seasons:
+        raise TraktError(
+            'Trakt did not clear the season (show/season not found)',
+            400,
+            result,
+        )
+    if deleted < 1 and not result.get('deleted'):
+        raise TraktError(
+            'Trakt did not clear the season watch history',
             400,
             result,
         )

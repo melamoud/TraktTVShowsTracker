@@ -65,6 +65,9 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     {% if media_type == 'show' %}
       <a class="pill {% if filt == 'unwatched_episodes' %}on{% endif %}"
          href="?{{ qs(page_n=1, filter_v='unwatched_episodes') }}">Unwatched episodes</a>
+    {% else %}
+      <a class="pill {% if filt == 'unwatched' %}on{% endif %}"
+         href="?{{ qs(page_n=1, filter_v='unwatched') }}">Unwatched</a>
     {% endif %}
     {% for n in (10, 50, 100) %}
       <a class="pill {% if per_page == n %}on{% endif %}"
@@ -117,12 +120,48 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
             <div class="row-overview">{{ m.overview[:320] }}{% if m.overview|length > 320 %}…{% endif %}</div>
           {% endif %}
         {% endif %}
+        {% if media_type == 'show' and st.episodes_aired is not none %}
+          <div class="meta show-progress-line">
+            <strong>{{ st.episodes_completed or 0 }}</strong> / {{ st.episodes_aired }} episodes watched
+            {% if st.episodes_aired and (st.episodes_completed or 0) >= st.episodes_aired %}
+              · complete
+            {% elif st.next_episode_season is not none and st.next_episode_number is not none %}
+              · Next: S{{ st.next_episode_season }}E{{ st.next_episode_number }}{% if st.next_episode_title %} — {{ st.next_episode_title }}{% endif %}
+            {% endif %}
+          </div>
+        {% endif %}
         <div class="tags">
           {% if st.on_watchlist %}<span class="tag watchlist">Wishlist</span>{% endif %}
           {% for name in row.list_names %}<span class="tag list">{{ name }}</span>{% endfor %}
           {% if st.watched %}<span class="tag watched">Watched</span>{% endif %}
           {% if st.progress_percent and st.progress_percent < 100 %}<span class="tag partial">{{ '%.0f'|format(st.progress_percent) }}%</span>{% endif %}
           {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
+        </div>
+        {% if row.my_providers %}
+          <div class="streaming-line mine">
+            <span class="streaming-label mine">Plays on your services:</span>
+            {% for p in row.my_providers %}<span class="tag stream mine">{{ p }}</span>{% endfor %}
+          </div>
+        {% endif %}
+        <div class="streaming-line meta">
+          {% if row.my_providers %}
+            <span class="streaming-label">Also streaming:</span>
+          {% else %}
+            <span class="streaming-label">Streaming:</span>
+          {% endif %}
+          {% if row.other_providers %}
+            {% for p in row.other_providers[:8] %}<span class="tag stream">{{ p }}</span>{% endfor %}
+          {% elif row.providers and not row.my_providers %}
+            {% for p in row.providers[:8] %}<span class="tag stream">{{ p }}</span>{% endfor %}
+          {% elif not row.my_providers %}
+            {% if tmdb_configured %}
+              <span class="muted">No subscription streaming listed for {{ streaming_region }}</span>
+            {% else %}
+              <span class="muted">Add TMDB_API_KEY in .env to show where it’s streaming</span>
+            {% endif %}
+          {% else %}
+            <span class="muted">Only listed on your services above</span>
+          {% endif %}
         </div>
         {% if row.found_on %}
           <div class="streaming-line meta">

@@ -158,6 +158,7 @@ def test_my_shows_orders_by_progress_then_last_watched(app, client, user):
 
     login_client(client, app, user)
     with patch('routes.user_routes.sync_user_media_state'), \
+         patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached'), \
          patch('routes.user_routes.enrich_media_list_for_display'):
@@ -166,3 +167,129 @@ def test_my_shows_orders_by_progress_then_last_watched(app, client, user):
     html = resp.get_data(as_text=True)
     pos = {tid: html.index(f'data-trakt-id="{tid}"') for tid in (1, 2, 3, 4)}
     assert pos[2] < pos[3] < pos[1] < pos[4]
+
+
+def test_my_shows_card_shows_episode_progress_and_next(app, client, user):
+    """Show cards render cached x/y watched and next episode."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        st = UserMediaState(
+            user_id=user,
+            media_type='show',
+            trakt_id=55,
+            on_watchlist=True,
+            watched=True,
+            progress_percent=50.0,
+            episodes_aired=10,
+            episodes_completed=5,
+            next_episode_season=2,
+            next_episode_number=1,
+            next_episode_title='Blood Trial',
+            progress_detail_at=datetime.utcnow(),
+        )
+        db.session.add(st)
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.sync_user_media_state'), \
+         patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        resp = client.get('/my/shows?lists_set=1&lists=watchlist&filter=lists')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert '5</strong> / 10 episodes watched' in html
+    assert 'Next: S2E1 — Blood Trial' in html
+
+
+def test_refresh_show_progress_skips_fresh_cache(app, user):
+    """Page enrich does not re-hit Trakt when progress_detail_at is fresh."""
+    from models import User
+    from services.sync_jobs import refresh_show_progress_for_ids
+
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        db.session.add(UserMediaState(
+            user_id=user,
+            media_type='show',
+            trakt_id=77,
+            watched=True,
+            episodes_aired=8,
+            episodes_completed=3,
+            progress_detail_at=datetime.utcnow(),
+        ))
+        db.session.commit()
+        with patch('services.sync_jobs.trakt_client.get_show_progress') as prog:
+            n = refresh_show_progress_for_ids(user_obj, [77], force=False)
+        assert n == 0
+        prog.assert_not_called()
+
+
+def test_my_movies_unwatched_filter(app, client, user):
+    """My movies Unwatched shows list titles that are not watched."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        _seed_state(user, trakt_id=1, on_watchlist=True, watched=False)
+        _seed_state(user, trakt_id=2, on_watchlist=True, watched=True)
+        _seed_state(user, trakt_id=3, on_watchlist=False, watched=True)
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.sync_user_media_state'), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        resp = client.get('/my/movies?lists_set=1&lists=watchlist&filter=unwatched')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'Unwatched' in html
+    assert 'data-trakt-id="1"' in html
+    assert 'data-trakt-id="2"' not in html
+    assert 'data-trakt-id="3"' not in html
+
+
+def test_my_shows_unwatched_excludes_finished_list_titles(app, client, user):
+    """Unwatched episodes drops 100% shows even when they remain on a list."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist", "10"]'
+        _seed_state(
+            user, media_type='show', trakt_id=100, on_watchlist=True,
+            watched=True, progress_percent=100.0,
+            last_watched_at=datetime(2026, 8, 1),
+        )
+        _seed_state(
+            user, media_type='show', trakt_id=101, on_watchlist=True,
+            watched=True, progress_percent=40.0,
+            last_watched_at=datetime(2026, 8, 2),
+        )
+        _seed_state(user, media_type='show', trakt_id=102, on_watchlist=True)
+        _seed_state(
+            user, media_type='show', trakt_id=103, on_watchlist=False,
+            watched=True, progress_percent=100.0,
+        )
+        db.session.add(UserListMembership(
+            user_id=user, list_id='10', media_type='show', trakt_id=100,
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    personal = [{'id': '10', 'slug': 'a', 'name': 'List 1', 'item_count': 1}]
+    with patch('routes.user_routes.sync_user_media_state'), \
+         patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=personal), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        resp = client.get(
+            '/my/shows?lists_set=1&lists=watchlist&lists=10&filter=unwatched_episodes'
+        )
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'data-trakt-id="100"' not in html  # finished, on list
+    assert 'data-trakt-id="101"' in html      # partial
+    assert 'data-trakt-id="102"' in html      # never started, on list
+    assert 'data-trakt-id="103"' not in html  # finished, not on list
+    assert '>2</strong> of <strong>2</strong>' in html

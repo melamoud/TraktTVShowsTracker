@@ -228,6 +228,24 @@ def test_mark_season_watched_posts_season_payload():
         assert body['shows'][0]['seasons'][0]['number'] == 2
 
 
+def test_mark_season_unwatched_posts_remove_payload():
+    """Season unwatch uses the same season body against /sync/history/remove."""
+    from services.trakt_client import mark_season_unwatched
+    from unittest.mock import MagicMock, patch
+
+    user = MagicMock()
+    with patch('services.trakt_client.api_request') as api:
+        api.return_value = {'deleted': {'episodes': 8}}
+        result = mark_season_unwatched(user, 1390, 3)
+        assert result['deleted']['episodes'] == 8
+        args, kwargs = api.call_args
+        assert args[0] == 'POST'
+        assert args[1] == '/sync/history/remove'
+        body = kwargs['json_body']
+        assert body['shows'][0]['ids']['trakt'] == 1390
+        assert body['shows'][0]['seasons'][0]['number'] == 3
+
+
 def test_series_progress_shows_bulk_watch_actions(app, client, user):
     """Incomplete seasons expose Mark season watched; series button when incomplete."""
     from datetime import datetime
@@ -266,3 +284,45 @@ def test_series_progress_shows_bulk_watch_actions(app, client, user):
     assert 'next-up' in html
     assert 'S1E1' in html
     assert 'One' in html
+
+
+def test_series_progress_shows_unwatch_season_when_complete(app, client, user):
+    """Complete seasons expose Unwatch season instead of Mark season watched."""
+    from datetime import datetime
+
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=4243, title='Done Show',
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        db.session.commit()
+
+    seasons = [{
+        'number': 2,
+        'episodes': [
+            {'number': 1, 'title': 'A', 'first_aired': '2020-01-01T00:00:00.000Z',
+             'ids': {'trakt': 11}},
+            {'number': 2, 'title': 'B', 'first_aired': '2020-01-08T00:00:00.000Z',
+             'ids': {'trakt': 12}},
+        ],
+    }]
+    progress = {'seasons': [{'number': 2, 'episodes': [
+        {'number': 1}, {'number': 2},
+    ]}]}
+
+    with patch('routes.user_routes.trakt_client.get_show_progress', return_value=progress), \
+         patch('routes.user_routes.trakt_client.get_show_seasons', return_value=seasons), \
+         patch('routes.user_routes.trakt_client.get_show_watch_history', return_value=[]), \
+         patch('routes.user_routes.trakt_client.get_show_watched_entry', return_value=None), \
+         patch(
+             'routes.user_routes.trakt_client.episode_watched_keys_from_trakt',
+             return_value={(2, 1), (2, 2)},
+         ):
+        login_client(client, app, user)
+        resp = client.get('/shows/4243/progress')
+    assert resp.status_code == 200
+    html = resp.data.decode('utf-8')
+    assert 'Unwatch season' in html
+    assert 'data-action="season-unwatched"' in html
+    assert 'Mark season watched' not in html
+    assert 'Mark series watched' not in html

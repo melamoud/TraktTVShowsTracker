@@ -396,7 +396,11 @@ document.addEventListener('click', async function (ev) {
       params.set('filter', 'lists');
       selected.forEach(function (id) { params.append('lists', id); });
       // Keep status if user opened the menu while on Both / Unwatched.
-      if (currentFilter === 'both' || currentFilter === 'unwatched_episodes') {
+      if (
+        currentFilter === 'both'
+        || currentFilter === 'unwatched'
+        || currentFilter === 'unwatched_episodes'
+      ) {
         params.set('filter', currentFilter);
       }
       location.search = params.toString();
@@ -423,9 +427,25 @@ document.addEventListener('click', async function (ev) {
       await apiPost('/api/lists/membership/' + mediaType + '/' + traktId, { selected: selected });
       location.reload();
     } else if (action === 'watched-add') {
+      const label = ctx.title || 'this title';
+      const warn = mediaType === 'show'
+        ? 'Mark ALL aired seasons/episodes of "' + label + '" as watched on Trakt?\n\n'
+          + 'This writes every remaining episode into watch history (not just the season you meant).'
+        : 'Mark "' + label + '" as watched on Trakt?';
+      if (!window.confirm(warn)) {
+        return;
+      }
       await apiPost('/api/watched/' + mediaType + '/' + traktId, { action: 'add' });
       location.reload();
     } else if (action === 'watched-remove') {
+      const label = ctx.title || 'this title';
+      const warn = mediaType === 'show'
+        ? 'Remove ALL watch history for "' + label + '" on Trakt?\n\n'
+          + 'Every season/episode play for this show will be cleared.'
+        : 'Remove "' + label + '" from Trakt watch history?';
+      if (!window.confirm(warn)) {
+        return;
+      }
       await apiPost('/api/watched/' + mediaType + '/' + traktId, { action: 'remove' });
       location.reload();
     } else if (action === 'review-marker') {
@@ -478,10 +498,22 @@ document.addEventListener('click', async function (ev) {
       }
       await apiPost('/api/show/' + traktId + '/season/' + season + '/watched', {});
       location.reload();
+    } else if (action === 'season-unwatched') {
+      const season = btn.getAttribute('data-season');
+      const label = ctx.title || ('Season ' + season);
+      if (!window.confirm(
+        'Remove all watch history for ' + label + ' on Trakt?\n\n'
+        + 'Only this season is cleared — other seasons stay as they are.'
+      )) {
+        return;
+      }
+      await apiPost('/api/show/' + traktId + '/season/' + season + '/unwatched', {});
+      location.reload();
     } else if (action === 'series-watched') {
       const expected = ctx.title || 'this show';
       if (!window.confirm(
-        'Mark all aired episodes of "' + expected + '" as watched on Trakt?'
+        'Mark ALL aired seasons/episodes of "' + expected + '" as watched on Trakt?\n\n'
+        + 'This writes every remaining episode into watch history.'
       )) {
         return;
       }

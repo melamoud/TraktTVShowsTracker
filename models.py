@@ -64,6 +64,8 @@ class UserPreference(db.Model):
     # List ids pre-checked when opening Add to lists (includes "watchlist").
     # Default: Wishlist only. Empty array = nothing pre-checked.
     default_selected_list_ids_json = db.Column(db.Text, default='["watchlist"]')
+    # Per-screen UI filters / page size (My, Latest, Recs), JSON object keyed by view.
+    ui_view_settings_json = db.Column(db.Text, default='{}')
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     # Onboarding / reminder for empty match filters (genres + keywords).
     onboarding_completed_at = db.Column(db.DateTime)  # finished wizard or skipped
@@ -253,6 +255,13 @@ class UserMediaState(db.Model):
     plays = db.Column(db.Integer, default=0)
     last_watched_at = db.Column(db.DateTime)
     progress_percent = db.Column(db.Float)  # shows: approx watched episode ratio
+    # Show episode summary for My Shows cards (filled on page view / Progress page).
+    episodes_aired = db.Column(db.Integer)
+    episodes_completed = db.Column(db.Integer)
+    next_episode_season = db.Column(db.Integer)
+    next_episode_number = db.Column(db.Integer)
+    next_episode_title = db.Column(db.String(400))
+    progress_detail_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

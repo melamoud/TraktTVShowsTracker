@@ -9,7 +9,7 @@ from flask import (
     request, session, url_for,
 )
 from flask_login import current_user, login_required
-from sqlalchemy import and_, case
+from sqlalchemy import and_, case, or_
 
 
 def _parse_air_datetime(value: str | None) -> datetime | None:
@@ -72,6 +72,7 @@ from routes.catalog_routes import _pagination_pages, _per_page
 from services.sync_jobs import (
     ensure_media_cached,
     enrich_media_list_for_display,
+    refresh_show_progress_for_ids,
     sync_user_media_state,
 )
 
@@ -383,19 +384,15 @@ def _my_filter_lists(user) -> list[dict]:
     return out
 
 
-def _resolve_selected_lists(user, filter_lists: list[dict]) -> list[str]:
-    """Selected list ids from query args, or Preferences defaults."""
+def _resolve_selected_lists(user, filter_lists: list[dict], view: str) -> list[str]:
+    """Selected list ids from query args, saved view prefs, or Preferences defaults."""
+    from services import view_prefs
+
     shown_ids = {lst['id'] for lst in filter_lists}
-    if request.args.get('lists_set') == '1':
-        selected = [
-            str(x).strip()
-            for x in request.args.getlist('lists')
-            if str(x).strip() in shown_ids
-        ]
-    else:
-        selected = filter_visible_list_ids(user, get_default_selected_list_ids(user))
-        selected = [lid for lid in selected if lid in shown_ids]
-    return selected
+    defaults = filter_visible_list_ids(user, get_default_selected_list_ids(user))
+    return view_prefs.resolve_lists(
+        user, view, shown_ids, defaults=defaults,
+    )
 
 
 def _trakt_ids_for_lists(user_id: int, media_type: str, selected_lists: list[str]) -> set[int]:
@@ -421,12 +418,26 @@ def _my_media(media_type: str):
     """Shared my-movies / my-shows listing with multi-list + watched filters."""
     import json
 
-    filt = (request.args.get('filter') or 'lists').lower()
+    from services import view_prefs
+
+    view = f'my_{media_type}s'
+    allowed_filters = ('lists', 'watched', 'both', 'unwatched', 'unwatched_episodes')
+    if 'filter' in request.args:
+        filt = view_prefs.resolve_choice(
+            current_user, view, 'filter', 'filter',
+            allowed=allowed_filters, default='lists',
+        )
+    else:
+        stored = view_prefs.get_view(current_user, view).get('filter')
+        filt = stored if stored in allowed_filters else 'lists'
     # Legacy bookmark: wishlist → lists mode.
     if filt == 'wishlist':
         filt = 'lists'
-    if filt not in ('lists', 'watched', 'both', 'unwatched_episodes'):
-        filt = 'lists'
+    # Movies have no episode progress — map the show filter name if saved/linked.
+    if media_type == 'movie' and filt == 'unwatched_episodes':
+        filt = 'unwatched'
+    if media_type == 'show' and filt == 'unwatched':
+        filt = 'unwatched_episodes'
 
     # Do NOT full-sync Trakt on every page view — that walks all watchlist /
     # watched / personal-list pages and is what made My Shows take 10s+.
@@ -438,7 +449,7 @@ def _my_media(media_type: str):
             current_app.logger.warning('Sync before my-media failed: %s', exc)
 
     filter_lists = _my_filter_lists(current_user)
-    selected_lists = _resolve_selected_lists(current_user, filter_lists)
+    selected_lists = _resolve_selected_lists(current_user, filter_lists, view)
     list_trakt_ids = _trakt_ids_for_lists(current_user.id, media_type, selected_lists)
 
     q = UserMediaState.query.filter_by(user_id=current_user.id, media_type=media_type)
@@ -449,21 +460,41 @@ def _my_media(media_type: str):
             q = q.filter(UserMediaState.trakt_id == -1)
     elif filt == 'watched':
         q = q.filter_by(watched=True)
+    elif filt == 'unwatched':
+        # Movies (or titles) on selected lists that are not watched yet.
+        if list_trakt_ids:
+            q = q.filter(
+                UserMediaState.trakt_id.in_(list_trakt_ids),
+                UserMediaState.watched.is_(False),
+            )
+        else:
+            q = q.filter(UserMediaState.trakt_id == -1)
     elif filt == 'unwatched_episodes':
-        # Titles on selected lists, or watched with incomplete progress.
+        # Still has something to watch: unfinished titles on selected lists,
+        # or any watched show with known incomplete progress.
+        # Fully watched (progress >= 100) must not appear — even if on a list.
+        not_finished = or_(
+            UserMediaState.watched.is_(False),
+            UserMediaState.progress_percent.is_(None),
+            UserMediaState.progress_percent < 100,
+        )
         clauses = []
         if list_trakt_ids:
-            clauses.append(UserMediaState.trakt_id.in_(list_trakt_ids))
+            clauses.append(
+                and_(UserMediaState.trakt_id.in_(list_trakt_ids), not_finished)
+            )
         clauses.append(
-            (UserMediaState.watched.is_(True)) & (UserMediaState.progress_percent < 100)
+            and_(
+                UserMediaState.watched.is_(True),
+                UserMediaState.progress_percent.isnot(None),
+                UserMediaState.progress_percent < 100,
+            )
         )
-        from sqlalchemy import or_
         q = q.filter(or_(*clauses))
     else:  # both
         clauses = [UserMediaState.watched.is_(True)]
         if list_trakt_ids:
             clauses.append(UserMediaState.trakt_id.in_(list_trakt_ids))
-        from sqlalchemy import or_
         q = q.filter(or_(*clauses))
 
     total = q.count()
@@ -505,6 +536,24 @@ def _my_media(media_type: str):
     except Exception as exc:
         current_app.logger.warning('Title enrich for my-media failed: %s', exc)
 
+    # Shows only: fill x/y + next episode for the visible page (not full Refresh).
+    if media_type == 'show' and trakt_ids:
+        try:
+            refresh_show_progress_for_ids(
+                current_user,
+                trakt_ids,
+                force=request.args.get('refresh') == '1',
+            )
+            # Re-load states so template sees fresh progress columns.
+            state_by_id = {
+                s.id: s for s in UserMediaState.query.filter(
+                    UserMediaState.id.in_([st.id for st in states])
+                ).all()
+            }
+            states = [state_by_id.get(st.id, st) for st in states]
+        except Exception as exc:
+            current_app.logger.warning('Show progress enrich failed: %s', exc)
+
     media_rows = {
         m.trakt_id: m
         for m in CachedMedia.query.filter(
@@ -513,16 +562,18 @@ def _my_media(media_type: str):
         ).all()
     }
     # Same metadata as Latest: overview, genres, locally cached poster + providers.
+    from services.streaming_matcher import split_providers_for_user
     from services.sync_jobs import sync_providers_for_media
     from services.tmdb_client import is_configured as tmdb_is_configured
 
+    tmdb_ok = tmdb_is_configured()
     try:
         to_enrich = [media_rows[tid] for tid in trakt_ids if tid in media_rows]
         enrich_media_list_for_display(to_enrich, max_fetches=len(to_enrich))
         provider_fetches = 0
         for media in to_enrich:
             if (
-                tmdb_is_configured()
+                tmdb_ok
                 and media.tmdb_id
                 and not media.providers
                 and provider_fetches < per_page
@@ -563,6 +614,8 @@ def _my_media(media_type: str):
         media = media_rows.get(st.trakt_id)
         genres = []
         providers = []
+        my_providers = []
+        other_providers = []
         if media:
             try:
                 genres = json.loads(media.genres_json or '[]')
@@ -574,11 +627,16 @@ def _my_media(media_type: str):
                 p.provider_name for p in (media.providers or [])
                 if p.offer_type in ('flatrate', 'ads', 'free')
             ]
+            my_providers, other_providers = split_providers_for_user(
+                providers, current_user,
+            )
         rows.append({
             'state': st,
             'media': media,
             'genres': genres,
             'providers': providers,
+            'my_providers': my_providers,
+            'other_providers': other_providers,
             'found_on': found_map.get(st.trakt_id, []),
             'list_names': membership_names.get(st.trakt_id, []),
         })
@@ -609,6 +667,8 @@ def _my_media(media_type: str):
         per_page=per_page,
         total=total,
         page_links=_pagination_pages(page, pages),
+        tmdb_configured=tmdb_ok,
+        streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='My Movies' if media_type == 'movie' else 'My Shows',
     )
 
@@ -734,6 +794,21 @@ def series_progress(trakt_id):
 
     next_episode = next_regular or next_special
 
+    # Persist episode summary for My Shows cards / Unwatched filter.
+    try:
+        from services.sync_jobs import apply_show_episode_progress
+        apply_show_episode_progress(
+            current_user.id,
+            trakt_id,
+            aired=total_aired,
+            completed=total_completed,
+            next_episode=next_episode,
+        )
+        db.session.commit()
+    except Exception as exc:
+        current_app.logger.warning('Could not cache show progress %%: %s', exc)
+        db.session.rollback()
+
     return render_template(
         'series_progress.html',
         media=media,
@@ -777,6 +852,19 @@ def api_season_watched(trakt_id, season_number):
         return jsonify({'success': True, 'added': added, 'season': season_number})
     except Exception as exc:
         current_app.logger.exception('Season watched failed: %s', exc)
+        return jsonify({'success': False, 'message': str(exc)}), 400
+
+
+@user_bp.route('/api/show/<int:trakt_id>/season/<int:season_number>/unwatched', methods=['POST'])
+@login_required
+def api_season_unwatched(trakt_id, season_number):
+    """Remove all watch history for one season on Trakt."""
+    try:
+        result = trakt_client.mark_season_unwatched(current_user, trakt_id, season_number)
+        deleted = int(((result.get('deleted') or {}).get('episodes')) or 0)
+        return jsonify({'success': True, 'deleted': deleted, 'season': season_number})
+    except Exception as exc:
+        current_app.logger.exception('Season unwatched failed: %s', exc)
         return jsonify({'success': False, 'message': str(exc)}), 400
 
 

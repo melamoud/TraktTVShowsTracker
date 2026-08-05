@@ -54,9 +54,19 @@ def cached_poster(media_type, trakt_id):
 
 
 def _per_page(view_type: str) -> int:
-    """Resolve allowed page size for a catalog view."""
-    allowed = current_app.config.get('ALLOWED_PER_PAGE', (10, 50, 100))
+    """Resolve allowed page size for a catalog view (persisted per user)."""
+    from services import view_prefs
+
+    allowed = tuple(current_app.config.get('ALLOWED_PER_PAGE', (10, 50, 100)))
     default = current_app.config.get('DEFAULT_PER_PAGE', 50)
+    user = view_prefs.current_user_or_none()
+    if user is not None:
+        value = view_prefs.resolve_per_page(
+            user, view_type, allowed=allowed, default=default,
+        )
+        # Keep session mirror for the current browser tab.
+        session.setdefault('per_page_settings', {})[view_type] = value
+        return value
     try:
         requested = int(request.args.get('per_page', 0))
     except (TypeError, ValueError):
@@ -241,24 +251,35 @@ def _recommendations_page(media_type: str):
     from services.sync_jobs import enrich_media_list_for_display, upsert_cached_media
     from services.tmdb_client import is_configured as tmdb_is_configured
 
+    from services import view_prefs
+
     view = f'rec_{media_type}s'
     per_page = _per_page(view)
     page = max(int(request.args.get('page', 1) or 1), 1)
 
-    hide_watched = request.args.get('hide_watched', '1') != '0'
-    hide_wishlist = request.args.get('hide_wishlist', '1') != '0'
-    on_my_services = request.args.get('on_my_services', '0') == '1'
-    match_only = request.args.get('match_only', '0') == '1'
+    hide_watched = view_prefs.resolve_bool(
+        current_user, view, 'hide_watched', 'hide_watched', default=True,
+    )
+    hide_wishlist = view_prefs.resolve_bool(
+        current_user, view, 'hide_wishlist', 'hide_wishlist', default=True,
+    )
+    on_my_services = view_prefs.resolve_bool(
+        current_user, view, 'on_my_services', 'on_my_services',
+        default=False, true_when='one',
+    )
+    match_only = view_prefs.resolve_bool(
+        current_user, view, 'match_only', 'match_only',
+        default=False, true_when='one',
+    )
 
     user_genres, _keywords = get_user_genres_keywords(current_user)
-    category = (request.args.get('category') or 'all').strip().lower()
     category_slugs = {genre_to_trakt_slug(g): g for g in user_genres if genre_to_trakt_slug(g)}
-    genre_filter = None
-    if category != 'all':
-        if category not in category_slugs:
-            category = 'all'
-        else:
-            genre_filter = category
+    category = view_prefs.resolve_choice(
+        current_user, view, 'category', 'category',
+        allowed=set(category_slugs) | {'all'},
+        default='all',
+    )
+    genre_filter = None if category == 'all' else category
 
     fetch_limit = 100
     items: list[CachedMedia] = []
@@ -432,31 +453,33 @@ def _latest_page(media_type: str):
     """Shared latest-movies / latest-shows listing (Trakt DB updates feed)."""
     from services.streaming_matcher import discovery_year_cutoff, user_has_match_prefs
 
+    from services import view_prefs
+
     view = f'latest_{media_type}s'
     per_page = _per_page(view)
     page = max(int(request.args.get('page', 1) or 1), 1)
     # Default: hide titles already watched on Trakt (still “in DB”, just less noise).
-    hide_watched = request.args.get('hide_watched', '1') != '0'
-    # Default: preference matches only (purple). Session remembers the toggle.
-    match_key = f'match_only_{media_type}'
+    hide_watched = view_prefs.resolve_bool(
+        current_user, view, 'hide_watched', 'hide_watched', default=True,
+    )
+    # Default: preference matches only (purple) when the user has match prefs.
+    # Persist across visits (replaces session-only toggle).
     if 'match_only' in request.args:
-        match_only = request.args.get('match_only') != '0'
-        session[match_key] = match_only
-    elif match_key in session:
-        match_only = bool(session[match_key])
+        match_only = view_prefs.resolve_bool(
+            current_user, view, 'match_only', 'match_only',
+            default=user_has_match_prefs(current_user),
+        )
     else:
-        # No prefs yet → show all so the page isn't empty before onboarding.
-        match_only = user_has_match_prefs(current_user)
+        stored_match = view_prefs.get_view(current_user, view).get('match_only')
+        if isinstance(stored_match, bool):
+            match_only = stored_match
+        else:
+            match_only = user_has_match_prefs(current_user)
 
     # Default: hide old production years (Trakt /updates is mostly metadata noise).
-    year_key = f'recent_years_{media_type}'
-    if 'recent_years' in request.args:
-        recent_years = request.args.get('recent_years') != '0'
-        session[year_key] = recent_years
-    elif year_key in session:
-        recent_years = bool(session[year_key])
-    else:
-        recent_years = True
+    recent_years = view_prefs.resolve_bool(
+        current_user, view, 'recent_years', 'recent_years', default=True,
+    )
     min_year = discovery_year_cutoff() if recent_years else None
 
     # Explicit older-page load only (never invent empty UI pages).

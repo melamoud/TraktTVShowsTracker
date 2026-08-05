@@ -45,6 +45,8 @@ Trakt’s `/updates` API **cannot** filter by genre/keyword server-side. Matches
 - Poster, description, genres  
 - **Streaming:** read-only TMDB/JustWatch list (needs free `TMDB_API_KEY`)  
 
+Filter and page-size choices are remembered for your account when you leave and return.
+
 Collection alerts (release day, new streaming, episodes) are automatic for Wishlist / list titles — see [Alerts](release_alerts). “Found on” is **not** on Latest — assign that on My movies/shows.
 
 ## Sync window

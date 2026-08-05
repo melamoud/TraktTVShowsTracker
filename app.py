@@ -162,6 +162,11 @@ def _ensure_schema(app):
                     "ALTER TABLE user_preferences ADD COLUMN default_selected_list_ids_json "
                     "TEXT DEFAULT '[\"watchlist\"]'"
                 )
+            if 'ui_view_settings_json' not in cols:
+                alters.append(
+                    "ALTER TABLE user_preferences ADD COLUMN ui_view_settings_json "
+                    "TEXT DEFAULT '{}'"
+                )
             for col, ddl in (
                 ('alert_release_day', 'ALTER TABLE user_preferences ADD COLUMN alert_release_day BOOLEAN DEFAULT 1 NOT NULL'),
                 ('alert_new_streaming', 'ALTER TABLE user_preferences ADD COLUMN alert_new_streaming BOOLEAN DEFAULT 1 NOT NULL'),
@@ -183,6 +188,30 @@ def _ensure_schema(app):
                         'ALTER TABLE notifications ADD COLUMN alert_type VARCHAR(32)'
                     ))
                 app.logger.info('Added notifications.alert_type column')
+        if 'user_media_state' in tables:
+            ucols = {c['name'] for c in insp.get_columns('user_media_state')}
+            u_alters = []
+            for col, ddl in (
+                ('episodes_aired',
+                 'ALTER TABLE user_media_state ADD COLUMN episodes_aired INTEGER'),
+                ('episodes_completed',
+                 'ALTER TABLE user_media_state ADD COLUMN episodes_completed INTEGER'),
+                ('next_episode_season',
+                 'ALTER TABLE user_media_state ADD COLUMN next_episode_season INTEGER'),
+                ('next_episode_number',
+                 'ALTER TABLE user_media_state ADD COLUMN next_episode_number INTEGER'),
+                ('next_episode_title',
+                 'ALTER TABLE user_media_state ADD COLUMN next_episode_title VARCHAR(400)'),
+                ('progress_detail_at',
+                 'ALTER TABLE user_media_state ADD COLUMN progress_detail_at DATETIME'),
+            ):
+                if col not in ucols:
+                    u_alters.append(ddl)
+            if u_alters:
+                with db.engine.begin() as conn:
+                    for stmt in u_alters:
+                        conn.execute(text(stmt))
+                app.logger.info('Added user_media_state episode progress columns')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
 

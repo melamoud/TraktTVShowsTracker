@@ -9,15 +9,19 @@ Opening this page uses the local cache (fast). Use **Refresh from Trakt** to re-
 - **Lists…** — opens a checklist (same style as Add to lists). Options = Wishlist + lists marked **Show in menu** in Preferences; initial checks = **Auto-select** defaults (or your last choice). Save reloads the page with those lists.
 - **Watched** — watched history only  
 - **Both** — selected lists **or** watched  
+- **Unwatched** — titles on your selected lists that are not watched yet
 
 ## Paging
 
 Long lists are paged (10 / 50 / 100 per page, same as Latest). Only the current page of titles is loaded and enriched.
 
+Filter choices and page size are remembered for your account when you leave and come back.
+
 ## Actions
 
 - **Add to lists…** — multi-select Wishlist + Trakt personal lists
-- **Mark watched / Unwatch** — syncs to Trakt
+- **Mark watched / Unwatch** — syncs to Trakt (asks for confirmation first)
+- **Streaming** / **Plays on your services** — TMDB availability (same as Latest); highlighted when it matches services in Preferences  
 - **Found on…** — multi-select where *you* found it (local only; see [Streaming](streaming))
 - Open the title for full detail, IMDb, trailer
 
