@@ -2,7 +2,7 @@
 User routes: preferences, my movies/shows, series progress, notifications, help.
 """
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from flask import (
     Blueprint, current_app, flash, jsonify, redirect, render_template,
@@ -52,9 +52,9 @@ def _episode_air_info(ep: dict, *, progress_says_aired: bool | None) -> dict:
 
 from help_utils import get_help_toc, render_help_markdown
 from models import (
-    CachedMedia, MediaFoundOn, Notification, ReviewMarker, StreamingService,
-    StreamingServiceSuggestion, UserListMembership, UserMediaState, UserPreference,
-    UserStreamingService, db,
+    CachedMedia, MediaFoundOn, MediaProviderAvailability, Notification,
+    ReviewMarker, StreamingService, StreamingServiceSuggestion,
+    UserListMembership, UserMediaState, UserPreference, UserStreamingService, db,
 )
 from services import trakt_client
 from services.seed import COMMON_GENRES
@@ -459,6 +459,10 @@ def _my_media(media_type: str):
     search_q = (request.args.get('q') or '').strip()
     if len(search_q) < 2:
         search_q = ''
+    from services.availability import (
+        normalize_avail, theater_window_bounds, upcoming_after,
+    )
+    avail = normalize_avail(request.args.get('avail'))
 
     q = UserMediaState.query.filter_by(user_id=current_user.id, media_type=media_type)
     if filt == 'lists':
@@ -507,22 +511,36 @@ def _my_media(media_type: str):
             clauses.append(UserMediaState.trakt_id.in_(list_trakt_ids))
         q = q.filter(or_(*clauses))
 
-    # In-list title search across the full filtered set (before pagination).
+    # Title search and/or availability filters need CachedMedia (before pagination).
+    needs_media_join = bool(search_q) or bool(avail)
+    if needs_media_join:
+        q = q.outerjoin(
+            CachedMedia,
+            and_(
+                CachedMedia.media_type == UserMediaState.media_type,
+                CachedMedia.trakt_id == UserMediaState.trakt_id,
+            ),
+        )
     if search_q:
         like = f'%{search_q}%'
-        q = (
-            q.outerjoin(
-                CachedMedia,
-                and_(
-                    CachedMedia.media_type == UserMediaState.media_type,
-                    CachedMedia.trakt_id == UserMediaState.trakt_id,
-                ),
-            )
-            .filter(or_(
-                CachedMedia.title.ilike(like),
-                cast(CachedMedia.year, String).ilike(like),
-            ))
+        q = q.filter(or_(
+            CachedMedia.title.ilike(like),
+            cast(CachedMedia.year, String).ilike(like),
+        ))
+    if avail == 'upcoming':
+        q = q.filter(CachedMedia.released_at >= upcoming_after())
+    elif avail == 'theater':
+        start, end = theater_window_bounds()
+        q = q.filter(
+            CachedMedia.released_at >= start,
+            CachedMedia.released_at <= end,
         )
+    elif avail == 'streaming':
+        streaming_ids = (
+            db.session.query(MediaProviderAvailability.cached_media_id)
+            .filter(MediaProviderAvailability.offer_type.in_(('flatrate', 'ads', 'free')))
+        )
+        q = q.filter(CachedMedia.id.in_(streaming_ids))
 
     total = q.count()
     per_page = _per_page(f'my_{media_type}')
@@ -639,6 +657,8 @@ def _my_media(media_type: str):
             if name:
                 membership_names.setdefault(mem.trakt_id, []).append(name)
 
+    from services.availability import attach_availability
+
     rows = []
     for st in states:
         media = media_rows.get(st.trakt_id)
@@ -660,7 +680,7 @@ def _my_media(media_type: str):
             my_providers, other_providers = split_providers_for_user(
                 providers, current_user,
             )
-        rows.append({
+        row = {
             'state': st,
             'media': media,
             'genres': genres,
@@ -669,7 +689,9 @@ def _my_media(media_type: str):
             'other_providers': other_providers,
             'found_on': found_map.get(st.trakt_id, []),
             'list_names': membership_names.get(st.trakt_id, []),
-        })
+        }
+        attach_availability(row)
+        rows.append(row)
 
     selected_set = set(selected_lists)
     filter_lists_payload = [
@@ -698,6 +720,7 @@ def _my_media(media_type: str):
         total=total,
         page_links=_pagination_pages(page, pages),
         search_q=search_q,
+        avail=avail,
         tmdb_configured=tmdb_ok,
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='My Movies' if media_type == 'movie' else 'My Shows',

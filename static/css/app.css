@@ -155,6 +155,29 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
   padding: 1rem 1.1rem; border: 1px solid var(--line); border-radius: 14px;
   background: linear-gradient(180deg, rgba(28,34,48,.9), rgba(20,24,33,.9));
 }
+.media-poster-col {
+  display: flex; flex-direction: column; gap: .4rem; align-items: stretch;
+}
+.avail-chips {
+  display: flex; flex-direction: column; gap: .28rem;
+}
+.avail-chip {
+  display: block; text-align: center;
+  font-size: .68rem; font-weight: 700; line-height: 1.2;
+  padding: .28rem .3rem; border-radius: 7px;
+  border: 1px solid var(--line);
+  letter-spacing: .01em;
+}
+.avail-chip.avail-upcoming {
+  color: #bfdbfe; border-color: #60a5fa; background: rgba(96, 165, 250, .14);
+}
+.avail-chip.avail-theater {
+  color: #ffedd5; border-color: #fb923c; background: rgba(251, 146, 60, .16);
+}
+.avail-chip.avail-streaming {
+  color: #a7f3d0; border-color: #34d399; background: rgba(52, 211, 153, .14);
+}
+.avail-filters { margin-top: .35rem; }
 .media-row.match { box-shadow: inset 3px 0 0 var(--match); }
 .media-row.on-my-services {
   box-shadow: inset 3px 0 0 var(--accent);

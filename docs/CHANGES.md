@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-06 — Availability chips + filters
+
+- Under-poster chips: **Upcoming** (>30 days out), **Theater window** (±30 days), **Streaming** / On your services
+- Filter pills on My movies/shows, Latest, and Recommended (`avail=`)
+
 ## 2026-08-06 — Series progress side panel
 
 - **Progress** / **Series progress** opens a right-hand drawer instead of leaving the page (My shows, Search, show detail)

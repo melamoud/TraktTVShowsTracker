@@ -72,13 +72,16 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
                data-media-type="{{ media_type }}"
                data-trakt-id="{{ m.trakt_id }}"
                data-title="{{ m.title|e }}">
-        <a class="media-poster" href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">
-          {% if m.poster_url %}
-            <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
-          {% else %}
-            <div class="poster-missing-sm">No image</div>
-          {% endif %}
-        </a>
+        <div class="media-poster-col">
+          <a class="media-poster" href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">
+            {% if m.poster_url %}
+              <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
+            {% else %}
+              <div class="poster-missing-sm">No image</div>
+            {% endif %}
+          </a>
+          {% include '_avail_chips.html' %}
+        </div>
         <div class="media-body">
           <h2 class="media-title">
             <a href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">

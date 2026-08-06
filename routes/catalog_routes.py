@@ -141,6 +141,7 @@ def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
     """Attach preference match, list/watched, found-on flags (marker applied later)."""
     import json
 
+    from services.availability import attach_availability
     from services.streaming_matcher import split_providers_for_user
 
     ids = [m.trakt_id for m in items]
@@ -162,7 +163,7 @@ def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
             if p.offer_type in ('flatrate', 'ads', 'free')
         ]
         my_providers, other_providers = split_providers_for_user(providers, current_user)
-        decorated.append({
+        row = {
             'media': m,
             'match': match,
             'on_watchlist': bool(st and st.on_watchlist),
@@ -175,7 +176,9 @@ def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
             'other_providers': other_providers,
             'older_than_marker': False,
             'is_marker': bool(marker and int(marker.trakt_id) == int(m.trakt_id)),
-        })
+        }
+        attach_availability(row)
+        decorated.append(row)
     return decorated
 
 
@@ -500,14 +503,23 @@ def _recommendations_page(media_type: str):
     if on_my_services:
         rows_all = [r for r in rows_all if r.get('my_providers')]
 
+    from services.availability import attach_availability, filter_rows_by_avail, normalize_avail
+
     search_q = _normalize_search_q(request.args.get('q'))
     if search_q:
         rows_all = [r for r in rows_all if _row_title_matches(r, search_q)]
+    avail = normalize_avail(request.args.get('avail'))
+    if avail:
+        for r in rows_all:
+            attach_availability(r)
+        rows_all = filter_rows_by_avail(rows_all, avail)
 
     total = len(rows_all)
     pages = max((total + per_page - 1) // per_page, 1) if total else 1
     page = min(page, pages)
     rows = rows_all[(page - 1) * per_page: page * per_page]
+    for r in rows:
+        attach_availability(r)
 
     categories = [{'slug': 'all', 'label': 'All'}]
     for slug, label in sorted(category_slugs.items(), key=lambda kv: kv[1].lower()):
@@ -539,6 +551,7 @@ def _recommendations_page(media_type: str):
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         fetch_error=fetch_error,
         search_q=search_q,
+        avail=avail,
         title='Recommended Movies' if media_type == 'movie' else 'Recommended Shows',
     )
 
@@ -673,11 +686,37 @@ def _latest_page(media_type: str):
     rows_all, filter_stats = _latest_visible_rows(
         media_type, hide_watched, match_only, min_year=min_year,
     )
+    from services.availability import filter_rows_by_avail, normalize_avail
+
     search_q = _normalize_search_q(request.args.get('q'))
     if search_q:
         rows_all = [r for r in rows_all if _row_title_matches(r, search_q)]
-        filter_stats = dict(filter_stats)
-        filter_stats['visible'] = len(rows_all)
+    avail = normalize_avail(request.args.get('avail'))
+    if avail:
+        # Streaming filter needs providers — enrich a capped batch when cold.
+        if avail == 'streaming':
+            try:
+                from services.sync_jobs import enrich_media_list_for_display as _enrich
+                cold = [r['media'] for r in rows_all if r['media'] and not r.get('providers')]
+                _enrich(cold[:40], max_fetches=20)
+                for r in rows_all:
+                    media = r['media']
+                    providers = [
+                        p.provider_name for p in (media.providers or [])
+                        if p.offer_type in ('flatrate', 'ads', 'free')
+                    ]
+                    r['providers'] = providers
+                    from services.streaming_matcher import split_providers_for_user
+                    from services.availability import attach_availability
+                    r['my_providers'], r['other_providers'] = split_providers_for_user(
+                        providers, current_user,
+                    )
+                    attach_availability(r)
+            except Exception as exc:
+                current_app.logger.warning('Latest streaming-filter enrich failed: %s', exc)
+        rows_all = filter_rows_by_avail(rows_all, avail)
+    filter_stats = dict(filter_stats)
+    filter_stats['visible'] = len(rows_all)
     # Do NOT auto-fetch older Trakt pages when the filtered list is short — that
     # made every Matches-only load walk the cache slowly. Use "Load older" instead.
 
@@ -691,6 +730,7 @@ def _latest_page(media_type: str):
     # Posters only when missing; skip TMDB streaming lookups on the list (detail page).
     try:
         import json
+        from services.availability import attach_availability
         from services.streaming_matcher import split_providers_for_user
 
         enrich_media_list_for_display([r['media'] for r in rows], max_fetches=8)
@@ -709,6 +749,7 @@ def _latest_page(media_type: str):
                 r['providers'], current_user,
             )
             r['match'] = match_preferences(media, current_user)
+            attach_availability(r)
     except Exception as exc:
         current_app.logger.warning('Visible-page enrich failed: %s', exc)
     marker = _marker(media_type)
@@ -742,6 +783,7 @@ def _latest_page(media_type: str):
         has_match_prefs=has_match_prefs,
         has_more_older=has_more_older,
         search_q=search_q,
+        avail=avail,
         tmdb_configured=tmdb_is_configured(),
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='Latest Movies' if media_type == 'movie' else 'Latest Shows',

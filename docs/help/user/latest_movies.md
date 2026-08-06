@@ -15,6 +15,8 @@ Without genres/keywords, Matches only is empty — use the setup wizard / Prefer
 
 **Search titles in this list…** filters the loaded Latest cache (after your year / match / watched filters) by title or year. For Trakt-wide search, use nav **Search**.
 
+**Upcoming / Theater window / Streaming** chips and filter pills use public release date (±30 / >30 days) and TMDB streaming lists.
+
 ## Source
 
 Uses Trakt’s official `/movies/updates` API — the closest public feed to “what just showed up / changed in Trakt’s DB”.

@@ -1,0 +1,14 @@
+{# Availability filter pills. Expects avail, and qs() macro that accepts avail_v. #}
+<div class="pill-row avail-filters" aria-label="Availability filters">
+  <a class="pill {% if not avail %}on{% endif %}"
+     href="?{{ qs(page_n=1, avail_v='') }}">Any release</a>
+  <a class="pill {% if avail == 'upcoming' %}on{% endif %}"
+     href="?{{ qs(page_n=1, avail_v='upcoming') }}"
+     title="Public release more than 30 days from today">Upcoming</a>
+  <a class="pill {% if avail == 'theater' %}on{% endif %}"
+     href="?{{ qs(page_n=1, avail_v='theater') }}"
+     title="Public release within ±30 days — theater window">Theater window</a>
+  <a class="pill {% if avail == 'streaming' %}on{% endif %}"
+     href="?{{ qs(page_n=1, avail_v='streaming') }}"
+     title="Listed on at least one streaming service (TMDB)">Streaming</a>
+</div>

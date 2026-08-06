@@ -4,8 +4,8 @@
 {% set hw = 1 if hide_watched else 0 %}
 {% set mo = 1 if match_only else 0 %}
 {% set ry = 1 if recent_years else 0 %}
-{% macro qs(page_n=None, per=None, hw_v=None, mo_v=None, ry_v=None, q_v=None) -%}
-page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&match_only={{ mo_v if mo_v is not none else mo }}&recent_years={{ ry_v if ry_v is not none else ry }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}
+{% macro qs(page_n=None, per=None, hw_v=None, mo_v=None, ry_v=None, q_v=None, avail_v=None) -%}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&match_only={{ mo_v if mo_v is not none else mo }}&recent_years={{ ry_v if ry_v is not none else ry }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 %}
@@ -79,6 +79,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     <input type="hidden" name="match_only" value="{{ mo }}">
     <input type="hidden" name="recent_years" value="{{ ry }}">
     <input type="hidden" name="page" value="1">
+    {% if avail %}<input type="hidden" name="avail" value="{{ avail }}">{% endif %}
     <label class="sr-only" for="latest-search-q">Search in this list</label>
     <input class="search-input" id="latest-search-q" type="search" name="q" value="{{ search_q }}"
            placeholder="Search titles in this list…" minlength="2">
@@ -87,11 +88,13 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <a class="btn btn-small" href="?{{ qs(page_n=1, q_v='') }}">Clear</a>
     {% endif %}
   </form>
+  {% include '_avail_filters.html' %}
 </div>
 <p class="meta">
   Showing <strong>{{ total }}</strong>{% if match_only %} match{{ '' if total == 1 else 'es' }}{% else %} title{{ '' if total == 1 else 's' }}{% endif %}
   from <strong>{{ filter_stats.cached_total }}</strong> cached Trakt updates
   {% if search_q %} · matching “{{ search_q }}”{% endif %}
+  {% if avail == 'upcoming' %} · upcoming{% elif avail == 'theater' %} · theater window{% elif avail == 'streaming' %} · streaming{% endif %}
   {% if recent_years and min_discovery_year %}
     · after year filter (≥{{ min_discovery_year }}): {{ filter_stats.after_year }}
   {% endif %}
@@ -131,13 +134,16 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
              data-media-type="{{ media_type }}"
              data-trakt-id="{{ m.trakt_id }}"
              data-title="{{ m.title|e }}">
-      <a class="media-poster" href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">
-        {% if m.poster_url %}
-          <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
-        {% else %}
-          <div class="poster-missing-sm">No image</div>
-        {% endif %}
-      </a>
+      <div class="media-poster-col">
+        <a class="media-poster" href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">
+          {% if m.poster_url %}
+            <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
+          {% else %}
+            <div class="poster-missing-sm">No image</div>
+          {% endif %}
+        </a>
+        {% include '_avail_chips.html' %}
+      </div>
       <div class="media-body">
         <h2 class="media-title">
           <a href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">

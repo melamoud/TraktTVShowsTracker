@@ -1,0 +1,8 @@
+{# Under-poster availability chips. Expects row.avail_chips #}
+{% if row.avail_chips %}
+  <div class="avail-chips" aria-label="Availability">
+    {% for chip in row.avail_chips %}
+      <span class="avail-chip avail-{{ chip.kind }}">{{ chip.label }}</span>
+    {% endfor %}
+  </div>
+{% endif %}
