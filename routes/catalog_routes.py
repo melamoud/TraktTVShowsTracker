@@ -204,6 +204,25 @@ def _apply_marker_to_visible_rows(rows: list[dict], media_type: str) -> None:
         row['older_than_marker'] = (i >= marker_index)
 
 
+def _normalize_search_q(raw: str | None) -> str:
+    """Strip search query; empty when shorter than 2 chars."""
+    q = (raw or '').strip()
+    return q if len(q) >= 2 else ''
+
+
+def _row_title_matches(row: dict, q: str) -> bool:
+    """Case-insensitive title/year match for in-list search."""
+    if not q:
+        return True
+    media = row.get('media')
+    if not media:
+        return False
+    needle = q.casefold()
+    title = (media.title or '').casefold()
+    year = str(media.year or '')
+    return needle in title or (bool(year) and needle in year)
+
+
 @catalog_bp.route('/')
 @login_required
 def home():
@@ -211,6 +230,127 @@ def home():
     from models import Notification
     unread = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
     return render_template('home.html', unread=unread)
+
+
+@catalog_bp.route('/search')
+@login_required
+def search():
+    """
+    Trakt-wide title search (movies and/or shows).
+
+    Results use the same decorated card fields as Latest (lists / watched / streaming).
+    """
+    from services.sync_jobs import enrich_media_list_for_display, upsert_cached_media
+    from services.streaming_matcher import split_providers_for_user
+    from services.tmdb_client import is_configured as tmdb_is_configured
+
+    q = _normalize_search_q(request.args.get('q'))
+    type_raw = (request.args.get('type') or 'both').lower()
+    if type_raw not in ('movie', 'show', 'both'):
+        type_raw = 'both'
+    page = max(int(request.args.get('page', 1) or 1), 1)
+    per_page = 20
+
+    types: list[str] = ['movie', 'show'] if type_raw == 'both' else [type_raw]
+    rows: list[dict] = []
+    fetch_error = None
+
+    if q:
+        try:
+            from services.user_media_sync import ensure_user_media_fresh
+            ensure_user_media_fresh(
+                current_user, media_types=tuple(types), force=False,
+            )
+        except Exception as exc:
+            current_app.logger.warning('User-state sync before search failed: %s', exc)
+
+        cached_items: list[tuple[str, CachedMedia]] = []
+        try:
+            per_type_limit = per_page if type_raw != 'both' else max(per_page // 2, 10)
+            for media_type in types:
+                hits = trakt_client.search_titles(
+                    current_user, media_type, q, limit=per_type_limit,
+                )
+                for entry in hits:
+                    row = upsert_cached_media(media_type, entry)
+                    if row:
+                        cached_items.append((media_type, row))
+            db.session.commit()
+        except Exception as exc:
+            fetch_error = str(exc)
+            current_app.logger.warning('Trakt search failed: %s', exc)
+            flash('Could not search Trakt right now.', 'warning')
+
+        # Decorate per media type (state maps are type-scoped).
+        by_type: dict[str, list] = {'movie': [], 'show': []}
+        for media_type, media in cached_items:
+            by_type[media_type].append(media)
+        for media_type, items in by_type.items():
+            if not items:
+                continue
+            decorated = _decorate(media_type, items)
+            for r in decorated:
+                r['media_type'] = media_type
+            rows.extend(decorated)
+
+        # Enrich + providers for the visible slice only (after simple paging).
+        total = len(rows)
+        pages = max((total + per_page - 1) // per_page, 1) if total else 1
+        page = min(page, pages)
+        page_rows = rows[(page - 1) * per_page: page * per_page]
+        try:
+            import json
+            enrich_media_list_for_display(
+                [r['media'] for r in page_rows], max_fetches=len(page_rows),
+            )
+            provider_fetches = 0
+            for r in page_rows:
+                media = r['media']
+                if (
+                    tmdb_is_configured()
+                    and media.tmdb_id
+                    and not media.providers
+                    and provider_fetches < per_page
+                ):
+                    sync_providers_for_media(media)
+                    provider_fetches += 1
+                try:
+                    genres = json.loads(media.genres_json or '[]')
+                except json.JSONDecodeError:
+                    genres = []
+                r['genres'] = genres if isinstance(genres, list) else []
+                providers = [
+                    p.provider_name for p in (media.providers or [])
+                    if p.offer_type in ('flatrate', 'ads', 'free')
+                ]
+                r['providers'] = providers
+                r['my_providers'], r['other_providers'] = split_providers_for_user(
+                    providers, current_user,
+                )
+                r['match'] = match_preferences(media, current_user)
+            db.session.commit()
+        except Exception as exc:
+            current_app.logger.warning('Search enrich failed: %s', exc)
+    else:
+        page_rows = []
+        total = 0
+        pages = 1
+
+    return render_template(
+        'search.html',
+        q=q,
+        search_type=type_raw,
+        rows=page_rows,
+        page=page,
+        pages=pages,
+        page_links=_pagination_pages(page, pages),
+        per_page=per_page,
+        total=total,
+        fetch_error=fetch_error,
+        tmdb_configured=tmdb_is_configured(),
+        streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
+        title='Search',
+    )
 
 
 @catalog_bp.route('/latest/movies')
@@ -360,6 +500,10 @@ def _recommendations_page(media_type: str):
     if on_my_services:
         rows_all = [r for r in rows_all if r.get('my_providers')]
 
+    search_q = _normalize_search_q(request.args.get('q'))
+    if search_q:
+        rows_all = [r for r in rows_all if _row_title_matches(r, search_q)]
+
     total = len(rows_all)
     pages = max((total + per_page - 1) // per_page, 1) if total else 1
     page = min(page, pages)
@@ -394,6 +538,7 @@ def _recommendations_page(media_type: str):
         tmdb_configured=tmdb_is_configured(),
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         fetch_error=fetch_error,
+        search_q=search_q,
         title='Recommended Movies' if media_type == 'movie' else 'Recommended Shows',
     )
 
@@ -528,6 +673,11 @@ def _latest_page(media_type: str):
     rows_all, filter_stats = _latest_visible_rows(
         media_type, hide_watched, match_only, min_year=min_year,
     )
+    search_q = _normalize_search_q(request.args.get('q'))
+    if search_q:
+        rows_all = [r for r in rows_all if _row_title_matches(r, search_q)]
+        filter_stats = dict(filter_stats)
+        filter_stats['visible'] = len(rows_all)
     # Do NOT auto-fetch older Trakt pages when the filtered list is short — that
     # made every Matches-only load walk the cache slowly. Use "Load older" instead.
 
@@ -591,6 +741,7 @@ def _latest_page(media_type: str):
         min_discovery_year=min_year,
         has_match_prefs=has_match_prefs,
         has_more_older=has_more_older,
+        search_q=search_q,
         tmdb_configured=tmdb_is_configured(),
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='Latest Movies' if media_type == 'movie' else 'Latest Shows',

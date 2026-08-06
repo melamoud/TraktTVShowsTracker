@@ -9,7 +9,7 @@ from flask import (
     request, session, url_for,
 )
 from flask_login import current_user, login_required
-from sqlalchemy import and_, case, or_
+from sqlalchemy import String, and_, case, cast, or_
 
 
 def _parse_air_datetime(value: str | None) -> datetime | None:
@@ -456,6 +456,9 @@ def _my_media(media_type: str):
     filter_lists = _my_filter_lists(current_user)
     selected_lists = _resolve_selected_lists(current_user, filter_lists, view)
     list_trakt_ids = _trakt_ids_for_lists(current_user.id, media_type, selected_lists)
+    search_q = (request.args.get('q') or '').strip()
+    if len(search_q) < 2:
+        search_q = ''
 
     q = UserMediaState.query.filter_by(user_id=current_user.id, media_type=media_type)
     if filt == 'lists':
@@ -503,6 +506,23 @@ def _my_media(media_type: str):
         if list_trakt_ids:
             clauses.append(UserMediaState.trakt_id.in_(list_trakt_ids))
         q = q.filter(or_(*clauses))
+
+    # In-list title search across the full filtered set (before pagination).
+    if search_q:
+        like = f'%{search_q}%'
+        q = (
+            q.outerjoin(
+                CachedMedia,
+                and_(
+                    CachedMedia.media_type == UserMediaState.media_type,
+                    CachedMedia.trakt_id == UserMediaState.trakt_id,
+                ),
+            )
+            .filter(or_(
+                CachedMedia.title.ilike(like),
+                cast(CachedMedia.year, String).ilike(like),
+            ))
+        )
 
     total = q.count()
     per_page = _per_page(f'my_{media_type}')
@@ -677,6 +697,7 @@ def _my_media(media_type: str):
         per_page=per_page,
         total=total,
         page_links=_pagination_pages(page, pages),
+        search_q=search_q,
         tmdb_configured=tmdb_ok,
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='My Movies' if media_type == 'movie' else 'My Shows',

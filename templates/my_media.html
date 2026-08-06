@@ -4,8 +4,8 @@
 {% macro lists_qs() -%}
 lists_set=1{% for lid in selected_lists %}&lists={{ lid }}{% endfor %}
 {%- endmacro %}
-{% macro qs(page_n=None, per=None, filter_v=None) -%}
-page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&filter={{ filter_v if filter_v is not none else filt }}&{{ lists_qs() }}
+{% macro qs(page_n=None, per=None, filter_v=None, q_v=None) -%}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&filter={{ filter_v if filter_v is not none else filt }}&{{ lists_qs() }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 %}
@@ -77,10 +77,27 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       Refresh from Trakt
     </a>
   </div>
+  <form class="search-fields" method="get" action="" style="margin-top:.55rem;">
+    <input type="hidden" name="lists_set" value="1">
+    {% for lid in selected_lists %}
+      <input type="hidden" name="lists" value="{{ lid }}">
+    {% endfor %}
+    <input type="hidden" name="filter" value="{{ filt }}">
+    <input type="hidden" name="per_page" value="{{ per_page }}">
+    <input type="hidden" name="page" value="1">
+    <label class="sr-only" for="my-search-q">Search in this list</label>
+    <input class="search-input" id="my-search-q" type="search" name="q" value="{{ search_q }}"
+           placeholder="Search titles in this list…" minlength="2">
+    <button class="btn btn-small btn-primary" type="submit">Search</button>
+    {% if search_q %}
+      <a class="btn btn-small" href="?{{ qs(page_n=1, q_v='') }}">Clear</a>
+    {% endif %}
+  </form>
 </div>
 
 <p class="meta">
   Showing <strong>{{ rows|length }}</strong> of <strong>{{ total }}</strong> title{{ '' if total == 1 else 's' }}
+  {% if search_q %} matching “{{ search_q }}”{% endif %}
   {% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}.
 </p>
 {{ pager('top') }}

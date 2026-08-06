@@ -52,6 +52,7 @@ def get_help_toc(role: str = 'user') -> list[dict]:
         {'title': 'Preferences', 'slug': 'preferences'},
         {'title': 'My movies', 'slug': 'my_movies'},
         {'title': 'My shows', 'slug': 'my_shows'},
+        {'title': 'Search', 'slug': 'search'},
         {'title': 'Series progress', 'slug': 'series_progress'},
         {'title': 'Streaming vs Found on', 'slug': 'streaming'},
         {'title': 'Alerts', 'slug': 'release_alerts'},

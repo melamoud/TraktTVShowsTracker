@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-05 — System-wide search
+
+- Nav **Search** page: Trakt exact + broad title search with Latest-style cards (Add to lists / Watched / streaming)
+- In-list **q** search on My movies/shows, Latest, and Recommended (full filtered set, not remembered)
+
 ## 2026-08-05 — Add to lists: clear-all remove fix
 
 - Uncheck all lists + Save reliably removes Wishlist / personal-list membership (no longer re-paginates every Trakt list on save or dialog open)

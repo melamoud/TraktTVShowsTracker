@@ -10,6 +10,8 @@ Each show card shows **x / y episodes watched** and **Next: SxEy — title** whe
 
 Filter choices (status, Lists…, titles per page) are remembered for your account. Leaving My shows and coming back via the menu restores the same settings.
 
+**Search titles in this list…** filters by title/year across the full filtered set (query is not remembered). For titles not on your lists yet, use nav **Search**.
+
 Opening the page uses a local cache, but it **auto-invalidates**: a cheap Trakt `/sync/last_activities` check runs on each visit, and watchlist / watched / lists re-sync when those timestamps advanced (e.g. you added a show on Trakt.tv). **Refresh from Trakt** forces a full re-pull. Sync is **read-only** — it never writes episode history.
 
 **Pin** keeps a show at the top of My shows (local only — for “watching now” / “soon”). Newest pin wins among pinned titles. **Unpin** returns it to normal sort.

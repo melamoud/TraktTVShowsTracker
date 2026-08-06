@@ -13,6 +13,8 @@ By default Latest applies two local filters:
 
 Without genres/keywords, Matches only is empty — use the setup wizard / Preferences, or All titles.
 
+**Search titles in this list…** filters the loaded Latest cache (after your year / match / watched filters) by title or year. For Trakt-wide search, use nav **Search**.
+
 ## Source
 
 Uses Trakt’s official `/movies/updates` API — the closest public feed to “what just showed up / changed in Trakt’s DB”.

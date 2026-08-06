@@ -488,6 +488,59 @@ def episode_watched_keys_from_trakt(
     return keys
 
 
+def search_titles(
+    user: User,
+    media_type: str,
+    query: str,
+    *,
+    limit: int = 20,
+) -> list[dict]:
+    """
+    Search Trakt for movies or shows by text query.
+
+    Calls exact search first, then broader search, and de-duplicates by Trakt id
+    (exact hits keep their earlier position). Each item is a Trakt search row
+    ``{type, score, movie|show: {...}}`` suitable for ``upsert_cached_media``.
+    """
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    q = (query or '').strip()
+    if len(q) < 2:
+        return []
+    lim = max(1, min(int(limit), 50))
+    params = {'query': q, 'extended': 'full', 'limit': lim}
+    exact = api_request(
+        'GET',
+        f'/search/{media_type}/exact',
+        user=user,
+        params=params,
+    ) or []
+    broad = api_request(
+        'GET',
+        f'/search/{media_type}',
+        user=user,
+        params=params,
+    ) or []
+    out: list[dict] = []
+    seen: set[int] = set()
+    for row in list(exact) + list(broad):
+        if not isinstance(row, dict):
+            continue
+        entity = row.get(media_type) or {}
+        ids = entity.get('ids') or {}
+        try:
+            tid = int(ids.get('trakt'))
+        except (TypeError, ValueError):
+            continue
+        if tid in seen:
+            continue
+        seen.add(tid)
+        out.append(row)
+        if len(out) >= lim:
+            break
+    return out
+
+
 def get_recommendations(
     user: User,
     media_type: str,

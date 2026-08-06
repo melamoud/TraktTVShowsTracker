@@ -10,6 +10,7 @@ Opening this page uses a local cache that **auto-invalidates** when Trakt report
 - **Watched** — watched history only  
 - **Both** — selected lists **or** watched  
 - **Unwatched** — titles on your selected lists that are not watched yet
+- **Search titles in this list…** — filters the full filtered set by title/year (not remembered; see [Search](search) for Trakt-wide search)
 
 ## Paging
 

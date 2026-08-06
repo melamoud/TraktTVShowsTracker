@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} — {{ app_name }}{% endblock %}
+{% block content %}
+{% macro qs(page_n=None, type_v=None, q_v=None) -%}
+page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is not none else search_type }}&q={{ (q_v if q_v is not none else q)|urlencode }}
+{%- endmacro %}
+{% macro pager(position) %}
+  {% if pages > 1 and q %}
+  <nav class="pager pill-row" aria-label="Pagination {{ position }}">
+    {% if page > 1 %}
+      <a class="pill" href="?{{ qs(page_n=page - 1) }}" aria-label="Previous page">&lt;</a>
+    {% else %}
+      <span class="pill disabled" aria-disabled="true">&lt;</span>
+    {% endif %}
+    {% for p in page_links %}
+      {% if p is none %}
+        <span class="pill ellipsis" aria-hidden="true">…</span>
+      {% elif p == page %}
+        <span class="pill on" aria-current="page">{{ p }}</span>
+      {% else %}
+        <a class="pill" href="?{{ qs(page_n=p) }}">{{ p }}</a>
+      {% endif %}
+    {% endfor %}
+    {% if page < pages %}
+      <a class="pill" href="?{{ qs(page_n=page + 1) }}" aria-label="Next page">&gt;</a>
+    {% else %}
+      <span class="pill disabled" aria-disabled="true">&gt;</span>
+    {% endif %}
+  </nav>
+  {% endif %}
+{% endmacro %}
+<h1>{{ title }}</h1>
+<p class="muted">
+  Search Trakt’s movie and show database. Add hits to Wishlist / personal lists, or mark watched — same actions as Latest.
+  For titles already on your lists, use the search box on My / Latest / Rec pages instead.
+</p>
+
+<form class="toolbar search-toolbar" method="get" action="{{ url_for('catalog.search') }}">
+  <div class="search-fields">
+    <label class="sr-only" for="search-q">Search titles</label>
+    <input class="search-input" id="search-q" type="search" name="q" value="{{ q }}"
+           placeholder="Title (min. 2 characters)" minlength="2" autofocus>
+    <select class="search-select" name="type" aria-label="Media type">
+      <option value="both" {% if search_type == 'both' %}selected{% endif %}>Movies &amp; shows</option>
+      <option value="movie" {% if search_type == 'movie' %}selected{% endif %}>Movies</option>
+      <option value="show" {% if search_type == 'show' %}selected{% endif %}>Shows</option>
+    </select>
+    <button class="btn btn-primary btn-small" type="submit">Search</button>
+    {% if q %}
+      <a class="btn btn-small" href="{{ url_for('catalog.search', type=search_type) }}">Clear</a>
+    {% endif %}
+  </div>
+</form>
+
+{% if not q %}
+  <p class="muted">Type at least 2 characters and press Search.</p>
+{% elif fetch_error %}
+  <p class="muted">Search failed. Try again in a moment.</p>
+{% else %}
+  <p class="meta">
+    Showing <strong>{{ rows|length }}</strong> of <strong>{{ total }}</strong> result{{ '' if total == 1 else 's' }}
+    for “{{ q }}”
+    {% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}.
+  </p>
+  {{ pager('top') }}
+
+  <div class="media-list">
+    {% for row in rows %}
+      {% set m = row.media %}
+      {% set media_type = row.media_type %}
+      <article class="media-row {% if row.match.matched %}match{% endif %}"
+               data-media-type="{{ media_type }}"
+               data-trakt-id="{{ m.trakt_id }}"
+               data-title="{{ m.title|e }}">
+        <a class="media-poster" href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">
+          {% if m.poster_url %}
+            <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
+          {% else %}
+            <div class="poster-missing-sm">No image</div>
+          {% endif %}
+        </a>
+        <div class="media-body">
+          <h2 class="media-title">
+            <a href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">
+              {{ m.title }}{% if m.year %} ({{ m.year }}){% endif %}
+            </a>
+            <span class="meta"> · {{ 'Movie' if media_type == 'movie' else 'Show' }}</span>
+          </h2>
+          <div class="meta">
+            {% if m.released_at %}Public release: {{ m.released_at }}{% endif %}
+            {% if m.network %}{% if m.released_at %} · {% endif %}Network: {{ m.network }}{% endif %}
+            {% if m.runtime %}{% if m.released_at or m.network %} · {% endif %}{{ m.runtime }} min{% endif %}
+          </div>
+          {% if m.overview %}
+            <div class="row-overview">{{ m.overview[:320] }}{% if m.overview|length > 320 %}…{% endif %}</div>
+          {% else %}
+            <div class="meta">No description loaded yet — open the title for details.</div>
+          {% endif %}
+          <div class="tags">
+            {% if row.match.matched %}<span class="tag match">Preference match</span>{% endif %}
+            {% if row.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
+            {% if row.watched %}<span class="tag watched">Watched</span>{% endif %}
+            {% if row.partial %}<span class="tag partial">Partial</span>{% endif %}
+            {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
+          </div>
+          {% if row.my_providers %}
+            <div class="streaming-line mine">
+              <span class="streaming-label mine">Plays on your services:</span>
+              {% for p in row.my_providers %}<span class="tag stream mine">{{ p }}</span>{% endfor %}
+            </div>
+          {% endif %}
+          <div class="streaming-line meta">
+            {% if row.my_providers %}
+              <span class="streaming-label">Also streaming:</span>
+            {% else %}
+              <span class="streaming-label">Streaming:</span>
+            {% endif %}
+            {% if row.other_providers %}
+              {% for p in row.other_providers[:8] %}<span class="tag stream">{{ p }}</span>{% endfor %}
+            {% elif row.providers and not row.my_providers %}
+              {% for p in row.providers[:8] %}<span class="tag stream">{{ p }}</span>{% endfor %}
+            {% elif not row.my_providers %}
+              {% if tmdb_configured %}
+                <span class="muted">No subscription streaming listed for {{ streaming_region }}</span>
+              {% else %}
+                <span class="muted">Add TMDB_API_KEY in .env to show where it’s streaming</span>
+              {% endif %}
+            {% else %}
+              <span class="muted">Only listed on your services above</span>
+            {% endif %}
+          </div>
+          {% if row.match.reasons %}
+            <div class="meta">Match: {{ row.match.reasons|join(' · ') }}</div>
+          {% endif %}
+          <div class="actions">
+            <button class="btn btn-small{% if not row.on_watchlist %} btn-primary{% endif %}" type="button"
+                    data-action="lists-edit"
+                    data-media-type="{{ media_type }}"
+                    data-trakt-id="{{ m.trakt_id }}"
+                    data-title="{{ m.title|e }}">Add to lists…</button>
+            {% if row.watched %}
+              <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
+            {% else %}
+              <button class="btn btn-small" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Mark watched</button>
+            {% endif %}
+            {% if media_type == 'show' %}
+              <a class="btn btn-small btn-primary" href="{{ url_for('user.series_progress', trakt_id=m.trakt_id) }}">Progress</a>
+            {% endif %}
+            {% if m.imdb_id %}<a class="btn btn-small" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>{% endif %}
+            {% if m.trailer_url %}<a class="btn btn-small" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>{% endif %}
+          </div>
+        </div>
+      </article>
+    {% else %}
+      <p class="muted">No Trakt titles matched “{{ q }}”.</p>
+    {% endfor %}
+  </div>
+
+  {{ pager('bottom') }}
+{% endif %}
+{% endblock %}

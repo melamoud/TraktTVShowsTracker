@@ -5,8 +5,8 @@
 {% set hwish = 1 if hide_wishlist else 0 %}
 {% set oms = 1 if on_my_services else 0 %}
 {% set mo = 1 if match_only else 0 %}
-{% macro qs(page_n=None, per=None, hw_v=None, hwish_v=None, oms_v=None, mo_v=None, cat=None) -%}
-page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_wishlist={{ hwish_v if hwish_v is not none else hwish }}&on_my_services={{ oms_v if oms_v is not none else oms }}&match_only={{ mo_v if mo_v is not none else mo }}&category={{ cat if cat is not none else category }}
+{% macro qs(page_n=None, per=None, hw_v=None, hwish_v=None, oms_v=None, mo_v=None, cat=None, q_v=None) -%}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_wishlist={{ hwish_v if hwish_v is not none else hwish }}&on_my_services={{ oms_v if oms_v is not none else oms }}&match_only={{ mo_v if mo_v is not none else mo }}&category={{ cat if cat is not none else category }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 %}
@@ -87,6 +87,22 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   <div class="actions">
     <a class="btn btn-small" href="?{{ qs(page_n=1) }}">Refresh</a>
   </div>
+  <form class="search-fields" method="get" action="" style="width:100%;">
+    <input type="hidden" name="per_page" value="{{ per_page }}">
+    <input type="hidden" name="hide_watched" value="{{ hw }}">
+    <input type="hidden" name="hide_wishlist" value="{{ hwish }}">
+    <input type="hidden" name="on_my_services" value="{{ oms }}">
+    <input type="hidden" name="match_only" value="{{ mo }}">
+    <input type="hidden" name="category" value="{{ category }}">
+    <input type="hidden" name="page" value="1">
+    <label class="sr-only" for="rec-search-q">Search in this list</label>
+    <input class="search-input" id="rec-search-q" type="search" name="q" value="{{ search_q }}"
+           placeholder="Search titles in this list…" minlength="2">
+    <button class="btn btn-small btn-primary" type="submit">Search</button>
+    {% if search_q %}
+      <a class="btn btn-small" href="?{{ qs(page_n=1, q_v='') }}">Clear</a>
+    {% endif %}
+  </form>
 </div>
 
 {% if user_service_names %}

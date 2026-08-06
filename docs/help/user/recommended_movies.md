@@ -17,6 +17,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **On my services** — keep only titles TMDB lists on a streaming service you marked in Preferences  
 - **Matches only** — purple genre/keyword preference matches only  
 - **10 / 50 / 100** per page  
+- **Search titles in this list…** — filter the current recommendation results by title/year (not remembered)
 
 The recommendation list itself is fetched live from Trakt each visit. Wishlist/watched tags used for hide filters also auto-refresh when Trakt activity timestamps advance.
 
