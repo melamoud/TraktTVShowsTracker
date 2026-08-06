@@ -106,7 +106,7 @@ function openListsDialog(opts) {
   if (hintEl) {
     hintEl.textContent = mode === 'filter'
       ? 'Choose which lists to show on this page. Same lists as Preferences (Show in menu).'
-      : 'Select one or more. Pre-checked from your Preferences defaults and current membership — change freely before Save.';
+      : 'Check the lists to keep this title on. Uncheck all and Save to remove it from every list shown.';
   }
   if (titleEl) {
     titleEl.textContent = mode === 'filter'
@@ -423,8 +423,16 @@ document.addEventListener('click', async function (ev) {
         traktId: traktId,
         title: ctx.title || '',
       });
+      // null = Cancel. [] = clear all lists (remove from Wishlist + personal lists).
       if (selected === null) return;
-      await apiPost('/api/lists/membership/' + mediaType + '/' + traktId, { selected: selected });
+      await apiPost('/api/lists/membership/' + mediaType + '/' + traktId, {
+        selected: Array.isArray(selected) ? selected : [],
+      });
+      location.reload();
+    } else if (action === 'pin-add' || action === 'pin-remove') {
+      await apiPost('/api/pin/' + mediaType + '/' + traktId, {
+        action: action === 'pin-remove' ? 'unpin' : 'pin',
+      });
       location.reload();
     } else if (action === 'watched-add') {
       const label = ctx.title || 'this title';

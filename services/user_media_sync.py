@@ -118,3 +118,30 @@ def ensure_user_media_fresh(
     sync_user_media_state(user, media_types=types)
     _persist(fingerprint)
     return True
+
+
+def note_user_media_write(
+    user,
+    media_types: tuple[str, ...] | None = None,
+) -> None:
+    """
+    After a local write that already updated the DB cache (watchlist / lists /
+    watched), refresh the activities fingerprint so the next page load does not
+    immediately re-pull everything from Trakt (rate limits / slow second action).
+    """
+    types = media_types or ('movie', 'show')
+    try:
+        activities = get_last_activities(user)
+        fp = activity_fingerprint(activities, types)
+        if not fp:
+            return
+        merged = dict(_stored_fingerprint(user))
+        merged.update(fp)
+        _save_fingerprint(user, merged)
+        db.session.commit()
+    except Exception as exc:
+        logger.warning('Could not note media write for user %s: %s', user.id, exc)
+        try:
+            db.session.rollback()
+        except Exception:
+            pass

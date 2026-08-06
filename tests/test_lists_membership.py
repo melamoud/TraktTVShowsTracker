@@ -23,7 +23,7 @@ def test_lists_membership_get_wishlist_first(app, client, user):
         {'id': '99', 'slug': 'ignore', 'name': 'Ignore me', 'item_count': 1},
     ]
     with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
-         patch('routes.catalog_routes.trakt_client.list_contains_item', return_value=False) as contains:
+         patch('routes.catalog_routes.trakt_client.list_contains_item') as contains:
         resp = client.get('/api/lists/membership/movie/42')
     assert resp.status_code == 200
     data = resp.get_json()
@@ -33,7 +33,8 @@ def test_lists_membership_get_wishlist_first(app, client, user):
     assert data['lists'][0]['selected'] is True
     assert ids == ['watchlist', '10']
     assert '99' not in ids
-    contains.assert_called_once()
+    # Dialog open must not paginate personal lists (hangs on 2nd+ title).
+    contains.assert_not_called()
 
 
 def test_lists_membership_get_applies_default_selected(app, client, user):
@@ -89,11 +90,8 @@ def test_lists_membership_post_updates_watchlist_and_list(app, client, user):
         {'id': '55', 'slug': 'keepers', 'name': 'Keepers', 'item_count': 2},
     ]
 
-    def contains(_user, list_id, _media_type, _trakt_id):
-        return list_id == '55'
-
     with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
-         patch('routes.catalog_routes.trakt_client.list_contains_item', side_effect=contains), \
+         patch('routes.catalog_routes.trakt_client.list_contains_item') as contains, \
          patch('routes.catalog_routes.trakt_client.remove_from_watchlist') as rm_wl, \
          patch('routes.catalog_routes.trakt_client.add_to_watchlist') as add_wl, \
          patch('routes.catalog_routes.trakt_client.add_to_list') as add_list, \
@@ -109,12 +107,86 @@ def test_lists_membership_post_updates_watchlist_and_list(app, client, user):
     assert data['on_watchlist'] is False
     rm_wl.assert_called_once()
     add_wl.assert_not_called()
-    add_list.assert_not_called()
+    add_list.assert_called_once()
     rm_list.assert_not_called()
+    contains.assert_not_called()
 
     with app.app_context():
         st = UserMediaState.query.filter_by(user_id=user, media_type='show', trakt_id=7).one()
         assert st.on_watchlist is False
+
+
+def test_lists_membership_post_empty_selected_removes_all(app, client, user):
+    """Uncheck all + Save removes Wishlist and personal-list membership."""
+    from models import UserListMembership
+
+    with app.app_context():
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=9, on_watchlist=True
+        ))
+        db.session.add(UserListMembership(
+            user_id=user, list_id='55', media_type='movie', trakt_id=9,
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    personal = [
+        {'id': '55', 'slug': 'keepers', 'name': 'Keepers', 'item_count': 2},
+        {'id': '66', 'slug': 'later', 'name': 'Later', 'item_count': 4},
+    ]
+
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
+         patch('routes.catalog_routes.trakt_client.list_contains_item') as contains, \
+         patch('routes.catalog_routes.trakt_client.remove_from_watchlist') as rm_wl, \
+         patch('routes.catalog_routes.trakt_client.add_to_watchlist') as add_wl, \
+         patch('routes.catalog_routes.trakt_client.add_to_list') as add_list, \
+         patch('routes.catalog_routes.trakt_client.remove_from_list') as rm_list, \
+         patch('services.user_media_sync.note_user_media_write'):
+        resp = client.post(
+            '/api/lists/membership/movie/9',
+            json={'selected': []},
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['success'] is True
+    assert data['on_watchlist'] is False
+    assert data['selected'] == []
+    rm_wl.assert_called_once()
+    rm_list.assert_called_once()
+    add_wl.assert_not_called()
+    add_list.assert_not_called()
+    # Clear-all must not paginate every personal list (that was the hang).
+    contains.assert_not_called()
+
+    with app.app_context():
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='movie', trakt_id=9,
+        ).one()
+        assert st.on_watchlist is False
+        left = UserListMembership.query.filter_by(
+            user_id=user, media_type='movie', trakt_id=9,
+        ).count()
+        assert left == 0
+
+
+def test_lists_membership_post_removes_watchlist_even_if_local_stale(app, client, user):
+    """Unchecked Wishlist always calls Trakt remove (local cache may be wrong)."""
+    login_client(client, app, user)
+    personal = []
+
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
+         patch('routes.catalog_routes.trakt_client.remove_from_watchlist') as rm_wl, \
+         patch('routes.catalog_routes.trakt_client.add_to_watchlist') as add_wl:
+        resp = client.post(
+            '/api/lists/membership/show/3',
+            json={'selected': []},
+        )
+
+    assert resp.status_code == 200
+    assert resp.get_json()['on_watchlist'] is False
+    rm_wl.assert_called_once()
+    add_wl.assert_not_called()
 
 
 def test_preferences_list_show_and_default(app, client, user):

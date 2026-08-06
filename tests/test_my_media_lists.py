@@ -241,6 +241,69 @@ def test_my_shows_orders_by_progress_then_last_watched(app, client, user):
     assert pos[2] < pos[3] < pos[1] < pos[4]
 
 
+def test_my_shows_pinned_sort_above_others(app, client, user):
+    """Pinned titles stay above in-progress / recently watched."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        _seed_state(
+            user, media_type='show', trakt_id=1, on_watchlist=True,
+            watched=True, progress_percent=40.0,
+            last_watched_at=datetime(2026, 8, 5),
+        )
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=2, on_watchlist=True,
+            watched=False, pinned=True, pinned_at=datetime(2026, 8, 4),
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=3, on_watchlist=True,
+            watched=False, pinned=True, pinned_at=datetime(2026, 8, 5),
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        resp = client.get('/my/shows?lists_set=1&lists=watchlist&filter=lists')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    pos = {tid: html.index(f'data-trakt-id="{tid}"') for tid in (1, 2, 3)}
+    assert pos[3] < pos[2] < pos[1]
+    assert 'Pinned' in html
+    assert 'data-action="pin-remove"' in html
+
+
+def test_api_pin_toggles_local_flag(app, client, user):
+    """Pin API sets/clears local pinned state without Trakt writes."""
+    with app.app_context():
+        _seed_state(user, media_type='movie', trakt_id=9, on_watchlist=True)
+        db.session.commit()
+
+    login_client(client, app, user)
+    resp = client.post('/api/pin/movie/9', json={'action': 'pin'})
+    assert resp.status_code == 200
+    assert resp.get_json()['pinned'] is True
+    with app.app_context():
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='movie', trakt_id=9,
+        ).one()
+        assert st.pinned is True
+        assert st.pinned_at is not None
+
+    resp = client.post('/api/pin/movie/9', json={'action': 'unpin'})
+    assert resp.status_code == 200
+    assert resp.get_json()['pinned'] is False
+    with app.app_context():
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='movie', trakt_id=9,
+        ).one()
+        assert st.pinned is False
+        assert st.pinned_at is None
+
+
 def test_my_shows_card_shows_episode_progress_and_next(app, client, user):
     """Show cards render cached x/y watched and next episode."""
     with app.app_context():

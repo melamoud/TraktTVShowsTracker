@@ -21,7 +21,7 @@ These settings apply to both **Add to lists…** and **My movies / My shows** fi
 
 Example: show three lists, but only Wishlist + List 1 auto-selected — Add to lists… and My movies open with those two checked.
 
-On Add to lists…, titles already on a list stay checked even if Auto-select is off for that list.
+On Add to lists…, titles already on a list stay checked even if Auto-select is off for that list. Uncheck every list and Save to remove the title from Wishlist and the personal lists shown in the menu.
 
 ## Genres & keywords
 

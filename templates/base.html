@@ -93,7 +93,7 @@
       <div class="modal-panel">
         <h2 id="lists-heading">Add to lists</h2>
         <p class="muted" id="lists-title"></p>
-        <p class="meta" id="lists-hint">Select one or more. Pre-checked from your Preferences defaults and current membership — change freely before Save.</p>
+        <p class="meta" id="lists-hint">Check the lists to keep this title on. Uncheck all and Save to remove it from every list shown.</p>
         <p class="meta" id="lists-loading" hidden>Loading your lists…</p>
         <p class="meta" id="lists-error" hidden></p>
         <div id="lists-options" class="found-on-options"></div>
@@ -105,7 +105,7 @@
     </div>
   </div>
   {% endif %}
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=12"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=13"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

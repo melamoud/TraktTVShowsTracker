@@ -515,6 +515,7 @@ def _my_media(media_type: str):
         page = pages
 
     # Meaningful DB sort (page-only; no full fetch):
+    # Pinned first (newest pin first), then:
     # 0 = in progress, 1 = has watch history, 2 = never started.
     # Within those: most recently watched first.
     in_progress = and_(
@@ -529,6 +530,8 @@ def _my_media(media_type: str):
     )
     states = (
         q.order_by(
+            UserMediaState.pinned.desc(),
+            UserMediaState.pinned_at.desc(),
             sort_bucket.asc(),
             UserMediaState.last_watched_at.desc(),
             UserMediaState.id.desc(),
@@ -826,6 +829,31 @@ def series_progress(trakt_id):
         progress_completed=total_completed,
         title=media.title if media else f'Show {trakt_id}',
     )
+
+
+@user_bp.route('/api/pin/<media_type>/<int:trakt_id>', methods=['POST'])
+@login_required
+def api_pin_media(media_type, trakt_id):
+    """Pin or unpin a title at the top of My movies / My shows (local only)."""
+    if media_type not in ('movie', 'show'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    action = (request.json or {}).get('action') or 'pin'
+    st = UserMediaState.query.filter_by(
+        user_id=current_user.id, media_type=media_type, trakt_id=trakt_id,
+    ).first()
+    if not st:
+        st = UserMediaState(
+            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id,
+        )
+        db.session.add(st)
+    if action == 'unpin':
+        st.pinned = False
+        st.pinned_at = None
+    else:
+        st.pinned = True
+        st.pinned_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'success': True, 'pinned': bool(st.pinned)})
 
 
 @user_bp.route('/api/episode/watched', methods=['POST'])

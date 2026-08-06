@@ -185,6 +185,8 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
 .tag.watched { color: #dcfce7; border-color: #22c55e; }
 .tag.partial { color: #fef3c7; border-color: #f59e0b; }
 .tag.found { color: #ccfbf1; border-color: #14b8a6; }
+.tag.pinned { color: #ffe4e6; border-color: #fb7185; background: rgba(251, 113, 133, .12); }
+.media-row.is-pinned { box-shadow: inset 3px 0 0 #fb7185; }
 .actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .65rem; }
 
 .hero-login {

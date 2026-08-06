@@ -662,6 +662,11 @@ def api_watchlist(media_type, trakt_id):
             db.session.add(st)
         st.on_watchlist = on
         db.session.commit()
+        try:
+            from services.user_media_sync import note_user_media_write
+            note_user_media_write(current_user, media_types=(media_type,))
+        except Exception:
+            pass
         return jsonify({'success': True, 'on_watchlist': on})
     except Exception as exc:
         current_app.logger.exception('Watchlist action failed: %s', exc)
@@ -698,6 +703,9 @@ def api_lists_membership(media_type, trakt_id):
 
     if request.method == 'GET':
         try:
+            # Local cache only — never paginate personal lists here. My pages
+            # sync memberships via last_activities; a live scan per list made
+            # opening Add to lists hang on the 2nd/3rd title.
             on_watchlist = bool(st and st.on_watchlist)
             lists_out = [{
                 'id': WATCHLIST_LIST_ID,
@@ -713,16 +721,6 @@ def api_lists_membership(media_type, trakt_id):
                     media_type=media_type,
                     trakt_id=trakt_id,
                 ).first() is not None
-                if not on_list:
-                    # Fall back to live Trakt when local cache is cold.
-                    on_list = trakt_client.list_contains_item(
-                        current_user, lst['id'], media_type, trakt_id
-                    )
-                    if on_list:
-                        set_list_membership(
-                            current_user.id, lst['id'], media_type, trakt_id, on_list=True
-                        )
-                        db.session.commit()
                 lists_out.append({
                     'id': lst['id'],
                     'name': lst['name'],
@@ -750,39 +748,55 @@ def api_lists_membership(media_type, trakt_id):
     # Ignore ids for hidden lists or unknown values (except watchlist).
     wanted_lists = {lid for lid in selected if lid in visible_ids}
     want_watchlist = WATCHLIST_LIST_ID in selected
+    clear_all = not want_watchlist and not wanted_lists
 
     try:
-        on_watchlist = bool(st and st.on_watchlist)
-        if want_watchlist and not on_watchlist:
-            trakt_client.add_to_watchlist(current_user, media_type, trakt_id)
+        # Diff against local membership cache only (no list_contains_item).
+        if want_watchlist:
+            if not (st and st.on_watchlist):
+                trakt_client.add_to_watchlist(current_user, media_type, trakt_id)
             on_watchlist = True
-        elif not want_watchlist and on_watchlist:
-            trakt_client.remove_from_watchlist(current_user, media_type, trakt_id)
+        else:
+            # Remove when local says on, or clear-all (empty selection).
+            if (st and st.on_watchlist) or clear_all:
+                trakt_client.remove_from_watchlist(current_user, media_type, trakt_id)
             on_watchlist = False
 
-        for lst in visible:
-            lid = lst['id']
-            currently = UserListMembership.query.filter_by(
+        if clear_all:
+            # Drop every cached personal-list row for this title (not only
+            # currently visible lists), so a 2nd clear cannot leave orphans.
+            mems = UserListMembership.query.filter_by(
                 user_id=current_user.id,
-                list_id=lid,
                 media_type=media_type,
                 trakt_id=trakt_id,
-            ).first() is not None
-            if not currently:
-                currently = trakt_client.list_contains_item(
-                    current_user, lid, media_type, trakt_id
+            ).all()
+            for mem in mems:
+                trakt_client.remove_from_list(
+                    current_user, mem.list_id, media_type, trakt_id,
                 )
-            want = lid in wanted_lists
-            if want and not currently:
-                trakt_client.add_to_list(current_user, lid, media_type, trakt_id)
                 set_list_membership(
-                    current_user.id, lid, media_type, trakt_id, on_list=True
+                    current_user.id, mem.list_id, media_type, trakt_id, on_list=False
                 )
-            elif not want and currently:
-                trakt_client.remove_from_list(current_user, lid, media_type, trakt_id)
-                set_list_membership(
-                    current_user.id, lid, media_type, trakt_id, on_list=False
-                )
+        else:
+            for lst in visible:
+                lid = lst['id']
+                currently = UserListMembership.query.filter_by(
+                    user_id=current_user.id,
+                    list_id=lid,
+                    media_type=media_type,
+                    trakt_id=trakt_id,
+                ).first() is not None
+                want = lid in wanted_lists
+                if want and not currently:
+                    trakt_client.add_to_list(current_user, lid, media_type, trakt_id)
+                    set_list_membership(
+                        current_user.id, lid, media_type, trakt_id, on_list=True
+                    )
+                elif not want and currently:
+                    trakt_client.remove_from_list(current_user, lid, media_type, trakt_id)
+                    set_list_membership(
+                        current_user.id, lid, media_type, trakt_id, on_list=False
+                    )
 
         if not st:
             st = UserMediaState(
@@ -791,6 +805,11 @@ def api_lists_membership(media_type, trakt_id):
             db.session.add(st)
         st.on_watchlist = on_watchlist
         db.session.commit()
+        try:
+            from services.user_media_sync import note_user_media_write
+            note_user_media_write(current_user, media_types=(media_type,))
+        except Exception:
+            pass
         return jsonify({
             'success': True,
             'on_watchlist': on_watchlist,
@@ -828,6 +847,11 @@ def api_watched(media_type, trakt_id):
             st.last_watched_at = datetime.utcnow()
             st.progress_percent = 100.0
         db.session.commit()
+        try:
+            from services.user_media_sync import note_user_media_write
+            note_user_media_write(current_user, media_types=(media_type,))
+        except Exception:
+            pass
         return jsonify({'success': True, 'watched': watched})
     except Exception as exc:
         current_app.logger.exception('Watched action failed: %s', exc)

@@ -212,6 +212,10 @@ def _ensure_schema(app):
                  'ALTER TABLE user_media_state ADD COLUMN next_episode_title VARCHAR(400)'),
                 ('progress_detail_at',
                  'ALTER TABLE user_media_state ADD COLUMN progress_detail_at DATETIME'),
+                ('pinned',
+                 'ALTER TABLE user_media_state ADD COLUMN pinned BOOLEAN DEFAULT 0 NOT NULL'),
+                ('pinned_at',
+                 'ALTER TABLE user_media_state ADD COLUMN pinned_at DATETIME'),
             ):
                 if col not in ucols:
                     u_alters.append(ddl)
@@ -219,7 +223,7 @@ def _ensure_schema(app):
                 with db.engine.begin() as conn:
                     for stmt in u_alters:
                         conn.execute(text(stmt))
-                app.logger.info('Added user_media_state episode progress columns')
+                app.logger.info('Added user_media_state episode progress / pin columns')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
 

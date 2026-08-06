@@ -1,5 +1,14 @@
 # Changes log
 
+## 2026-08-05 — Add to lists: clear-all remove fix
+
+- Uncheck all lists + Save reliably removes Wishlist / personal-list membership (no longer re-paginates every Trakt list on save or dialog open)
+- After list writes, refresh activities fingerprint so reload does not immediately full-sync (avoids 2nd-title rate-limit / hang)
+
+## 2026-08-05 — My movies/shows: pin to top
+
+- **Pin / Unpin** on My movies & My shows — local-only; pinned titles sort above everything else
+
 ## 2026-08-05 — My movies/shows: auto cache invalidation
 
 - Opening My pages checks Trakt `/sync/last_activities` and re-syncs watchlist/watched/lists when they changed (no manual Refresh required for Trakt.tv edits)

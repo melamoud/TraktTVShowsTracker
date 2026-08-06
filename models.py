@@ -264,6 +264,9 @@ class UserMediaState(db.Model):
     next_episode_number = db.Column(db.Integer)
     next_episode_title = db.Column(db.String(400))
     progress_detail_at = db.Column(db.DateTime)
+    # Local-only pin to keep “watching now / soon” titles at the top of My pages.
+    pinned = db.Column(db.Boolean, default=False, nullable=False)
+    pinned_at = db.Column(db.DateTime)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
