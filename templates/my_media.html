@@ -158,6 +158,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% if st.on_watchlist %}<span class="tag watchlist">Wishlist</span>{% endif %}
           {% for name in row.list_names %}<span class="tag list">{{ name }}</span>{% endfor %}
           {% if st.watched %}<span class="tag watched">Watched</span>{% endif %}
+          {% set rating = st.rating %}{% set favorited = st.favorited %}
+          {% include '_rate_favorite_tags.html' %}
           {% if st.progress_percent and st.progress_percent < 100 %}<span class="tag partial">{{ '%.0f'|format(st.progress_percent) }}%</span>{% endif %}
           {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
         </div>
@@ -221,6 +223,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
                   data-media-type="{{ media_type }}"
                   data-trakt-id="{{ st.trakt_id }}"
                   data-title="{{ (m.title if m else st.trakt_id)|e }}">Add to lists…</button>
+          {% set rating = st.rating %}{% set favorited = st.favorited %}{% set trakt_id = st.trakt_id %}
+          {% include '_rate_favorite_actions.html' %}
           {% if st.watched %}
             <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Unwatch</button>
           {% else %}

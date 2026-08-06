@@ -18,6 +18,8 @@ Opening the page uses a local cache, but it **auto-invalidates**: a cheap Trakt 
 
 **Pin** keeps a show at the top of My shows (local only — for “watching now” / “soon”). Newest pin wins among pinned titles. **Unpin** returns it to normal sort.
 
+**Rate…** (1–10) and **Favorite / Unfavorite** sync to Trakt the same way as on trakt.tv.
+
 **Mark watched** on a show confirms first: it marks **all** aired seasons/episodes on Trakt (same as Trakt’s whole-show watched). Prefer **Progress** → season/episode actions when you only finished one season.
 
 Cards show **Streaming** / **Plays on your services** from TMDB (same layout as Latest), plus your local **Found on** choices.

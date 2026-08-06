@@ -926,7 +926,11 @@ def api_episode_watched():
             watched = True
         return jsonify({'success': True, 'watched': watched})
     except Exception as exc:
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        current_app.logger.exception('Episode watched action failed: %s', exc)
+        return jsonify({
+            'success': False,
+            'message': 'Could not update episode. Please try again.',
+        }), 400
 
 
 @user_bp.route('/api/show/<int:trakt_id>/season/<int:season_number>/watched', methods=['POST'])
@@ -939,7 +943,10 @@ def api_season_watched(trakt_id, season_number):
         return jsonify({'success': True, 'added': added, 'season': season_number})
     except Exception as exc:
         current_app.logger.exception('Season watched failed: %s', exc)
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return jsonify({
+            'success': False,
+            'message': 'Could not mark season watched. Please try again.',
+        }), 400
 
 
 @user_bp.route('/api/show/<int:trakt_id>/season/<int:season_number>/unwatched', methods=['POST'])
@@ -952,7 +959,10 @@ def api_season_unwatched(trakt_id, season_number):
         return jsonify({'success': True, 'deleted': deleted, 'season': season_number})
     except Exception as exc:
         current_app.logger.exception('Season unwatched failed: %s', exc)
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return jsonify({
+            'success': False,
+            'message': 'Could not unwatch season. Please try again.',
+        }), 400
 
 
 @user_bp.route('/notifications')

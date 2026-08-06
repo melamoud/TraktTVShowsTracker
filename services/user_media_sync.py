@@ -34,16 +34,22 @@ def activity_fingerprint(activities: dict, media_types: tuple[str, ...]) -> dict
     movies = activities.get('movies') or {}
     shows = activities.get('shows') or {}
     episodes = activities.get('episodes') or {}
+    ratings = activities.get('ratings') or {}
+    favorites = activities.get('favorites') or {}
     fp = {
         'watchlist': watchlist.get('updated_at'),
         'lists': lists.get('updated_at'),
+        'ratings': ratings.get('updated_at'),
+        'favorites': favorites.get('updated_at'),
     }
     if 'movie' in types:
         fp['movies_watched'] = movies.get('watched_at')
         fp['movies_watchlisted'] = movies.get('watchlisted_at')
+        fp['movies_rated'] = movies.get('rated_at')
     if 'show' in types:
         fp['episodes_watched'] = episodes.get('watched_at')
         fp['shows_watchlisted'] = shows.get('watchlisted_at')
+        fp['shows_rated'] = shows.get('rated_at')
     return fp
 
 

@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-06 — Ratings + favorites
+
+- **Rate…** (1–10) and **Favorite / Unfavorite** on My, Latest, Recommended, Search, and title detail — syncs to Trakt like watchlist/watched
+- Tags show current rating and Favorite; Refresh / auto-sync pulls `/sync/ratings` and `/sync/favorites`
+
 ## 2026-08-06 — Availability chips + filters
 
 - Under-poster chips: **Upcoming** (>30 days out), **Theater window** (±30 days), **Streaming** / On your services

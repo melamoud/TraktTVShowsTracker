@@ -34,6 +34,12 @@ from services.sync_jobs import (
 catalog_bp = Blueprint('catalog', __name__)
 
 
+def _api_fail(log_msg: str, exc: Exception, *, user_message: str = 'Something went wrong. Please try again.', status: int = 400):
+    """Log full exception server-side; return a short safe message to the client."""
+    current_app.logger.exception('%s: %s', log_msg, exc)
+    return jsonify({'success': False, 'message': user_message}), status
+
+
 @catalog_bp.route('/cache/posters/<media_type>/<int:trakt_id>')
 def cached_poster(media_type, trakt_id):
     """
@@ -169,6 +175,8 @@ def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
             'on_watchlist': bool(st and st.on_watchlist),
             'watched': bool(st and st.watched),
             'partial': bool(st and st.progress_percent and 0 < st.progress_percent < 100),
+            'rating': int(st.rating) if st and st.rating else None,
+            'favorited': bool(st and st.favorited),
             'found_on': found.get(m.trakt_id, []),
             'genres': genres,
             'providers': providers,
@@ -862,8 +870,93 @@ def api_watchlist(media_type, trakt_id):
             pass
         return jsonify({'success': True, 'on_watchlist': on})
     except Exception as exc:
-        current_app.logger.exception('Watchlist action failed: %s', exc)
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        db.session.rollback()
+        return _api_fail(
+            'Watchlist action failed',
+            exc,
+            user_message='Could not update watchlist. Please try again.',
+        )
+
+
+@catalog_bp.route('/api/rating/<media_type>/<int:trakt_id>', methods=['POST'])
+@login_required
+def api_rating(media_type, trakt_id):
+    """Set or clear a 1–10 Trakt rating and update local cache."""
+    if media_type not in ('movie', 'show'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    payload = request.json or {}
+    raw = payload.get('rating', payload.get('action'))
+    try:
+        if raw in (None, '', 'clear', 'remove'):
+            trakt_client.remove_rating(current_user, media_type, trakt_id)
+            score = None
+        else:
+            score = int(raw)
+            if score < 1 or score > 10:
+                return jsonify({'success': False, 'message': 'Rating must be 1–10'}), 400
+            trakt_client.add_rating(current_user, media_type, trakt_id, score)
+        st = UserMediaState.query.filter_by(
+            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
+        ).first()
+        if not st:
+            st = UserMediaState(
+                user_id=current_user.id, media_type=media_type, trakt_id=trakt_id,
+            )
+            db.session.add(st)
+        st.rating = score
+        db.session.commit()
+        try:
+            from services.user_media_sync import note_user_media_write
+            note_user_media_write(current_user, media_types=(media_type,))
+        except Exception:
+            pass
+        return jsonify({'success': True, 'rating': score})
+    except Exception as exc:
+        db.session.rollback()
+        return _api_fail(
+            'Rating action failed',
+            exc,
+            user_message='Could not update rating. Please try again.',
+        )
+
+
+@catalog_bp.route('/api/favorite/<media_type>/<int:trakt_id>', methods=['POST'])
+@login_required
+def api_favorite(media_type, trakt_id):
+    """Add or remove a title from Trakt favorites and update local cache."""
+    if media_type not in ('movie', 'show'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    action = (request.json or {}).get('action') or 'add'
+    try:
+        if action == 'remove':
+            trakt_client.remove_from_favorites(current_user, media_type, trakt_id)
+            on = False
+        else:
+            trakt_client.add_to_favorites(current_user, media_type, trakt_id)
+            on = True
+        st = UserMediaState.query.filter_by(
+            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
+        ).first()
+        if not st:
+            st = UserMediaState(
+                user_id=current_user.id, media_type=media_type, trakt_id=trakt_id,
+            )
+            db.session.add(st)
+        st.favorited = on
+        db.session.commit()
+        try:
+            from services.user_media_sync import note_user_media_write
+            note_user_media_write(current_user, media_types=(media_type,))
+        except Exception:
+            pass
+        return jsonify({'success': True, 'favorited': on})
+    except Exception as exc:
+        db.session.rollback()
+        return _api_fail(
+            'Favorite action failed',
+            exc,
+            user_message='Could not update favorites. Please try again.',
+        )
 
 
 @catalog_bp.route('/api/lists/membership/<media_type>/<int:trakt_id>', methods=['GET', 'POST'])
@@ -887,8 +980,11 @@ def api_lists_membership(media_type, trakt_id):
     try:
         personal = trakt_client.get_personal_lists(current_user)
     except Exception as exc:
-        current_app.logger.exception('Failed loading Trakt lists: %s', exc)
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return _api_fail(
+            'Failed loading Trakt lists',
+            exc,
+            user_message='Could not load your lists. Please try again.',
+        )
 
     hidden = set(get_hidden_list_ids(current_user))
     visible = [lst for lst in personal if lst['id'] not in hidden]
@@ -928,8 +1024,11 @@ def api_lists_membership(media_type, trakt_id):
                 'lists': lists_out,
             })
         except Exception as exc:
-            current_app.logger.exception('List membership read failed: %s', exc)
-            return jsonify({'success': False, 'message': str(exc)}), 400
+            return _api_fail(
+                'List membership read failed',
+                exc,
+                user_message='Could not load your lists. Please try again.',
+            )
 
     payload = request.json or {}
     selected_raw = payload.get('selected')
@@ -991,6 +1090,11 @@ def api_lists_membership(media_type, trakt_id):
                         current_user.id, lid, media_type, trakt_id, on_list=False
                     )
 
+        # Re-load after set_list_membership / _upsert_state may have created the row
+        # in this same session (stale ``st is None`` caused duplicate INSERT).
+        st = UserMediaState.query.filter_by(
+            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id,
+        ).first()
         if not st:
             st = UserMediaState(
                 user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
@@ -1012,8 +1116,12 @@ def api_lists_membership(media_type, trakt_id):
             ),
         })
     except Exception as exc:
-        current_app.logger.exception('List membership update failed: %s', exc)
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        db.session.rollback()
+        return _api_fail(
+            'List membership update failed',
+            exc,
+            user_message='Could not update lists. Please try again.',
+        )
 
 
 @catalog_bp.route('/api/watched/<media_type>/<int:trakt_id>', methods=['POST'])
@@ -1047,8 +1155,12 @@ def api_watched(media_type, trakt_id):
             pass
         return jsonify({'success': True, 'watched': watched})
     except Exception as exc:
-        current_app.logger.exception('Watched action failed: %s', exc)
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        db.session.rollback()
+        return _api_fail(
+            'Watched action failed',
+            exc,
+            user_message='Could not update watched status. Please try again.',
+        )
 
 
 @catalog_bp.route('/api/review-marker/<media_type>/<int:trakt_id>', methods=['POST'])
@@ -1176,8 +1288,11 @@ def api_hide_recommendation(media_type, trakt_id):
         trakt_client.hide_recommendation(current_user, media_type, trakt_id)
         return jsonify({'success': True, 'hidden': True, 'trakt_id': int(trakt_id)})
     except Exception as exc:
-        current_app.logger.exception('Hide recommendation failed: %s', exc)
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return _api_fail(
+            'Hide recommendation failed',
+            exc,
+            user_message='Could not hide recommendation. Please try again.',
+        )
 
 
 @catalog_bp.route('/api/sync-catalog/<media_type>', methods=['POST'])
@@ -1195,4 +1310,8 @@ def api_sync_catalog(media_type):
         # Skip watchlist/watched sync — full library pagination often dominates Refresh time.
         return jsonify({'success': True, 'count': count})
     except Exception as exc:
-        return jsonify({'success': False, 'message': str(exc)}), 400
+        return _api_fail(
+            'Catalog sync failed',
+            exc,
+            user_message='Could not refresh from Trakt. Please try again.',
+        )

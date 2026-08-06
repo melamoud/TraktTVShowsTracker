@@ -41,6 +41,8 @@
       {% for k in row.match.keywords %}<span class="tag match">{{ k }}</span>{% endfor %}
       {% if row.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
       {% if row.watched %}<span class="tag watched">Watched</span>{% endif %}
+      {% set rating = row.rating %}{% set favorited = row.favorited %}
+      {% include '_rate_favorite_tags.html' %}
     </div>
     {% if row.my_providers %}
       <div class="streaming-line mine">
@@ -77,6 +79,9 @@
               data-media-type="{{ media_type }}"
               data-trakt-id="{{ m.trakt_id }}"
               data-title="{{ m.title|e }}">Add to lists…</button>
+      {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
+      {% set btn_class = 'btn' %}
+      {% include '_rate_favorite_actions.html' %}
       {% if row.watched %}
         <button class="btn" type="button" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
       {% else %}

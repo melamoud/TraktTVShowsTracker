@@ -5,6 +5,20 @@ function csrfToken() {
   return el ? el.getAttribute('content') : '';
 }
 
+function userFacingError(message, fallback) {
+  /** Keep alerts short; never surface SQL / stack traces in the browser. */
+  const fb = fallback || 'Something went wrong. Please try again.';
+  const msg = message == null ? '' : String(message).trim();
+  if (!msg) return fb;
+  if (
+    msg.length > 180
+    || /sqlalchemy|IntegrityError|OperationalError|Traceback|SQL:|UNIQUE constraint/i.test(msg)
+  ) {
+    return fb;
+  }
+  return msg;
+}
+
 async function apiPost(url, body) {
   body = body || {};
   const resp = await fetch(url, {
@@ -18,7 +32,7 @@ async function apiPost(url, body) {
   });
   const data = await resp.json().catch(function () { return {}; });
   if (!resp.ok || data.success === false) {
-    throw new Error(data.message || 'Request failed');
+    throw new Error(userFacingError(data.message, 'Request failed'));
   }
   return data;
 }
@@ -33,7 +47,7 @@ async function apiGet(url) {
   });
   const data = await resp.json().catch(function () { return {}; });
   if (!resp.ok || data.success === false) {
-    throw new Error(data.message || 'Request failed');
+    throw new Error(userFacingError(data.message, 'Request failed'));
   }
   return data;
 }
@@ -411,6 +425,25 @@ async function afterProgressMutation() {
   location.reload();
 }
 
+document.addEventListener('change', async function (ev) {
+  const el = ev.target.closest('select.rate-select');
+  if (!el) return;
+  const mediaType = el.getAttribute('data-media-type');
+  const traktId = el.getAttribute('data-trakt-id');
+  if (!mediaType || !traktId) return;
+  const value = el.value;
+  if (value === '') return;
+  el.disabled = true;
+  try {
+    const rating = value === 'clear' ? null : Number(value);
+    await apiPost('/api/rating/' + mediaType + '/' + traktId, { rating: rating });
+    location.reload();
+  } catch (err) {
+    alert(err.message || String(err));
+    el.disabled = false;
+  }
+});
+
 document.addEventListener('click', async function (ev) {
   const btn = ev.target.closest('[data-action]');
   if (!btn) return;
@@ -564,6 +597,11 @@ document.addEventListener('click', async function (ev) {
     } else if (action === 'pin-add' || action === 'pin-remove') {
       await apiPost('/api/pin/' + mediaType + '/' + traktId, {
         action: action === 'pin-remove' ? 'unpin' : 'pin',
+      });
+      location.reload();
+    } else if (action === 'favorite-add' || action === 'favorite-remove') {
+      await apiPost('/api/favorite/' + mediaType + '/' + traktId, {
+        action: action === 'favorite-remove' ? 'remove' : 'add',
       });
       location.reload();
     } else if (action === 'watched-add') {

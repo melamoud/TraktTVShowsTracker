@@ -601,6 +601,67 @@ def remove_from_watchlist(user: User, media_type: str, trakt_id: int) -> dict:
     return api_request('POST', '/sync/watchlist/remove', user=user, json_body=body) or {}
 
 
+def get_ratings(user: User, media_type: str) -> list:
+    """Return the user's Trakt ratings for movies or shows."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    return api_request(
+        'GET',
+        f'/sync/ratings/{media_type}s',
+        user=user,
+        params={'limit': 100},
+        paginate_max_pages=50,
+    ) or []
+
+
+def add_rating(user: User, media_type: str, trakt_id: int, rating: int) -> dict:
+    """Set a 1–10 Trakt rating for a movie/show."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    score = int(rating)
+    if score < 1 or score > 10:
+        raise ValueError('rating must be 1–10')
+    body = {f'{media_type}s': [{'ids': {'trakt': int(trakt_id)}, 'rating': score}]}
+    return api_request('POST', '/sync/ratings', user=user, json_body=body) or {}
+
+
+def remove_rating(user: User, media_type: str, trakt_id: int) -> dict:
+    """Clear the user's Trakt rating for a movie/show."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    body = {f'{media_type}s': [{'ids': {'trakt': int(trakt_id)}}]}
+    return api_request('POST', '/sync/ratings/remove', user=user, json_body=body) or {}
+
+
+def get_favorites(user: User, media_type: str) -> list:
+    """Return the user's Trakt favorites for movies or shows."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    return api_request(
+        'GET',
+        f'/sync/favorites/{media_type}s',
+        user=user,
+        params={'limit': 100},
+        paginate_max_pages=50,
+    ) or []
+
+
+def add_to_favorites(user: User, media_type: str, trakt_id: int) -> dict:
+    """Add a movie/show to Trakt favorites."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    body = {f'{media_type}s': [{'ids': {'trakt': int(trakt_id)}}]}
+    return api_request('POST', '/sync/favorites', user=user, json_body=body) or {}
+
+
+def remove_from_favorites(user: User, media_type: str, trakt_id: int) -> dict:
+    """Remove a movie/show from Trakt favorites."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    body = {f'{media_type}s': [{'ids': {'trakt': int(trakt_id)}}]}
+    return api_request('POST', '/sync/favorites/remove', user=user, json_body=body) or {}
+
+
 def get_personal_lists(user: User) -> list[dict]:
     """
     Return the user's Trakt personal/custom lists (not watchlist).

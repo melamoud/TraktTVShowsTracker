@@ -103,6 +103,8 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
             {% if row.match.matched %}<span class="tag match">Preference match</span>{% endif %}
             {% if row.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
             {% if row.watched %}<span class="tag watched">Watched</span>{% endif %}
+            {% set rating = row.rating %}{% set favorited = row.favorited %}
+            {% include '_rate_favorite_tags.html' %}
             {% if row.partial %}<span class="tag partial">Partial</span>{% endif %}
             {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
           </div>
@@ -141,6 +143,8 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
                     data-media-type="{{ media_type }}"
                     data-trakt-id="{{ m.trakt_id }}"
                     data-title="{{ m.title|e }}">Add to lists…</button>
+            {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
+            {% include '_rate_favorite_actions.html' %}
             {% if row.watched %}
               <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
             {% else %}

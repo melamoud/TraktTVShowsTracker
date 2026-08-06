@@ -628,7 +628,7 @@ def enrich_media_details(media_type: str, limit: int = 40) -> int:
 
 
 def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None) -> None:
-    """Refresh local watchlist/watched cache from Trakt for one user."""
+    """Refresh local watchlist/watched/ratings/favorites cache from Trakt for one user."""
     types = media_types or ('movie', 'show')
     for media_type in types:
         try:
@@ -638,6 +638,22 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
         except Exception as exc:
             logger.warning('State sync failed for user %s %s: %s', user.id, media_type, exc)
             continue
+
+        ratings: list = []
+        ratings_ok = False
+        try:
+            ratings = trakt_client.get_ratings(user, media_type)
+            ratings_ok = True
+        except Exception as exc:
+            logger.warning('Ratings sync failed for user %s %s: %s', user.id, media_type, exc)
+
+        favorites: list = []
+        favorites_ok = False
+        try:
+            favorites = trakt_client.get_favorites(user, media_type)
+            favorites_ok = True
+        except Exception as exc:
+            logger.warning('Favorites sync failed for user %s %s: %s', user.id, media_type, exc)
 
         wl_ids: set[int] = set()
         for entry in watchlist:
@@ -673,6 +689,35 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
             )
             upsert_cached_media(media_type, entry)
 
+        rated_ids: set[int] = set()
+        for entry in ratings:
+            entity = entry.get(media_type) or {}
+            tid = (entity.get('ids') or {}).get('trakt')
+            if not tid:
+                continue
+            tid = int(tid)
+            score = entry.get('rating')
+            try:
+                score = int(score) if score is not None else None
+            except (TypeError, ValueError):
+                score = None
+            if score is None or score < 1 or score > 10:
+                continue
+            rated_ids.add(tid)
+            _upsert_state(user.id, media_type, tid, rating=score)
+            upsert_cached_media(media_type, entry)
+
+        favorited_ids: set[int] = set()
+        for entry in favorites:
+            entity = entry.get(media_type) or {}
+            tid = (entity.get('ids') or {}).get('trakt')
+            if not tid:
+                continue
+            tid = int(tid)
+            favorited_ids.add(tid)
+            _upsert_state(user.id, media_type, tid, favorited=True)
+            upsert_cached_media(media_type, entry)
+
         # Drop local flags for titles no longer on Trakt lists (full sync only).
         for row in UserMediaState.query.filter_by(
             user_id=user.id, media_type=media_type
@@ -681,6 +726,10 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
                 row.on_watchlist = False
             if row.trakt_id not in watched_ids:
                 row.watched = False
+            if ratings_ok and row.trakt_id not in rated_ids:
+                row.rating = None
+            if favorites_ok and row.trakt_id not in favorited_ids:
+                row.favorited = False
             # Old sync invented progress=100 from play count. Without a real
             # Progress-page / page-enrich detail stamp, that % is untrusted and
             # hides unfinished shows from "Unwatched episodes" forever.
@@ -837,6 +886,9 @@ def ensure_media_cached(media_type: str, trakt_ids: list[int]) -> None:
         db.session.commit()
 
 
+_MISSING = object()
+
+
 def _upsert_state(
     user_id: int,
     media_type: str,
@@ -846,8 +898,10 @@ def _upsert_state(
     plays: int = 0,
     last_watched_at: datetime | None = None,
     progress_percent: float | None = None,
+    rating=_MISSING,
+    favorited=_MISSING,
 ) -> None:
-    """Upsert a UserMediaState row. Booleans are set only when explicitly passed."""
+    """Upsert a UserMediaState row. Optional fields are set only when explicitly passed."""
     row = UserMediaState.query.filter_by(
         user_id=user_id, media_type=media_type, trakt_id=trakt_id
     ).first()
@@ -864,6 +918,10 @@ def _upsert_state(
         row.last_watched_at = last_watched_at
     if progress_percent is not None:
         row.progress_percent = progress_percent
+    if rating is not _MISSING:
+        row.rating = rating
+    if favorited is not _MISSING:
+        row.favorited = bool(favorited)
     row.updated_at = datetime.utcnow()
 
 

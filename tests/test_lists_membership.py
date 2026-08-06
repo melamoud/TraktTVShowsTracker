@@ -116,6 +116,60 @@ def test_lists_membership_post_updates_watchlist_and_list(app, client, user):
         assert st.on_watchlist is False
 
 
+def test_lists_membership_post_watchlist_plus_list_no_duplicate_state(app, client, user):
+    """
+    Adding Wishlist + a personal list must not double-insert UserMediaState.
+
+    set_list_membership/_upsert_state creates the row; membership POST used to
+    INSERT again from a stale ``st is None`` and hit UNIQUE constraint.
+    """
+    login_client(client, app, user)
+    personal = [{'id': '55', 'slug': 'keepers', 'name': 'Keepers', 'item_count': 1}]
+
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
+         patch('routes.catalog_routes.trakt_client.add_to_watchlist') as add_wl, \
+         patch('routes.catalog_routes.trakt_client.add_to_list') as add_list, \
+         patch('routes.catalog_routes.trakt_client.remove_from_watchlist'), \
+         patch('routes.catalog_routes.trakt_client.remove_from_list'), \
+         patch('services.user_media_sync.note_user_media_write'):
+        resp = client.post(
+            '/api/lists/membership/movie/4965',
+            json={'selected': ['watchlist', '55']},
+        )
+
+    assert resp.status_code == 200, resp.get_json()
+    assert resp.get_json()['success'] is True
+    assert resp.get_json()['on_watchlist'] is True
+    add_wl.assert_called_once()
+    add_list.assert_called_once()
+    with app.app_context():
+        rows = UserMediaState.query.filter_by(
+            user_id=user, media_type='movie', trakt_id=4965,
+        ).all()
+        assert len(rows) == 1
+        assert rows[0].on_watchlist is True
+
+
+def test_lists_membership_post_errors_are_sanitized(app, client, user):
+    """API failures must not return SQLAlchemy / SQL details to the client."""
+    login_client(client, app, user)
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch(
+             'routes.catalog_routes.trakt_client.add_to_watchlist',
+             side_effect=RuntimeError('UNIQUE constraint failed: user_media_state'),
+         ):
+        resp = client.post(
+            '/api/lists/membership/movie/1',
+            json={'selected': ['watchlist']},
+        )
+    assert resp.status_code == 400
+    data = resp.get_json()
+    assert data['success'] is False
+    assert 'UNIQUE' not in data['message']
+    assert 'user_media_state' not in data['message']
+    assert 'Could not update lists' in data['message']
+
+
 def test_lists_membership_post_empty_selected_removes_all(app, client, user):
     """Uncheck all + Save removes Wishlist and personal-list membership."""
     from models import UserListMembership

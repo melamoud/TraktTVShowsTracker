@@ -267,6 +267,9 @@ class UserMediaState(db.Model):
     # Local-only pin to keep “watching now / soon” titles at the top of My pages.
     pinned = db.Column(db.Boolean, default=False, nullable=False)
     pinned_at = db.Column(db.DateTime)
+    # Trakt user rating (1–10) and favorites — synced from /sync/ratings + /sync/favorites.
+    rating = db.Column(db.Integer)  # None = unrated
+    favorited = db.Column(db.Boolean, default=False, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 

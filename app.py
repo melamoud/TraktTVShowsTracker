@@ -216,6 +216,10 @@ def _ensure_schema(app):
                  'ALTER TABLE user_media_state ADD COLUMN pinned BOOLEAN DEFAULT 0 NOT NULL'),
                 ('pinned_at',
                  'ALTER TABLE user_media_state ADD COLUMN pinned_at DATETIME'),
+                ('rating',
+                 'ALTER TABLE user_media_state ADD COLUMN rating INTEGER'),
+                ('favorited',
+                 'ALTER TABLE user_media_state ADD COLUMN favorited BOOLEAN DEFAULT 0 NOT NULL'),
             ):
                 if col not in ucols:
                     u_alters.append(ddl)
@@ -223,7 +227,7 @@ def _ensure_schema(app):
                 with db.engine.begin() as conn:
                     for stmt in u_alters:
                         conn.execute(text(stmt))
-                app.logger.info('Added user_media_state episode progress / pin columns')
+                app.logger.info('Added user_media_state progress / pin / rating columns')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
 

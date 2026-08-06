@@ -23,6 +23,8 @@ Filter choices and page size are remembered for your account when you leave and 
 
 - **Pin / Unpin** — keep a title at the top of My movies (local only; for “watching now” / “soon”)
 - **Add to lists…** — multi-select Wishlist + Trakt personal lists (uncheck all + Save = remove from those lists)
+- **Rate…** — set or clear a 1–10 Trakt rating (same as trakt.tv)
+- **Favorite / Unfavorite** — add or remove from Trakt favorites
 - **Mark watched / Unwatch** — syncs to Trakt (asks for confirmation first)
 - **Streaming** / **Plays on your services** — TMDB availability (same as Latest); highlighted when it matches services in Preferences  
 - **Found on…** — multi-select where *you* found it (local only; see [Streaming](streaming))

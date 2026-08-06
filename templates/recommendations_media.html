@@ -178,6 +178,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% for k in row.match.keywords %}<span class="tag match">{{ k }}</span>{% endfor %}
           {% if row.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
           {% if row.watched %}<span class="tag watched">Watched</span>{% endif %}
+          {% set rating = row.rating %}{% set favorited = row.favorited %}
+          {% include '_rate_favorite_tags.html' %}
           {% for g in row.genres[:6] %}
             {% if g not in row.match.genres %}<span class="tag">{{ g }}</span>{% endif %}
           {% endfor %}
@@ -217,6 +219,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
                   data-media-type="{{ media_type }}"
                   data-trakt-id="{{ m.trakt_id }}"
                   data-title="{{ m.title|e }}">Add to lists…</button>
+          {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
+          {% include '_rate_favorite_actions.html' %}
           {% if row.watched %}
             <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
           {% else %}
