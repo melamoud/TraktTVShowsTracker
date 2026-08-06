@@ -2,7 +2,7 @@
 
 Movies from your Trakt **Wishlist**, **personal lists** (the ones you show in Preferences), and/or **watched** history, with local metadata (poster, description, genres).
 
-Opening this page uses a local cache that **auto-invalidates** when Trakt reports newer watchlist / watched / list activity. **Refresh from Trakt** forces a full re-pull. Sorted by in-progress first, then most recently watched; not-started titles last.
+Opening this page uses a local cache that **auto-invalidates** when Trakt reports newer watchlist / watched / list activity. In-app rate / watch / list actions only mark those activity slices fresh, so adds you made on Trakt.tv still sync on the next visit. **Refresh from Trakt** forces a full re-pull. Sorted by in-progress first, then most recently watched; not-started titles last.
 
 ## Filters
 
@@ -10,7 +10,7 @@ Opening this page uses a local cache that **auto-invalidates** when Trakt report
 - **Watched** — watched history only  
 - **Both** — selected lists **or** watched  
 - **Unwatched** — titles on your selected lists that are not watched yet
-- **Search titles in this list…** — filters the full filtered set by title/year (not remembered; see [Search](search) for Trakt-wide search)
+- **Search titles in this list…** — filters the full filtered set by title/year (backfills missing local titles first; not remembered; see [Search](search) for Trakt-wide search)
 - **Upcoming / Theater window / Streaming** — release & streaming availability (chips under the poster). Theater = public release within ±30 days; Upcoming = more than 30 days out; Streaming = TMDB lists a subscription/free vendor
 
 ## Paging

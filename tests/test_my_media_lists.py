@@ -116,7 +116,7 @@ def test_my_movies_auto_syncs_when_activities_change(app, user):
             },
         }
         with patch('services.user_media_sync.get_last_activities', return_value=activities), \
-             patch('services.user_media_sync.sync_user_media_state') as sync:
+             patch('services.user_media_sync.sync_user_media_state', return_value=True) as sync:
             ran = ensure_user_media_fresh(user_obj, media_types=('movie',), force=False)
         assert ran is True
         sync.assert_called_once()
@@ -155,6 +155,80 @@ def test_my_movies_skips_sync_when_activities_unchanged(app, user):
             ran = ensure_user_media_fresh(user_obj, media_types=('movie',), force=False)
         assert ran is False
         sync.assert_not_called()
+
+
+def test_failed_sync_does_not_advance_fingerprint(app, user):
+    """A failed watchlist pull must not mark activities fresh."""
+    from models import User
+    from services.user_media_sync import ensure_user_media_fresh
+
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        old_fp = {
+            'watchlist': '2026-08-01T00:00:00.000Z',
+            'lists': '2026-08-01T00:00:00.000Z',
+            'movies_watched': '2026-08-01T00:00:00.000Z',
+            'movies_watchlisted': '2026-08-01T00:00:00.000Z',
+        }
+        user_obj.last_sync_at = datetime(2026, 8, 1)
+        user_obj.trakt_activities_json = json.dumps(old_fp)
+        db.session.commit()
+
+        activities = {
+            'watchlist': {'updated_at': '2026-08-05T13:02:01.000Z'},
+            'lists': {'updated_at': '2026-08-01T00:00:00.000Z'},
+            'movies': {
+                'watched_at': '2026-08-01T00:00:00.000Z',
+                'watchlisted_at': '2026-08-05T13:02:01.000Z',
+            },
+        }
+        with patch('services.user_media_sync.get_last_activities', return_value=activities), \
+             patch('services.user_media_sync.sync_user_media_state', return_value=False) as sync:
+            ran = ensure_user_media_fresh(user_obj, media_types=('movie',), force=False)
+        assert ran is True
+        sync.assert_called_once()
+        db.session.refresh(user_obj)
+        stored = json.loads(user_obj.trakt_activities_json or '{}')
+        assert stored.get('watchlist') == old_fp['watchlist']
+
+
+def test_note_user_media_write_does_not_poison_watchlist_fingerprint(app, user):
+    """Rating in-app must not stamp a newer remote watchlist timestamp as synced."""
+    from models import User
+    from services.user_media_sync import note_user_media_write
+
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        user_obj.last_sync_at = datetime(2026, 8, 1)
+        user_obj.trakt_activities_json = json.dumps({
+            'watchlist': '2026-08-01T00:00:00.000Z',
+            'lists': '2026-08-01T00:00:00.000Z',
+            'ratings': '2026-08-01T00:00:00.000Z',
+            'movies_watchlisted': '2026-08-01T00:00:00.000Z',
+            'movies_rated': '2026-08-01T00:00:00.000Z',
+        })
+        db.session.commit()
+
+        # Trakt has a newer watchlist (added on website) AND newer rating (just did in-app).
+        activities = {
+            'watchlist': {'updated_at': '2026-08-06T12:00:00.000Z'},
+            'lists': {'updated_at': '2026-08-01T00:00:00.000Z'},
+            'ratings': {'updated_at': '2026-08-06T12:05:00.000Z'},
+            'movies': {
+                'watchlisted_at': '2026-08-06T12:00:00.000Z',
+                'rated_at': '2026-08-06T12:05:00.000Z',
+            },
+        }
+        with patch('services.user_media_sync.get_last_activities', return_value=activities):
+            note_user_media_write(user_obj, media_types=('movie',), aspects=('ratings',))
+
+        db.session.refresh(user_obj)
+        stored = json.loads(user_obj.trakt_activities_json or '{}')
+        # Rating keys advanced; watchlist keys must stay stale so next page syncs.
+        assert stored.get('ratings') == '2026-08-06T12:05:00.000Z'
+        assert stored.get('movies_rated') == '2026-08-06T12:05:00.000Z'
+        assert stored.get('watchlist') == '2026-08-01T00:00:00.000Z'
+        assert stored.get('movies_watchlisted') == '2026-08-01T00:00:00.000Z'
 
 
 def test_my_movies_lists_set_overrides_defaults(app, client, user):

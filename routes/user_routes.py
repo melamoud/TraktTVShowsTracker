@@ -512,8 +512,27 @@ def _my_media(media_type: str):
         q = q.filter(or_(*clauses))
 
     # Title search and/or availability filters need CachedMedia (before pagination).
+    # Backfill missing titles for the filtered candidate set first — otherwise
+    # q= cannot match rows that only exist in UserMediaState (Search page used
+    # to "unlock" them by upserting CachedMedia as a side effect).
     needs_media_join = bool(search_q) or bool(avail)
     if needs_media_join:
+        # Snapshot ids without mutating `q` (legacy Query.with_entities is in-place).
+        candidate_ids = [
+            int(tid)
+            for tid in db.session.scalars(
+                q.statement.with_only_columns(
+                    UserMediaState.trakt_id,
+                    maintain_column_froms=True,
+                ).distinct()
+            ).all()
+        ]
+        try:
+            ensure_media_cached(media_type, candidate_ids)
+        except Exception as exc:
+            current_app.logger.warning(
+                'Title backfill before my-media filter failed: %s', exc,
+            )
         q = q.outerjoin(
             CachedMedia,
             and_(

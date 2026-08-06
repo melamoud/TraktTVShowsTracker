@@ -627,9 +627,16 @@ def enrich_media_details(media_type: str, limit: int = 40) -> int:
     return updated
 
 
-def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None) -> None:
-    """Refresh local watchlist/watched/ratings/favorites cache from Trakt for one user."""
+def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None) -> bool:
+    """
+    Refresh local watchlist/watched/ratings/favorites cache from Trakt for one user.
+
+    Returns True only when every requested media type's watchlist+watched pull
+    succeeded and personal-list membership sync completed. Callers must not
+    advance the activities fingerprint when this returns False.
+    """
     types = media_types or ('movie', 'show')
+    all_ok = True
     for media_type in types:
         try:
             watchlist = trakt_client.get_watchlist(user, media_type)
@@ -637,6 +644,7 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
             watched = trakt_client.get_watched(user, media_type)
         except Exception as exc:
             logger.warning('State sync failed for user %s %s: %s', user.id, media_type, exc)
+            all_ok = False
             continue
 
         ratings: list = []
@@ -744,9 +752,11 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
         sync_user_list_memberships(user, media_types=types)
     except Exception as exc:
         logger.warning('List membership sync failed for user %s: %s', user.id, exc)
+        all_ok = False
 
     user.last_sync_at = datetime.utcnow()
     db.session.commit()
+    return all_ok
 
 
 def sync_user_list_memberships(

@@ -20,6 +20,13 @@ logger = logging.getLogger('app')
 # If last_activities is unreachable, still re-sync after this age.
 _FALLBACK_MAX_AGE = timedelta(minutes=30)
 
+# Aspects that local writes can touch (maps to fingerprint keys).
+_ASPECT_WATCHLIST = 'watchlist'
+_ASPECT_LISTS = 'lists'
+_ASPECT_WATCHED = 'watched'
+_ASPECT_RATINGS = 'ratings'
+_ASPECT_FAVORITES = 'favorites'
+
 
 def get_last_activities(user) -> dict:
     """Return Trakt /sync/last_activities for the user."""
@@ -53,6 +60,38 @@ def activity_fingerprint(activities: dict, media_types: tuple[str, ...]) -> dict
     return fp
 
 
+def fingerprint_keys_for_aspects(
+    aspects: tuple[str, ...],
+    media_types: tuple[str, ...],
+) -> set[str]:
+    """Fingerprint keys touched by a local write of the given aspects."""
+    types = tuple(media_types) or ('movie', 'show')
+    keys: set[str] = set()
+    for aspect in aspects:
+        if aspect == _ASPECT_WATCHLIST:
+            keys.add('watchlist')
+            if 'movie' in types:
+                keys.add('movies_watchlisted')
+            if 'show' in types:
+                keys.add('shows_watchlisted')
+        elif aspect == _ASPECT_LISTS:
+            keys.add('lists')
+        elif aspect == _ASPECT_WATCHED:
+            if 'movie' in types:
+                keys.add('movies_watched')
+            if 'show' in types:
+                keys.add('episodes_watched')
+        elif aspect == _ASPECT_RATINGS:
+            keys.add('ratings')
+            if 'movie' in types:
+                keys.add('movies_rated')
+            if 'show' in types:
+                keys.add('shows_rated')
+        elif aspect == _ASPECT_FAVORITES:
+            keys.add('favorites')
+    return keys
+
+
 def _stored_fingerprint(user) -> dict:
     raw = getattr(user, 'trakt_activities_json', None) or '{}'
     try:
@@ -78,6 +117,9 @@ def ensure_user_media_fresh(
 
     Uses a cheap ``/sync/last_activities`` check. Returns True when a sync ran.
     ``force=True`` always syncs (manual Refresh button).
+
+    Fingerprint is only advanced after a successful sync so a failed pull cannot
+    mark the cache “fresh” and hide remote wishlist/list adds.
     """
     types = media_types or ('movie', 'show')
 
@@ -94,12 +136,18 @@ def ensure_user_media_fresh(
             db.session.rollback()
 
     if force:
-        sync_user_media_state(user, media_types=types)
-        try:
-            activities = get_last_activities(user)
-            _persist(activity_fingerprint(activities, types))
-        except Exception as exc:
-            logger.warning('Could not store activities after forced sync: %s', exc)
+        ok = sync_user_media_state(user, media_types=types)
+        if ok:
+            try:
+                activities = get_last_activities(user)
+                _persist(activity_fingerprint(activities, types))
+            except Exception as exc:
+                logger.warning('Could not store activities after forced sync: %s', exc)
+        else:
+            logger.warning(
+                'Forced media sync incomplete for user %s; leaving activities fingerprint unchanged',
+                user.id,
+            )
         return True
 
     need_sync = False
@@ -121,28 +169,47 @@ def ensure_user_media_fresh(
     if not need_sync:
         return False
 
-    sync_user_media_state(user, media_types=types)
-    _persist(fingerprint)
+    ok = sync_user_media_state(user, media_types=types)
+    if ok and fingerprint:
+        _persist(fingerprint)
+    elif not ok:
+        logger.warning(
+            'Media sync incomplete for user %s; not advancing activities fingerprint',
+            user.id,
+        )
     return True
 
 
 def note_user_media_write(
     user,
     media_types: tuple[str, ...] | None = None,
+    *,
+    aspects: tuple[str, ...] | None = None,
 ) -> None:
     """
     After a local write that already updated the DB cache (watchlist / lists /
-    watched), refresh the activities fingerprint so the next page load does not
-    immediately re-pull everything from Trakt (rate limits / slow second action).
+    watched / ratings / favorites), refresh only the fingerprint keys for those
+    aspects so the next page load does not immediately re-pull that slice.
+
+    Important: do **not** copy unrelated Trakt activity timestamps. Doing so
+    would mark remote watchlist/list adds as “already synced” without importing
+    them (e.g. rating something in-app after adding a show on Trakt.tv).
     """
     types = media_types or ('movie', 'show')
+    # Default: assume watchlist-shaped writes when callers omit aspects (legacy).
+    write_aspects = aspects or (_ASPECT_WATCHLIST,)
+    keys = fingerprint_keys_for_aspects(write_aspects, types)
+    if not keys:
+        return
     try:
         activities = get_last_activities(user)
         fp = activity_fingerprint(activities, types)
         if not fp:
             return
         merged = dict(_stored_fingerprint(user))
-        merged.update(fp)
+        for key in keys:
+            if key in fp:
+                merged[key] = fp[key]
         _save_fingerprint(user, merged)
         db.session.commit()
     except Exception as exc:

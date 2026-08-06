@@ -865,7 +865,9 @@ def api_watchlist(media_type, trakt_id):
         db.session.commit()
         try:
             from services.user_media_sync import note_user_media_write
-            note_user_media_write(current_user, media_types=(media_type,))
+            note_user_media_write(
+                current_user, media_types=(media_type,), aspects=('watchlist',),
+            )
         except Exception:
             pass
         return jsonify({'success': True, 'on_watchlist': on})
@@ -907,7 +909,9 @@ def api_rating(media_type, trakt_id):
         db.session.commit()
         try:
             from services.user_media_sync import note_user_media_write
-            note_user_media_write(current_user, media_types=(media_type,))
+            note_user_media_write(
+                current_user, media_types=(media_type,), aspects=('ratings',),
+            )
         except Exception:
             pass
         return jsonify({'success': True, 'rating': score})
@@ -946,7 +950,9 @@ def api_favorite(media_type, trakt_id):
         db.session.commit()
         try:
             from services.user_media_sync import note_user_media_write
-            note_user_media_write(current_user, media_types=(media_type,))
+            note_user_media_write(
+                current_user, media_types=(media_type,), aspects=('favorites',),
+            )
         except Exception:
             pass
         return jsonify({'success': True, 'favorited': on})
@@ -1104,7 +1110,11 @@ def api_lists_membership(media_type, trakt_id):
         db.session.commit()
         try:
             from services.user_media_sync import note_user_media_write
-            note_user_media_write(current_user, media_types=(media_type,))
+            note_user_media_write(
+                current_user,
+                media_types=(media_type,),
+                aspects=('watchlist', 'lists'),
+            )
         except Exception:
             pass
         return jsonify({
@@ -1150,7 +1160,9 @@ def api_watched(media_type, trakt_id):
         db.session.commit()
         try:
             from services.user_media_sync import note_user_media_write
-            note_user_media_write(current_user, media_types=(media_type,))
+            note_user_media_write(
+                current_user, media_types=(media_type,), aspects=('watched',),
+            )
         except Exception:
             pass
         return jsonify({'success': True, 'watched': watched})

@@ -125,6 +125,41 @@ def test_my_movies_q_filters_by_title(app, client, user):
     assert 'matching “alpha”' in html or 'matching &ldquo;alpha&rdquo;' in html or 'alpha' in html
 
 
+def test_my_shows_q_backfills_missing_cached_media(app, client, user):
+    """Title search must backfill CachedMedia before filtering (not only after page)."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=195475, on_watchlist=True,
+        ))
+        # Intentionally no CachedMedia row — mirrors stale sync / state-only rows.
+        db.session.commit()
+
+    def fake_ensure(media_type, trakt_ids):
+        assert media_type == 'show'
+        if 195475 in (trakt_ids or []):
+            if not CachedMedia.query.filter_by(media_type='show', trakt_id=195475).first():
+                db.session.add(CachedMedia(
+                    media_type='show', trakt_id=195475, title='The Ark', year=2023,
+                ))
+                db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached', side_effect=fake_ensure), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        resp = client.get(
+            '/my/shows?lists_set=1&lists=watchlist&filter=lists&q=ark'
+        )
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'data-trakt-id="195475"' in html
+    assert 'The Ark' in html
+
+
 def test_recommendations_q_filters_by_title(app, client, user):
     login_client(client, app, user)
     fake = [

@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-06 — My lists sync / title search cache fixes
+
+- In-app watchlist / list / watched / rating / favorite writes only advance matching Trakt activity fingerprint keys (no longer stamps unrelated remote watchlist/list adds as already synced)
+- Failed watchlist/watched/list pulls do not advance the fingerprint (cache stays stale until a successful sync)
+- My movies/shows title + availability filters backfill missing `CachedMedia` for the filtered set before applying `q=` / `avail=`
+
 ## 2026-08-06 — Ratings + favorites
 
 - **Rate…** (1–10) and **Favorite / Unfavorite** on My, Latest, Recommended, Search, and title detail — syncs to Trakt like watchlist/watched
