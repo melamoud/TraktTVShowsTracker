@@ -20,4 +20,4 @@ Opening the page uses a local cache, but it **auto-invalidates**: a cheap Trakt 
 
 Cards show **Streaming** / **Plays on your services** from TMDB (same layout as Latest), plus your local **Found on** choices.
 
-Use **Progress** to open the episode screen (mark seasons/episodes; writes back to Trakt).
+Use **Progress** to open the episode panel beside the list (mark seasons/episodes; writes back to Trakt). See [Series progress](series_progress).

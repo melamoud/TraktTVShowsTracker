@@ -66,6 +66,49 @@ def test_series_progress_prefers_history_over_progress_flags(app, client, user):
     assert 'btn-watch' in html and '>Watch<' in html
 
 
+def test_series_progress_partial_returns_body_only(app, client, user):
+    """Drawer fetch uses ?partial=1 without full page chrome."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=55, title='Drawer Show', year=2024,
+        ))
+        db.session.commit()
+
+    progress = {
+        'aired': 1,
+        'completed': 0,
+        'seasons': [{
+            'number': 1,
+            'aired': 1,
+            'completed': 0,
+            'episodes': [{'number': 1, 'completed': False}],
+        }],
+    }
+    seasons_meta = [{
+        'number': 1,
+        'episodes': [{
+            'number': 1,
+            'title': 'Pilot',
+            'ids': {'trakt': 901},
+            'first_aired': '2024-01-01T00:00:00.000Z',
+        }],
+    }]
+    login_client(client, app, user)
+    with patch('routes.user_routes.trakt_client.get_show_progress', return_value=progress), \
+         patch('routes.user_routes.trakt_client.get_show_seasons', return_value=seasons_meta), \
+         patch('routes.user_routes.trakt_client.get_show_watch_history', return_value=[]), \
+         patch('routes.user_routes.trakt_client.get_show_watched_entry', return_value=None):
+        resp = client.get('/shows/55/progress?partial=1')
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert '<!doctype html>' not in html.lower()
+    assert '← My shows' not in html
+    assert 'progress-header' in html or 'From history' in html
+    assert 'Pilot' in html
+    assert 'data-action="episode-watched"' in html
+
+
 def test_sanitize_episode_ids_strips_nested_plex():
     """Nested plex.guid must not be sent to Trakt history sync."""
     from services.trakt_client import sanitize_episode_ids

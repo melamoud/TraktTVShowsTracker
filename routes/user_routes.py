@@ -717,6 +717,11 @@ def series_progress(trakt_id):
         watched_entry = trakt_client.get_show_watched_entry(current_user, trakt_id)
     except Exception as exc:
         current_app.logger.exception('Progress load failed: %s', exc)
+        if request.args.get('partial') == '1':
+            return (
+                '<p class="muted">Could not load show progress from Trakt right now.</p>',
+                502,
+            )
         flash('Could not load show progress from Trakt.', 'danger')
         return redirect(url_for('user.my_shows'))
 
@@ -840,16 +845,19 @@ def series_progress(trakt_id):
         current_app.logger.warning('Could not cache show progress %%: %s', exc)
         db.session.rollback()
 
-    return render_template(
-        'series_progress.html',
-        media=media,
-        trakt_id=trakt_id,
-        seasons=season_views,
-        next_episode=next_episode,
-        progress_aired=total_aired,
-        progress_completed=total_completed,
-        title=media.title if media else f'Show {trakt_id}',
-    )
+    ctx = {
+        'media': media,
+        'trakt_id': trakt_id,
+        'seasons': season_views,
+        'next_episode': next_episode,
+        'progress_aired': total_aired,
+        'progress_completed': total_completed,
+        'title': media.title if media else f'Show {trakt_id}',
+    }
+    # Drawer / AJAX: return body-only fragment (no full page chrome).
+    if request.args.get('partial') == '1':
+        return render_template('_series_progress_body.html', **ctx)
+    return render_template('series_progress.html', **ctx)
 
 
 @user_bp.route('/api/pin/<media_type>/<int:trakt_id>', methods=['POST'])

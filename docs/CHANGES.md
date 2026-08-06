@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-06 — Series progress side panel
+
+- **Progress** / **Series progress** opens a right-hand drawer instead of leaving the page (My shows, Search, show detail)
+- Episode/season watch actions refresh the panel in place; closing after edits reloads the list underneath
+
 ## 2026-08-05 — System-wide search
 
 - Nav **Search** page: Trakt exact + broad title search with Latest-style cards (Add to lists / Watched / streaming)

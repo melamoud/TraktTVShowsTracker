@@ -2,6 +2,8 @@
 
 Shows **aired** episodes for a series and which ones you’ve watched on Trakt.
 
+**Progress** / **Series progress** on My shows, Search, and show detail opens a **side panel** over the current page (no navigation away). Mark episodes/seasons there; the panel refreshes in place. Closing it after changes reloads the underlying page so card counts update. The full `/shows/…/progress` URL still works for bookmarks.
+
 ## Where watched marks come from
 
 Episode **Watch / Watched** uses the same Trakt sync sources Showly and Kodi use:

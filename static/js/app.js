@@ -296,6 +296,121 @@ function rowContext(btn) {
   };
 }
 
+let progressDrawerTraktId = null;
+let progressDrawerDirty = false;
+let progressDrawerKeyHandler = null;
+
+function isProgressDrawerOpen() {
+  const drawer = document.getElementById('progress-drawer');
+  return !!(drawer && !drawer.hidden);
+}
+
+function closeProgressDrawer() {
+  const drawer = document.getElementById('progress-drawer');
+  if (!drawer) return;
+  drawer.hidden = true;
+  document.body.classList.remove('modal-open');
+  if (progressDrawerKeyHandler) {
+    document.removeEventListener('keydown', progressDrawerKeyHandler);
+    progressDrawerKeyHandler = null;
+  }
+  const dirty = progressDrawerDirty;
+  progressDrawerDirty = false;
+  progressDrawerTraktId = null;
+  if (dirty) {
+    location.reload();
+  }
+}
+
+async function refreshProgressDrawer() {
+  const body = document.getElementById('progress-drawer-body');
+  const loadingEl = document.getElementById('progress-drawer-loading');
+  const errorEl = document.getElementById('progress-drawer-error');
+  if (!body || !progressDrawerTraktId) return;
+  if (loadingEl) loadingEl.hidden = false;
+  if (errorEl) {
+    errorEl.hidden = true;
+    errorEl.textContent = '';
+  }
+  try {
+    const resp = await fetch(
+      '/shows/' + progressDrawerTraktId + '/progress?partial=1',
+      {
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+          'Accept': 'text/html',
+        },
+      }
+    );
+    const html = await resp.text();
+    if (!resp.ok) {
+      throw new Error(html.replace(/<[^>]+>/g, '').trim() || 'Failed to load progress');
+    }
+    body.innerHTML = html;
+  } catch (err) {
+    if (errorEl) {
+      errorEl.hidden = false;
+      errorEl.textContent = err.message || String(err);
+    }
+  } finally {
+    if (loadingEl) loadingEl.hidden = true;
+  }
+}
+
+async function openProgressDrawer(opts) {
+  opts = opts || {};
+  const traktId = opts.traktId;
+  const title = opts.title || '';
+  const drawer = document.getElementById('progress-drawer');
+  const titleEl = document.getElementById('progress-drawer-title');
+  const body = document.getElementById('progress-drawer-body');
+  const closeBtn = document.getElementById('progress-drawer-close');
+  const errorEl = document.getElementById('progress-drawer-error');
+  if (!drawer || !body || !traktId) return;
+
+  progressDrawerTraktId = String(traktId);
+  progressDrawerDirty = false;
+  if (titleEl) titleEl.textContent = title || ('Show ' + traktId);
+  body.innerHTML = '';
+  if (errorEl) {
+    errorEl.hidden = true;
+    errorEl.textContent = '';
+  }
+  drawer.hidden = false;
+  document.body.classList.add('modal-open');
+
+  function onKey(ev) {
+    if (ev.key === 'Escape') closeProgressDrawer();
+  }
+  progressDrawerKeyHandler = onKey;
+  document.addEventListener('keydown', onKey);
+
+  if (closeBtn && !closeBtn._progressBound) {
+    closeBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      closeProgressDrawer();
+    });
+    closeBtn._progressBound = true;
+  }
+  if (!drawer._progressBound) {
+    drawer.addEventListener('click', function (ev) {
+      if (ev.target === drawer) closeProgressDrawer();
+    });
+    drawer._progressBound = true;
+  }
+
+  await refreshProgressDrawer();
+}
+
+async function afterProgressMutation() {
+  if (isProgressDrawerOpen() && progressDrawerTraktId) {
+    progressDrawerDirty = true;
+    await refreshProgressDrawer();
+    return;
+  }
+  location.reload();
+}
+
 document.addEventListener('click', async function (ev) {
   const btn = ev.target.closest('[data-action]');
   if (!btn) return;
@@ -412,6 +527,23 @@ document.addEventListener('click', async function (ev) {
     return;
   }
 
+  if (action === 'progress-open') {
+    const id = traktId || btn.getAttribute('data-trakt-id');
+    if (!id) return;
+    btn.disabled = true;
+    try {
+      await openProgressDrawer({
+        traktId: id,
+        title: ctx.title || btn.getAttribute('data-title') || '',
+      });
+    } catch (err) {
+      alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+    }
+    return;
+  }
+
   if (!mediaType || traktId === null || traktId === '') return;
 
   btn.disabled = true;
@@ -495,7 +627,7 @@ document.addEventListener('click', async function (ev) {
         ids: ids,
         action: action === 'episode-unwatched' ? 'remove' : 'add',
       });
-      location.reload();
+      await afterProgressMutation();
     } else if (action === 'season-watched') {
       const season = btn.getAttribute('data-season');
       const label = ctx.title || ('Season ' + season);
@@ -505,7 +637,7 @@ document.addEventListener('click', async function (ev) {
         return;
       }
       await apiPost('/api/show/' + traktId + '/season/' + season + '/watched', {});
-      location.reload();
+      await afterProgressMutation();
     } else if (action === 'season-unwatched') {
       const season = btn.getAttribute('data-season');
       const label = ctx.title || ('Season ' + season);
@@ -516,7 +648,7 @@ document.addEventListener('click', async function (ev) {
         return;
       }
       await apiPost('/api/show/' + traktId + '/season/' + season + '/unwatched', {});
-      location.reload();
+      await afterProgressMutation();
     } else if (action === 'series-watched') {
       const expected = ctx.title || 'this show';
       if (!window.confirm(
@@ -526,7 +658,7 @@ document.addEventListener('click', async function (ev) {
         return;
       }
       await apiPost('/api/watched/show/' + traktId, { action: 'add' });
-      location.reload();
+      await afterProgressMutation();
     } else if (action === 'sync-catalog') {
       await apiPost('/api/sync-catalog/' + mediaType, {});
       location.reload();

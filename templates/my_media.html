@@ -189,7 +189,11 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
         {% endif %}
         <div class="actions">
           {% if media_type == 'show' %}
-            <a class="btn btn-small btn-primary" href="{{ url_for('user.series_progress', trakt_id=st.trakt_id) }}">Progress</a>
+            <button class="btn btn-small btn-primary" type="button"
+                    data-action="progress-open"
+                    data-media-type="show"
+                    data-trakt-id="{{ st.trakt_id }}"
+                    data-title="{{ (m.title if m else st.trakt_id)|e }}">Progress</button>
           {% endif %}
           {% if st.pinned %}
             <button class="btn btn-small" type="button"

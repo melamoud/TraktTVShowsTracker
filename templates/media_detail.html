@@ -85,7 +85,11 @@
       <button class="btn btn-warn" type="button" data-action="review-marker" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}">Reviewed older than this</button>
       <button class="btn" type="button" data-action="found-on" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}" data-providers="{{ row.providers|join('|') }}" data-found-on="{{ row.found_on|join('|') }}">Found on…</button>
       {% if media_type == 'show' %}
-        <a class="btn btn-primary" href="{{ url_for('user.series_progress', trakt_id=m.trakt_id) }}">Series progress</a>
+        <button class="btn btn-primary" type="button"
+                data-action="progress-open"
+                data-media-type="show"
+                data-trakt-id="{{ m.trakt_id }}"
+                data-title="{{ m.title|e }}">Series progress</button>
       {% endif %}
       {% if m.imdb_id %}<a class="btn" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>{% endif %}
       {% if m.trailer_url %}<a class="btn" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>{% endif %}

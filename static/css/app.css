@@ -290,6 +290,46 @@ input[type=text], input[type=url], textarea, select {
   .list-prefs-head { font-size: .78rem; }
 }
 
+/* Right slide-over for series progress (keeps My shows / detail underneath). */
+.drawer-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  background: rgba(4, 8, 14, .55);
+  display: flex; justify-content: flex-end;
+}
+.drawer-overlay[hidden] { display: none !important; }
+.drawer-panel {
+  width: min(34rem, 100vw);
+  height: 100%;
+  background: linear-gradient(180deg, #1a2030 0%, #121722 100%);
+  border-left: 1px solid var(--line);
+  box-shadow: -12px 0 40px rgba(0, 0, 0, .35);
+  display: flex; flex-direction: column;
+  animation: drawer-in .22s ease-out;
+}
+@keyframes drawer-in {
+  from { transform: translateX(100%); opacity: .6; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.drawer-header {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: .75rem; padding: 1rem 1.1rem .35rem;
+  border-bottom: 1px solid var(--line);
+}
+.drawer-heading-wrap { min-width: 0; flex: 1; }
+.drawer-heading-wrap h2 { margin: 0; font-size: 1.25rem; }
+#progress-drawer-title { margin: .25rem 0 0; }
+.drawer-hint { margin: .55rem 1.1rem 0; }
+.drawer-body {
+  flex: 1; overflow: auto;
+  padding: .65rem 1.1rem 1.5rem;
+  -webkit-overflow-scrolling: touch;
+}
+#progress-drawer-loading,
+#progress-drawer-error { margin: .55rem 1.1rem; }
+@media (max-width: 640px) {
+  .drawer-panel { width: 100vw; }
+}
+
 .season-block {
   margin: 1rem 0;
   border: 1px solid var(--line);

@@ -144,7 +144,11 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
               <button class="btn btn-small" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Mark watched</button>
             {% endif %}
             {% if media_type == 'show' %}
-              <a class="btn btn-small btn-primary" href="{{ url_for('user.series_progress', trakt_id=m.trakt_id) }}">Progress</a>
+              <button class="btn btn-small btn-primary" type="button"
+                      data-action="progress-open"
+                      data-media-type="show"
+                      data-trakt-id="{{ m.trakt_id }}"
+                      data-title="{{ m.title|e }}">Progress</button>
             {% endif %}
             {% if m.imdb_id %}<a class="btn btn-small" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>{% endif %}
             {% if m.trailer_url %}<a class="btn btn-small" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>{% endif %}

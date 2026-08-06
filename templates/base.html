@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=7">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=8">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -105,8 +105,26 @@
       </div>
     </div>
   </div>
+
+  <div id="progress-drawer" class="drawer-overlay" hidden>
+    <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="progress-drawer-heading">
+      <header class="drawer-header">
+        <div class="drawer-heading-wrap">
+          <h2 id="progress-drawer-heading">Progress</h2>
+          <p class="muted" id="progress-drawer-title"></p>
+        </div>
+        <button class="btn btn-small" type="button" id="progress-drawer-close" aria-label="Close progress">Close</button>
+      </header>
+      <p class="meta drawer-hint">
+        Watched marks come from Trakt watch history. Updates write back immediately.
+      </p>
+      <p class="meta" id="progress-drawer-loading" hidden>Loading progress…</p>
+      <p class="meta" id="progress-drawer-error" hidden></p>
+      <div id="progress-drawer-body" class="drawer-body"></div>
+    </aside>
+  </div>
   {% endif %}
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=13"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=14"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>
