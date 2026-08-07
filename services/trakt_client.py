@@ -662,6 +662,29 @@ def remove_from_favorites(user: User, media_type: str, trakt_id: int) -> dict:
     return api_request('POST', '/sync/favorites/remove', user=user, json_body=body) or {}
 
 
+def get_calendar_entries(
+    user: User,
+    media_type: str,
+    start_date: str,
+    days: int,
+) -> list:
+    """
+    Return Trakt "My calendar" entries for movies or shows over a window.
+
+    ``/calendars/my/{movies|shows}/{start_date}/{days}`` — episode air dates
+    (watchlist + watched shows) and movie releases. ``start_date`` is YYYY-MM-DD,
+    ``days`` max 33 per Trakt docs.
+    """
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    days = max(1, min(int(days), 33))
+    return api_request(
+        'GET',
+        f'/calendars/my/{media_type}s/{start_date}/{days}',
+        user=user,
+    ) or []
+
+
 def get_personal_lists(user: User) -> list[dict]:
     """
     Return the user's Trakt personal/custom lists (not watchlist).

@@ -138,6 +138,33 @@ def _found_map(media_type: str, trakt_ids: list[int]) -> dict[int, list[str]]:
     return out
 
 
+def _list_names_map(media_type: str, trakt_ids: list[int]) -> dict[int, list[str]]:
+    """Load personal-list names for each title (not watchlist)."""
+    if not trakt_ids:
+        return {}
+    from services.streaming_matcher import WATCHLIST_LIST_ID
+
+    rows = UserListMembership.query.filter(
+        UserListMembership.user_id == current_user.id,
+        UserListMembership.media_type == media_type,
+        UserListMembership.trakt_id.in_(trakt_ids),
+    ).all()
+    list_ids = {r.list_id for r in rows}
+    list_names = {}
+    if list_ids:
+        try:
+            for lst in trakt_client.get_personal_lists(current_user):
+                if str(lst.get('id')) in list_ids:
+                    list_names[str(lst.get('id'))] = lst.get('name') or 'List'
+        except Exception as exc:
+            current_app.logger.warning('Could not load list names for tags: %s', exc)
+    out: dict[int, list[str]] = {}
+    for r in rows:
+        name = list_names.get(r.list_id) or 'List'
+        out.setdefault(r.trakt_id, []).append(name)
+    return out
+
+
 def _marker(media_type: str) -> ReviewMarker | None:
     """Return the user's review marker for a catalog page."""
     return ReviewMarker.query.filter_by(user_id=current_user.id, media_type=media_type).first()
@@ -153,6 +180,7 @@ def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
     ids = [m.trakt_id for m in items]
     states = _state_map(media_type, ids)
     found = _found_map(media_type, ids)
+    list_names = _list_names_map(media_type, ids)
     marker = _marker(media_type)
     decorated = []
     for m in items:
@@ -178,6 +206,7 @@ def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
             'rating': int(st.rating) if st and st.rating else None,
             'favorited': bool(st and st.favorited),
             'found_on': found.get(m.trakt_id, []),
+            'list_names': list_names.get(m.trakt_id, []),
             'genres': genres,
             'providers': providers,
             'my_providers': my_providers,

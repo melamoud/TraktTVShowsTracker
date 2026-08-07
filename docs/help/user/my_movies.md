@@ -11,6 +11,7 @@ Opening this page uses a local cache that **auto-invalidates** when Trakt report
 - **Both** — selected lists **or** watched  
 - **Unwatched** — titles on your selected lists that are not watched yet
 - **Search titles in this list…** — filters the full filtered set by title/year (backfills missing local titles first; not remembered; see [Search](search) for Trakt-wide search)
+- **View: List / Weekly / Daily / Monthly** — switch to a Trakt-style **calendar** of upcoming releases (My calendar: movie premieres) limited to your current **Lists… / Watched** filters; click an entry to open the title. Mode is remembered.
 - **Upcoming / Theater window / Streaming** — release & streaming availability (chips under the poster). Theater = public release within ±30 days; Upcoming = more than 30 days out; Streaming = TMDB lists a subscription/free vendor
 
 ## Paging

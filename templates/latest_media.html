@@ -165,6 +165,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% if row.is_marker %}<span class="tag">Marker — dimmed from here down</span>{% endif %}
           {% if row.match.matched %}<span class="tag match">Preference match</span>{% endif %}
           {% if row.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
+          {% for name in row.list_names %}<span class="tag list">{{ name }}</span>{% endfor %}
           {% if row.watched %}<span class="tag watched">Watched</span>{% endif %}
           {% set rating = row.rating %}{% set favorited = row.favorited %}
           {% include '_rate_favorite_tags.html' %}

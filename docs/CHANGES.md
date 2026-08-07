@@ -1,5 +1,17 @@
 # Changes log
 
+## 2026-08-06 — Personal-list tags on all title cards
+
+- Detail page, Latest, Search, and Recommendations now show personal-list tags (not just `Watchlist`)
+- My Shows/Movies already showed personal-list tags; this fills the gap everywhere else
+- Tag name comes from cached Trakt personal list names; missing list names default to "List"
+
+## 2026-08-06 — My movies/shows calendar view
+
+- **View: List / Weekly / Daily / Monthly** pills on My movies and My shows — Trakt-style calendar of episode air dates (shows) and movie releases from `/calendars/my`, filtered to the current Lists… / Watched selection
+- Entries click through to the title detail page; calendar mode is remembered per view
+- Calendar entries cached in `user_calendar_events`; failed Trakt fetches never blank the calendar
+
 ## 2026-08-06 — My lists sync / title search cache fixes
 
 - In-app watchlist / list / watched / rating / favorite writes only advance matching Trakt activity fingerprint keys (no longer stamps unrelated remote watchlist/list adds as already synced)

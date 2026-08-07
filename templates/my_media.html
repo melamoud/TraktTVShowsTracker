@@ -4,8 +4,11 @@
 {% macro lists_qs() -%}
 lists_set=1{% for lid in selected_lists %}&lists={{ lid }}{% endfor %}
 {%- endmacro %}
-{% macro qs(page_n=None, per=None, filter_v=None, q_v=None, avail_v=None) -%}
-page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&filter={{ filter_v if filter_v is not none else filt }}&{{ lists_qs() }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}
+{% macro cal_qs(anchor=None, mode_v=None) -%}
+{% set mm = mode_v if mode_v is not none else display_mode %}display={{ mm }}&{{ lists_qs() }}&filter={{ filt }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if avail %}&avail={{ avail }}{% endif %}{% if anchor %}&cal_date={{ anchor.isoformat() }}{% endif %}
+{%- endmacro %}
+{% macro qs(page_n=None, per=None, filter_v=None, q_v=None, avail_v=None, mode_v=None, cal_anchor=None) -%}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&filter={{ filter_v if filter_v is not none else filt }}&{{ lists_qs() }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}{% set mm = mode_v if mode_v is not none else display_mode %}{% if mm and mm != 'list' %}&display={{ mm }}{% if cal_anchor %}&cal_date={{ cal_anchor.isoformat() }}{% elif calendar %}&cal_date={{ calendar.anchor.isoformat() }}{% endif %}{% endif %}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 %}
@@ -77,6 +80,20 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       Refresh from Trakt
     </a>
   </div>
+  <div class="pill-row" style="margin-top:.55rem; align-items:center;">
+    <span class="meta">View:</span>
+    <a class="pill {% if display_mode == 'list' %}on{% endif %}"
+       href="?{{ qs(page_n=1, mode_v='list') }}">List</a>
+    <a class="pill {% if display_mode == 'weekly' %}on{% endif %}"
+       href="?{{ qs(page_n=1, mode_v='weekly') }}">Weekly</a>
+    <a class="pill {% if display_mode == 'daily' %}on{% endif %}"
+       href="?{{ qs(page_n=1, mode_v='daily') }}">Daily</a>
+    <a class="pill {% if display_mode == 'monthly' %}on{% endif %}"
+       href="?{{ qs(page_n=1, mode_v='monthly') }}">Monthly</a>
+    {% if calendar %}
+      <span class="meta">— air dates / first releases from Trakt’s My calendar</span>
+    {% endif %}
+  </div>
   <form class="search-fields" method="get" action="" style="margin-top:.55rem;">
     <input type="hidden" name="lists_set" value="1">
     {% for lid in selected_lists %}
@@ -86,6 +103,10 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     <input type="hidden" name="per_page" value="{{ per_page }}">
     <input type="hidden" name="page" value="1">
     {% if avail %}<input type="hidden" name="avail" value="{{ avail }}">{% endif %}
+    {% if display_mode and display_mode != 'list' %}
+      <input type="hidden" name="display" value="{{ display_mode }}">
+      {% if calendar %}<input type="hidden" name="cal_date" value="{{ calendar.anchor.isoformat() }}">{% endif %}
+    {% endif %}
     <label class="sr-only" for="my-search-q">Search in this list</label>
     <input class="search-input" id="my-search-q" type="search" name="q" value="{{ search_q }}"
            placeholder="Search titles in this list…" minlength="2">
@@ -97,6 +118,67 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   {% include '_avail_filters.html' %}
 </div>
 
+{% if calendar %}
+<div class="cal-header">
+  <nav class="pill-row cal-nav" aria-label="Calendar navigation">
+    <a class="pill" href="?{{ cal_qs(anchor=calendar.prev_anchor) }}" aria-label="Previous">&lt;</a>
+    <a class="pill {% if calendar.anchor == calendar.today %}on{% endif %}"
+       href="?{{ cal_qs(anchor=calendar.today) }}">Today</a>
+    <a class="pill" href="?{{ cal_qs(anchor=calendar.next_anchor) }}" aria-label="Next">&gt;</a>
+  </nav>
+  <h2 class="cal-title">{{ calendar.label }}
+    {% if calendar.extra_months %}<span class="meta"> · {{ calendar.extra_months|join(' · ') }}</span>{% endif %}
+  </h2>
+</div>
+
+{% if calendar.period == 'daily' %}
+  {% set day = calendar.days[0] %}
+  <section class="cal-day-list">
+    {% if day.events %}
+      {% for ev in day.events %}
+        <a class="cal-event card" href="{{ url_for('catalog.media_detail', media_type=ev.media_type, trakt_id=ev.trakt_id) }}">
+          {% if ev.poster_url %}
+            <img class="cal-thumb" src="{{ ev.poster_url }}" alt="" width="40" height="60" loading="lazy">
+          {% endif %}
+          <span class="cal-event-body">
+            <span class="cal-event-title">{{ ev.title }}</span>
+            {% if ev.label %}<span class="meta">{{ ev.label }}</span>{% endif %}
+          </span>
+        </a>
+      {% endfor %}
+    {% else %}
+      <p class="muted">Nothing airing or releasing this day for your current filters.</p>
+    {% endif %}
+  </section>
+{% else %}
+  <div class="cal-grid cal-grid-{{ calendar.period }}">
+    {% for wd in calendar.weekdays %}<div class="cal-weekday">{{ wd }}</div>{% endfor %}
+    {% for day in calendar.days %}
+      <div class="cal-cell{% if not day.in_month %} cal-out{% endif %}{% if day.is_today %} cal-today{% endif %}{% if calendar.period == 'weekly' %} cal-cell-week{% endif %}">
+        <div class="cal-date">{{ day.date.day }}</div>
+        <div class="cal-events">
+          {% for ev in day.events %}
+            <a class="cal-event" href="{{ url_for('catalog.media_detail', media_type=ev.media_type, trakt_id=ev.trakt_id) }}"
+               title="{{ ev.title }}{% if ev.label %} — {{ ev.label }}{% endif %}">
+              {% if ev.poster_url %}
+                <img class="cal-thumb" src="{{ ev.poster_url }}" alt="" width="28" height="42" loading="lazy">
+              {% endif %}
+              <span class="cal-event-body">
+                <span class="cal-event-title">{{ ev.title }}</span>
+                {% if ev.label %}<span class="cal-event-sub">{{ ev.label }}</span>{% endif %}
+              </span>
+            </a>
+          {% endfor %}
+        </div>
+      </div>
+    {% endfor %}
+  </div>
+  {% if not calendar.days | selectattr('events') | list %}
+    <p class="muted">Nothing airing or releasing in this period for your current filters.</p>
+  {% endif %}
+{% endif %}
+
+{% else %}
 <p class="meta">
   Showing <strong>{{ rows|length }}</strong> of <strong>{{ total }}</strong> title{{ '' if total == 1 else 's' }}
   {% if search_q %} matching “{{ search_q }}”{% endif %}
@@ -253,4 +335,5 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
 </div>
 
 {{ pager('bottom') }}
+{% endif %}
 {% endblock %}

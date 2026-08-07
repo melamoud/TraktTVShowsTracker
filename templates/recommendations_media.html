@@ -177,6 +177,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% for g in row.match.genres %}<span class="tag match">{{ g }}</span>{% endfor %}
           {% for k in row.match.keywords %}<span class="tag match">{{ k }}</span>{% endfor %}
           {% if row.on_watchlist %}<span class="tag watchlist">Watchlist</span>{% endif %}
+          {% for name in row.list_names %}<span class="tag list">{{ name }}</span>{% endfor %}
           {% if row.watched %}<span class="tag watched">Watched</span>{% endif %}
           {% set rating = row.rating %}{% set favorited = row.favorited %}
           {% include '_rate_favorite_tags.html' %}

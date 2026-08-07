@@ -414,6 +414,23 @@ def _trakt_ids_for_lists(user_id: int, media_type: str, selected_lists: list[str
     return ids
 
 
+def _calendar_trakt_ids(
+    user_id: int, media_type: str, filt: str, list_trakt_ids: set[int],
+) -> set[int]:
+    """Title ids whose air/release events the calendar should show."""
+    watched_ids = {
+        int(tid)
+        for tid, in UserMediaState.query.filter_by(
+            user_id=user_id, media_type=media_type, watched=True,
+        ).with_entities(UserMediaState.trakt_id).all()
+    }
+    if filt == 'watched':
+        return watched_ids
+    if filt == 'both':
+        return watched_ids | set(list_trakt_ids)
+    return set(list_trakt_ids)
+
+
 def _my_media(media_type: str):
     """Shared my-movies / my-shows listing with multi-list + watched filters."""
     import json
@@ -463,6 +480,40 @@ def _my_media(media_type: str):
         normalize_avail, theater_window_bounds, upcoming_after,
     )
     avail = normalize_avail(request.args.get('avail'))
+
+    # Calendar view mode (List = normal rows; Weekly is the default calendar).
+    display_mode = view_prefs.resolve_choice(
+        current_user, view, 'display', 'display',
+        allowed=('list', 'daily', 'weekly', 'monthly'), default='list',
+    )
+    calendar_ctx = None
+    if display_mode in ('daily', 'weekly', 'monthly'):
+        from services import calendar_view as cal_view
+        try:
+            anchor_str = (request.args.get('cal_date') or '').strip()
+            anchor = date.fromisoformat(anchor_str) if anchor_str else date.today()
+        except ValueError:
+            anchor = date.today()
+        cal_start, cal_end = cal_view.period_bounds(display_mode, anchor)
+        cal_days = (cal_end - cal_start).days + 1
+        try:
+            cal_view.ensure_user_calendar_fresh(
+                current_user, cal_start, cal_days,
+            )
+        except Exception as exc:
+            current_app.logger.warning('Calendar sync failed: %s', exc)
+        cal_ids = _calendar_trakt_ids(
+            current_user.id, media_type, filt, list_trakt_ids,
+        )
+        calendar_ctx = cal_view.build_calendar_view(
+            current_user.id, media_type, display_mode, anchor, cal_ids,
+        )
+        if not cal_ids and filt in ('lists', 'unwatched', 'unwatched_episodes'):
+            flash(
+                'Calendar covers titles on your selected lists and watched history '
+                '— nothing matches the current filters.',
+                'info',
+            )
 
     q = UserMediaState.query.filter_by(user_id=current_user.id, media_type=media_type)
     if filt == 'lists':
@@ -740,6 +791,8 @@ def _my_media(media_type: str):
         page_links=_pagination_pages(page, pages),
         search_q=search_q,
         avail=avail,
+        display_mode=display_mode,
+        calendar=calendar_ctx,
         tmdb_configured=tmdb_ok,
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='My Movies' if media_type == 'movie' else 'My Shows',

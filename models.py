@@ -273,6 +273,29 @@ class UserMediaState(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class UserCalendarEvent(db.Model):
+    """Cached Trakt "My calendar" episode air / movie release entry for one user."""
+
+    __tablename__ = 'user_calendar_events'
+    __table_args__ = (
+        db.UniqueConstraint(
+            'user_id', 'media_type', 'trakt_id', 'event_date',
+            'season_number', 'episode_number',
+            name='uq_user_calendar_event',
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    media_type = db.Column(db.String(16), nullable=False)  # movie | show
+    trakt_id = db.Column(db.Integer, nullable=False)
+    event_date = db.Column(db.Date, nullable=False, index=True)
+    season_number = db.Column(db.Integer)   # None for movies
+    episode_number = db.Column(db.Integer)  # None for movies
+    episode_title = db.Column(db.String(400))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class UserListMembership(db.Model):
     """Cached membership of a title on a Trakt personal list (not watchlist)."""
 
