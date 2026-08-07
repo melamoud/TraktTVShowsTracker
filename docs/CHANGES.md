@@ -1,5 +1,14 @@
 # Changes log
 
+## 2026-08-07 — Admin scheduler controls
+
+- New **Admin → Scheduler** page lets admins change background sync schedules without editing `.env` or restarting the server
+- Catalog sync and media alerts can each run on an **interval** (every N minutes/hours) or **daily at a specific time** (e.g. `08:00` and `20:00`)
+- Jobs can be individually enabled/disabled from the UI; saved settings apply immediately to the running scheduler
+- The first interval-based media alerts run after boot still respects the `ALERTS_STARTUP_DELAY_SECONDS` delay; cron schedules and later UI changes are unaffected
+- Settings are stored in the new `scheduler_config` table; env values are only used as defaults on the first app start
+- Manual **Run alert check now** and **Reset to defaults** buttons are on the same page
+
 ## 2026-08-07 — My Shows renders from cache only (instant pages)
 
 - My Shows/Movies pages no longer call Trakt for episode/progress data — the **Newest aired** view used to fire 10+ per-show API calls *while rendering*, taking 1–3 minutes whenever progress or last-aired data was stale. Both the newest-aired branch and the list view's per-page progress fill are gone

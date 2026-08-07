@@ -16,6 +16,7 @@ from models import (
     CatalogFeedSync,
     MediaProviderAvailability,
     ReviewMarker,
+    SchedulerConfig,
     User,
     UserListMembership,
     UserMediaState,
@@ -1224,35 +1225,182 @@ def run_catalog_sync_job(app: Flask) -> None:
             logger.exception('Catalog sync job failed: %s', exc)
 
 
-def start_scheduler(app: Flask):
-    """Start APScheduler background jobs; return scheduler instance."""
-    from apscheduler.schedulers.background import BackgroundScheduler
+SCHEDULER_MODES = ('interval', 'cron')
 
-    scheduler = BackgroundScheduler(daemon=True)
-    minutes = app.config.get('CATALOG_SYNC_INTERVAL_MINUTES', 60)
-    hours = app.config.get('ALERTS_INTERVAL_HOURS', app.config.get('PROVIDER_SYNC_INTERVAL_HOURS', 12))
-    startup_delay = app.config.get('ALERTS_STARTUP_DELAY_SECONDS', 120)
-    scheduler.add_job(
-        run_catalog_sync_job, 'interval', minutes=minutes, args=[app], id='catalog_sync',
-        replace_existing=True,
-    )
-    # Run alerts once shortly after boot — a pure interval job never fires when
-    # the app restarts before the first interval elapses.
-    scheduler.add_job(
-        check_release_watches, 'interval', hours=hours, args=[app], id='media_alerts',
-        next_run_time=datetime.now() + timedelta(seconds=startup_delay),
-        replace_existing=True,
-    )
+DEFAULT_SCHEDULER_CONFIG = {
+    'catalog_sync_enabled': True,
+    'catalog_sync_mode': 'interval',
+    'catalog_sync_interval_minutes': 60,
+    'catalog_sync_cron_time': '08:00',
+    'media_alerts_enabled': True,
+    'media_alerts_mode': 'interval',
+    'media_alerts_interval_hours': 6.0,
+    'media_alerts_cron_time': '08:00',
+    'alerts_startup_delay_seconds': 120,
+}
+
+
+# Minimum allowed intervals to prevent accidental self-DDoS.
+MIN_CATALOG_SYNC_MINUTES = 5
+MIN_ALERTS_INTERVAL_HOURS = 1.0
+
+
+def _env_scheduler_defaults(app: Flask) -> dict:
+    """Return env-based defaults for the first scheduler_config row."""
+    return {
+        'catalog_sync_interval_minutes': int(
+            app.config.get('CATALOG_SYNC_INTERVAL_MINUTES', 60)
+        ),
+        'media_alerts_interval_hours': float(
+            app.config.get(
+                'ALERTS_INTERVAL_HOURS',
+                app.config.get('PROVIDER_SYNC_INTERVAL_HOURS', 6),
+            )
+        ),
+        'alerts_startup_delay_seconds': int(
+            app.config.get('ALERTS_STARTUP_DELAY_SECONDS', 120)
+        ),
+    }
+
+
+def get_or_create_scheduler_config(app: Flask | None = None) -> SchedulerConfig:
+    """Load the single scheduler config row, creating it from env defaults if absent."""
+    row = SchedulerConfig.query.first()
+    if row:
+        return row
+    values = DEFAULT_SCHEDULER_CONFIG.copy()
+    if app:
+        values.update(_env_scheduler_defaults(app))
+    row = SchedulerConfig(**values)
+    db.session.add(row)
+    db.session.commit()
+    return row
+
+
+def _parse_cron_time(value: str) -> tuple[int, int]:
+    """Parse 'HH:MM' into (hour, minute)."""
+    value = (value or '08:00').strip()
+    parts = value.split(':')
+    if len(parts) != 2:
+        raise ValueError(f'Invalid cron time: {value}')
+    return int(parts[0]), int(parts[1])
+
+
+def apply_scheduler_config(app: Flask, scheduler=None) -> None:
+    """Reschedule all background jobs from the current DB config."""
+    if scheduler is None:
+        scheduler = app.extensions.get('shows_scheduler')
+    if scheduler is None:
+        app.logger.warning('apply_scheduler_config: no scheduler running')
+        return
+
+    config = get_or_create_scheduler_config(app)
+
+    try:
+        scheduler.remove_job('catalog_sync')
+    except Exception:
+        pass
+    if config.catalog_sync_enabled:
+        if config.catalog_sync_mode == 'interval':
+            scheduler.add_job(
+                run_catalog_sync_job,
+                'interval',
+                minutes=max(MIN_CATALOG_SYNC_MINUTES, int(config.catalog_sync_interval_minutes)),
+                args=[app],
+                id='catalog_sync',
+                replace_existing=True,
+            )
+        elif config.catalog_sync_mode == 'cron':
+            hour, minute = _parse_cron_time(config.catalog_sync_cron_time)
+            scheduler.add_job(
+                run_catalog_sync_job,
+                'cron',
+                hour=hour,
+                minute=minute,
+                args=[app],
+                id='catalog_sync',
+                replace_existing=True,
+            )
+
+    try:
+        scheduler.remove_job('media_alerts')
+    except Exception:
+        pass
     # Keep old job id replaced if a previous process registered it.
     try:
         scheduler.remove_job('release_watches')
     except Exception:
         pass
-    scheduler.start()
-    # Exposed so routes can queue one-off jobs (e.g. manual My Shows refresh).
+    if config.media_alerts_enabled:
+        if config.media_alerts_mode == 'interval':
+            scheduler.add_job(
+                check_release_watches,
+                'interval',
+                hours=max(MIN_ALERTS_INTERVAL_HOURS, float(config.media_alerts_interval_hours)),
+                args=[app],
+                id='media_alerts',
+                replace_existing=True,
+            )
+        elif config.media_alerts_mode == 'cron':
+            hour, minute = _parse_cron_time(config.media_alerts_cron_time)
+            scheduler.add_job(
+                check_release_watches,
+                'cron',
+                hour=hour,
+                minute=minute,
+                args=[app],
+                id='media_alerts',
+                replace_existing=True,
+            )
+
+    app.logger.info(
+        'Scheduler config applied: catalog %s, alerts %s',
+        'enabled' if config.catalog_sync_enabled else 'disabled',
+        'enabled' if config.media_alerts_enabled else 'disabled',
+    )
+
+
+def get_scheduler_status(app: Flask) -> dict:
+    """Return scheduler config + runtime status for the admin UI."""
+    scheduler = app.extensions.get('shows_scheduler')
+    config = get_or_create_scheduler_config(app)
+    status = {
+        'config': config,
+        'running': scheduler is not None and getattr(scheduler, 'running', False),
+    }
+    if scheduler:
+        for job_id in ('catalog_sync', 'media_alerts'):
+            job = scheduler.get_job(job_id)
+            status[job_id] = {
+                'next_run_time': getattr(job, 'next_run_time', None) if job else None,
+                'exists': job is not None,
+            }
+    return status
+
+
+def start_scheduler(app: Flask):
+    """Start APScheduler background jobs; return scheduler instance."""
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    scheduler = BackgroundScheduler(daemon=True)
     app.extensions['shows_scheduler'] = scheduler
+    scheduler.start()
+    config = get_or_create_scheduler_config(app)
+    apply_scheduler_config(app, scheduler)
+    # On first boot the interval-based alert job should fire soon so users get
+    # notifications without waiting a full interval; on subsequent re-schedules
+    # from the admin UI we do not force this delay.
+    if config.media_alerts_enabled and config.media_alerts_mode == 'interval':
+        try:
+            scheduler.get_job('media_alerts').modify(
+                next_run_time=datetime.now() + timedelta(seconds=config.alerts_startup_delay_seconds)
+            )
+        except Exception as exc:
+            app.logger.warning('Could not set startup delay for media alerts: %s', exc)
     app.logger.info(
         'Scheduler started (catalog every %sm, alerts every %sh, first alert run in %ss)',
-        minutes, hours, startup_delay,
+        config.catalog_sync_interval_minutes,
+        config.media_alerts_interval_hours,
+        config.alerts_startup_delay_seconds,
     )
     return scheduler

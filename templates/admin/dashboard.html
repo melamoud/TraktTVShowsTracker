@@ -12,12 +12,19 @@
     <h2 class="media-title">Streaming services ({{ stats.services }})</h2>
     <div class="meta">{{ stats.pending_suggestions }} pending suggestions from users.</div>
   </a>
+  <a class="media-row" href="{{ url_for('admin.scheduler_config') }}">
+    <h2 class="media-title">Scheduler</h2>
+    <div class="meta">
+      Control how often catalog sync and media alerts run. Choose interval (every X hours/minutes)
+      or daily time-of-day, enable/disable jobs, and run them manually.
+    </div>
+  </a>
   <article class="media-row">
     <h2 class="media-title">Media alerts</h2>
     <div class="meta">
       Dedup events recorded: {{ stats.alert_events }}.
       TMDB key: {% if stats.tmdb_configured %}<strong>configured</strong>{% else %}<strong>missing</strong> (needed for streaming alerts){% endif %}.
-      Auto job runs every PROVIDER_SYNC_INTERVAL_HOURS for release day, new streaming, and episode/season air.
+      Auto job checks release day, new streaming, and episode/season air based on the scheduler settings.
     </div>
     <div class="actions">
       <form method="post" action="{{ url_for('admin.run_release_check') }}">

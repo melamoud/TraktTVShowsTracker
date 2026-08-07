@@ -2,7 +2,7 @@
 My Shows cache maintenance — the only place per-show Trakt fetches happen.
 
 Pages render from cache only. This module runs inside the periodic media job
-(every ALERTS_INTERVAL_HOURS, default 6h):
+(admin-configurable interval, default 6h):
 
 1. last-aired dates derived from the already-synced My-calendar rows (free;
    covers watchlisted / in-progress shows).

@@ -392,3 +392,21 @@ class AppMeta(db.Model):
     key = db.Column(db.String(120), primary_key=True)
     value = db.Column(db.Text)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class SchedulerConfig(db.Model):
+    """Admin-editable schedule for background sync jobs."""
+
+    __tablename__ = 'scheduler_config'
+
+    id = db.Column(db.Integer, primary_key=True)
+    catalog_sync_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    catalog_sync_mode = db.Column(db.String(16), default='interval', nullable=False)  # interval | cron
+    catalog_sync_interval_minutes = db.Column(db.Integer, default=60, nullable=False)
+    catalog_sync_cron_time = db.Column(db.String(8), default='08:00')
+    media_alerts_enabled = db.Column(db.Boolean, default=True, nullable=False)
+    media_alerts_mode = db.Column(db.String(16), default='interval', nullable=False)  # interval | cron
+    media_alerts_interval_hours = db.Column(db.Float, default=6.0, nullable=False)
+    media_alerts_cron_time = db.Column(db.String(8), default='08:00')
+    alerts_startup_delay_seconds = db.Column(db.Integer, default=120, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

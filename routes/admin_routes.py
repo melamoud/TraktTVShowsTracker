@@ -13,8 +13,15 @@ from flask_login import current_user, login_required
 
 from help_utils import get_help_toc, render_help_markdown
 from models import (
-    Notification, StreamingService, StreamingServiceSuggestion,
+    Notification, SchedulerConfig, StreamingService, StreamingServiceSuggestion,
     User, UserSession, db,
+)
+from services.sync_jobs import (
+    MIN_ALERTS_INTERVAL_HOURS,
+    MIN_CATALOG_SYNC_MINUTES,
+    apply_scheduler_config,
+    get_or_create_scheduler_config,
+    get_scheduler_status,
 )
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
@@ -193,6 +200,93 @@ def streaming_services():
         StreamingServiceSuggestion.created_at.desc()
     ).all()
     return render_template('admin/streaming_services.html', services=services, pending=pending)
+
+
+@admin_bp.route('/scheduler', methods=['GET', 'POST'])
+@admin_required
+def scheduler_config():
+    """View and edit background sync scheduler settings."""
+    app = current_app._get_current_object()
+
+    if request.method == 'POST':
+        action = request.form.get('action')
+        if action == 'reset':
+            from services.sync_jobs import DEFAULT_SCHEDULER_CONFIG
+            row = get_or_create_scheduler_config(app)
+            for key, value in DEFAULT_SCHEDULER_CONFIG.items():
+                setattr(row, key, value)
+            db.session.commit()
+            apply_scheduler_config(app)
+            flash('Scheduler reset to defaults and applied.', 'success')
+            return redirect(url_for('admin.scheduler_config'))
+
+        # Update from form
+        errors = []
+        row = get_or_create_scheduler_config(app)
+
+        row.catalog_sync_enabled = request.form.get('catalog_sync_enabled') == 'on'
+        row.catalog_sync_mode = request.form.get('catalog_sync_mode', 'interval')
+        if row.catalog_sync_mode not in ('interval', 'cron'):
+            errors.append('Catalog schedule mode must be interval or cron.')
+
+        try:
+            row.catalog_sync_interval_minutes = int(request.form.get('catalog_sync_interval_minutes', 60))
+        except (TypeError, ValueError):
+            errors.append('Catalog interval must be a whole number of minutes.')
+        else:
+            if row.catalog_sync_interval_minutes < MIN_CATALOG_SYNC_MINUTES:
+                errors.append(f'Catalog interval must be at least {MIN_CATALOG_SYNC_MINUTES} minutes.')
+
+        row.catalog_sync_cron_time = (request.form.get('catalog_sync_cron_time') or '08:00').strip()
+        try:
+            hour, minute = row.catalog_sync_cron_time.split(':')
+            if not (0 <= int(hour) <= 23 and 0 <= int(minute) <= 59):
+                raise ValueError
+        except ValueError:
+            errors.append('Catalog time must be HH:MM in 24-hour format.')
+
+        row.media_alerts_enabled = request.form.get('media_alerts_enabled') == 'on'
+        row.media_alerts_mode = request.form.get('media_alerts_mode', 'interval')
+        if row.media_alerts_mode not in ('interval', 'cron'):
+            errors.append('Alerts schedule mode must be interval or cron.')
+
+        try:
+            row.media_alerts_interval_hours = float(request.form.get('media_alerts_interval_hours', 6))
+        except (TypeError, ValueError):
+            errors.append('Alerts interval must be a number of hours.')
+        else:
+            if row.media_alerts_interval_hours < MIN_ALERTS_INTERVAL_HOURS:
+                errors.append(f'Alerts interval must be at least {MIN_ALERTS_INTERVAL_HOURS} hour.')
+
+        row.media_alerts_cron_time = (request.form.get('media_alerts_cron_time') or '08:00').strip()
+        try:
+            hour, minute = row.media_alerts_cron_time.split(':')
+            if not (0 <= int(hour) <= 23 and 0 <= int(minute) <= 59):
+                raise ValueError
+        except ValueError:
+            errors.append('Alerts time must be HH:MM in 24-hour format.')
+
+        try:
+            row.alerts_startup_delay_seconds = int(request.form.get('alerts_startup_delay_seconds', 120))
+        except (TypeError, ValueError):
+            errors.append('Startup delay must be a whole number of seconds.')
+        else:
+            if row.alerts_startup_delay_seconds < 0:
+                errors.append('Startup delay cannot be negative.')
+
+        if errors:
+            for msg in errors:
+                flash(msg, 'danger')
+            status = get_scheduler_status(app)
+            return render_template('admin/scheduler.html', status=status), 400
+
+        db.session.commit()
+        apply_scheduler_config(app)
+        flash('Scheduler settings saved and applied.', 'success')
+        return redirect(url_for('admin.scheduler_config'))
+
+    status = get_scheduler_status(app)
+    return render_template('admin/scheduler.html', status=status)
 
 
 @admin_bp.route('/help/')

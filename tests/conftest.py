@@ -42,6 +42,8 @@ class TestConfig:
     PUBLIC_HOST = 'localhost'
     DEBUG = False
     CATALOG_SYNC_INTERVAL_MINUTES = 60
+    ALERTS_INTERVAL_HOURS = 6
+    ALERTS_STARTUP_DELAY_SECONDS = 120
     PROVIDER_SYNC_INTERVAL_HOURS = 12
     SSL_CERT_FILE = 'cert.pem'
     SSL_KEY_FILE = 'key.pem'

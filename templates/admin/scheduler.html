@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}Scheduler — Admin{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('admin.dashboard') }}">← Admin</a></p>
+<h1>Scheduler</h1>
+
+{% if not status.running %}
+<div class="flash danger">The scheduler is not running. Settings are saved but will not take effect until the server is started without <code>--no-scheduler</code>.</div>
+{% endif %}
+
+<div class="meta" style="margin-bottom:1rem;">
+  {% if status.running %}
+    Scheduler is running.
+    Catalog sync next run: {% if status.catalog_sync.next_run_time %}{{ status.catalog_sync.next_run_time.strftime('%Y-%m-%d %H:%M %Z') }}{% else %}disabled / not scheduled{% endif %}.
+    Media alerts next run: {% if status.media_alerts.next_run_time %}{{ status.media_alerts.next_run_time.strftime('%Y-%m-%d %H:%M %Z') }}{% else %}disabled / not scheduled{% endif %}.
+  {% else %}
+    Scheduler status: stopped.
+  {% endif %}
+</div>
+
+<form method="post" class="form-grid" style="max-width:620px;" id="scheduler-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="action" value="save">
+
+  <h2>Catalog sync</h2>
+  <p class="muted">Refreshes newest Trakt /updates and enriches metadata for Latest movies/shows.</p>
+
+  <label style="display:flex; align-items:center; gap:.5rem; font-weight:500;">
+    <input type="checkbox" name="catalog_sync_enabled"{% if status.config.catalog_sync_enabled %} checked{% endif %}> Enabled
+  </label>
+
+  <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+    <label style="display:flex; align-items:center; gap:.4rem; font-weight:500;">
+      <input type="radio" name="catalog_sync_mode" value="interval"{% if status.config.catalog_sync_mode == 'interval' %} checked{% endif %}> Every
+    </label>
+    <input type="number" name="catalog_sync_interval_minutes" min="5" value="{{ status.config.catalog_sync_interval_minutes }}" style="width:5rem;">
+    <span class="muted">minutes</span>
+  </div>
+
+  <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+    <label style="display:flex; align-items:center; gap:.4rem; font-weight:500;">
+      <input type="radio" name="catalog_sync_mode" value="cron"{% if status.config.catalog_sync_mode == 'cron' %} checked{% endif %}> Daily at
+    </label>
+    <input type="time" name="catalog_sync_cron_time" value="{{ status.config.catalog_sync_cron_time }}" style="width:7rem;">
+  </div>
+
+  <h2>Media alerts</h2>
+  <p class="muted">Release day, new streaming, and episode/season air checks for all users.</p>
+
+  <label style="display:flex; align-items:center; gap:.5rem; font-weight:500;">
+    <input type="checkbox" name="media_alerts_enabled"{% if status.config.media_alerts_enabled %} checked{% endif %}> Enabled
+  </label>
+
+  <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+    <label style="display:flex; align-items:center; gap:.4rem; font-weight:500;">
+      <input type="radio" name="media_alerts_mode" value="interval"{% if status.config.media_alerts_mode == 'interval' %} checked{% endif %}> Every
+    </label>
+    <input type="number" name="media_alerts_interval_hours" min="1" step="0.5" value="{{ status.config.media_alerts_interval_hours }}" style="width:5rem;">
+    <span class="muted">hours</span>
+  </div>
+
+  <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+    <label style="display:flex; align-items:center; gap:.4rem; font-weight:500;">
+      <input type="radio" name="media_alerts_mode" value="cron"{% if status.config.media_alerts_mode == 'cron' %} checked{% endif %}> Daily at
+    </label>
+    <input type="time" name="media_alerts_cron_time" value="{{ status.config.media_alerts_cron_time }}" style="width:7rem;">
+  </div>
+
+  <h2>Startup delay</h2>
+  <p class="muted">Seconds after boot before the first interval-based media alerts run (does not affect cron or later changes).</p>
+  <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
+    <input type="number" name="alerts_startup_delay_seconds" min="0" value="{{ status.config.alerts_startup_delay_seconds }}" style="width:5rem;">
+    <span class="muted">seconds</span>
+  </div>
+
+  <div class="actions" style="margin-top:1rem;">
+    <button class="btn btn-primary" type="submit">Save and apply</button>
+  </div>
+</form>
+
+<div class="actions" style="margin-top:1.5rem;">
+  <form method="post" action="{{ url_for('admin.run_release_check') }}" style="display:inline;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn-small btn-primary" type="submit">Run alert check now</button>
+  </form>
+  <form method="post" action="{{ url_for('admin.scheduler_config') }}" style="display:inline; margin-left:0.5rem;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="action" value="reset">
+    <button class="btn btn-small" type="submit" onclick="return confirm('Reset scheduler to defaults?')">Reset to defaults</button>
+  </form>
+</div>
+{% endblock %}
