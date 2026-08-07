@@ -31,7 +31,7 @@ from models import (
 )
 from services import trakt_client
 from services.calendar_view import ensure_user_calendar_fresh
-from services.sync_jobs import sync_providers_for_media
+from services.sync_jobs import collection_trakt_ids, sync_providers_for_media
 from services.tmdb_client import is_configured as tmdb_configured
 
 logger = logging.getLogger(__name__)
@@ -60,20 +60,6 @@ def alert_pref_enabled(user: User, alert_type: str) -> bool:
     if alert_type == ALERT_NEW_USER_LOGIN:
         return bool(getattr(prefs, 'alert_new_user_login', True))
     return True
-
-
-def collection_trakt_ids(user_id: int, media_type: str) -> set[int]:
-    """Titles on Wishlist or any cached personal list for this user."""
-    ids: set[int] = set()
-    for tid, in UserMediaState.query.filter_by(
-        user_id=user_id, media_type=media_type, on_watchlist=True
-    ).with_entities(UserMediaState.trakt_id).all():
-        ids.add(int(tid))
-    for tid, in UserListMembership.query.filter_by(
-        user_id=user_id, media_type=media_type
-    ).with_entities(UserListMembership.trakt_id).all():
-        ids.add(int(tid))
-    return ids
 
 
 def is_finished(user_id: int, media_type: str, trakt_id: int) -> bool:
@@ -425,6 +411,8 @@ def _check_episodes(user: User, trakt_id: int, media: CachedMedia) -> int:
     try:
         seasons = trakt_client.get_show_seasons(trakt_id)
     except Exception as exc:
+        if getattr(exc, 'status_code', None) == 429:
+            raise  # caller stops the whole fallback loop when throttled
         logger.warning('Episode alert fetch failed for show %s: %s', trakt_id, exc)
         return 0
 
@@ -503,16 +491,22 @@ def _check_episodes(user: User, trakt_id: int, media: CachedMedia) -> int:
 
 def run_media_alerts(app: Flask) -> int:
     """
-    Scan all active users' collection titles and create due notifications.
+    Per-user media cycle: due notifications + My Shows cache refresh.
 
     Returns total notifications created.
     """
+    from services.shows_cache import refresh_shows_cache_for_user
+
     notified = 0
     with app.app_context():
         users = User.query.filter_by(is_active_account=True).all()
         for user in users:
             try:
-                notified += _run_alerts_for_user(user)
+                created, rate_limited = _run_alerts_for_user(user)
+                notified += created
+                # When Trakt throttled the calendar fetch, don't pile per-show
+                # calls on top — the next run catches up.
+                refresh_shows_cache_for_user(user, skip_per_show=rate_limited)
             except Exception as exc:
                 logger.exception('Media alerts failed for user %s: %s', user.id, exc)
                 db.session.rollback()
@@ -525,19 +519,30 @@ def run_media_alerts(app: Flask) -> int:
     return notified
 
 
-def _run_alerts_for_user(user: User) -> int:
+def _run_alerts_for_user(user: User) -> tuple[int, bool]:
+    """Returns (notifications created, hit Trakt rate limit during this run)."""
     created = 0
     today = date.today()
     win_start = today - timedelta(days=RELEASE_GRACE_DAYS)
 
     # One bulk pull: /calendars/my covers every watchlisted or in-progress show.
+    # Shows only — alerts never read movie calendar rows. The fetch window is
+    # ±33 days: the 3-day grace window drives alerts, while the wider pool
+    # feeds the My Shows cache (last-aired + upcoming premieres) for free.
     show_events: dict[int, list] = {}
     calendar_ok = False
+    rate_limited = False
     try:
-        ensure_user_calendar_fresh(user, win_start, RELEASE_GRACE_DAYS + 1)
+        ensure_user_calendar_fresh(
+            user, today - timedelta(days=33), 66,
+            media_types=('show',), raise_on_rate_limit=True,
+        )
         calendar_ok = True
     except Exception as exc:
         logger.warning('Alert calendar sync failed for user %s: %s', user.id, exc)
+        rate_limited = getattr(exc, 'status_code', None) == 429
+        if rate_limited:
+            logger.warning('Trakt is throttling; skipping per-show episode scans this run')
     if calendar_ok:
         for e in UserCalendarEvent.query.filter(
             UserCalendarEvent.user_id == user.id,
@@ -587,5 +592,17 @@ def _run_alerts_for_user(user: User) -> int:
             )
         else:
             # List-only never-watched shows (or calendar fetch failed): per-show fetch.
-            created += _check_episodes(user, trakt_id, media)
-    return created
+            # When Trakt is throttling, don't pile on — the next run catches up
+            # (grace window means nothing is lost).
+            if rate_limited:
+                continue
+            try:
+                created += _check_episodes(user, trakt_id, media)
+            except Exception as exc:
+                if getattr(exc, 'status_code', None) != 429:
+                    raise
+                rate_limited = True
+                logger.warning(
+                    'Trakt is throttling; remaining episode scans deferred to next run'
+                )
+    return created, rate_limited

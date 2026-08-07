@@ -42,8 +42,6 @@ def test_newest_aired_hides_future_shows_and_sorts(app, client, user):
 
     login_client(client, app, user)
     with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
-         patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
-         patch('routes.user_routes.refresh_latest_aired_for_ids', return_value=0), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached'), \
          patch('routes.user_routes.enrich_media_list_for_display'):
@@ -118,8 +116,6 @@ def test_newest_aired_pinned_shows_stay_on_top(app, client, user):
 
     login_client(client, app, user)
     with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
-         patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
-         patch('routes.user_routes.refresh_latest_aired_for_ids', return_value=0), \
          patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
          patch('routes.user_routes.ensure_media_cached'), \
          patch('routes.user_routes.enrich_media_list_for_display'):

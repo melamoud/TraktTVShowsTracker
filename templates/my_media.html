@@ -233,7 +233,9 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
             {% if st.episodes_aired and (st.episodes_completed or 0) >= st.episodes_aired %}
               · complete
             {% elif st.next_episode_season is not none and st.next_episode_number is not none %}
-              · Next: S{{ st.next_episode_season }}E{{ st.next_episode_number }}{% if st.next_episode_title %} — {{ st.next_episode_title }}{% endif %}
+              · Next: S{{ st.next_episode_season }}E{{ st.next_episode_number }}{% if st.next_episode_title %} — {{ st.next_episode_title }}{% endif %}{% if row.next_ep and row.next_ep.date %} · {{ row.next_ep.date.strftime('%Y-%m-%d') }}{% endif %}
+            {% elif row.next_ep and row.next_ep.label %}
+              · Next: {{ row.next_ep.label }}{% if row.next_ep.title %} — {{ row.next_ep.title }}{% endif %} · {{ row.next_ep.date.strftime('%Y-%m-%d') }}
             {% endif %}
           </div>
         {% endif %}

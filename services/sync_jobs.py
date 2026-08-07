@@ -774,18 +774,14 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
     user.last_sync_at = datetime.utcnow()
     db.session.commit()
 
-    # Pre-populate latest aired dates for show rows touched by this sync.
-    # This keeps the "Newest aired" My Shows view fast without hammering Trakt
-    # on every page load. Failures are logged but do not fail the overall sync.
+    # Seed last-aired for newly discovered shows only (bounded). Everything
+    # else is maintained by the periodic media job — no per-show sweeps here.
     if 'show' in types:
-        show_ids = sorted(wl_ids | watched_ids)
-        if show_ids:
-            try:
-                refresh_latest_aired_for_ids(
-                    user, show_ids, force=False, max_age_hours=12, max_workers=2,
-                )
-            except Exception as exc:
-                logger.warning('Latest-aired pre-population after sync failed: %s', exc)
+        try:
+            from services.shows_cache import seed_new_shows_inline
+            seed_new_shows_inline(user)
+        except Exception as exc:
+            logger.warning('Latest-aired seed after sync failed: %s', exc)
 
     return all_ok
 
@@ -1135,12 +1131,32 @@ def _latest_aired_from_seasons(seasons: list) -> tuple[datetime | None, str | No
     return latest, label
 
 
+def collection_trakt_ids(user_id: int, media_type: str) -> set[int]:
+    """Titles on Wishlist or any cached personal list for this user."""
+    ids: set[int] = set()
+    for tid, in UserMediaState.query.filter_by(
+        user_id=user_id, media_type=media_type, on_watchlist=True
+    ).with_entities(UserMediaState.trakt_id).all():
+        ids.add(int(tid))
+    for tid, in UserListMembership.query.filter_by(
+        user_id=user_id, media_type=media_type
+    ).with_entities(UserListMembership.trakt_id).all():
+        ids.add(int(tid))
+    return ids
+
+
 def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
-    """Fetch and store latest aired episode for a single show. Returns True if updated."""
+    """Fetch and store latest aired episode for a single show. Returns True if updated.
+
+    Stamps ``last_aired_checked_at`` even when nothing aired (prevents re-seed
+    loops). Re-raises HTTP 429 so callers can stop a batch when throttled.
+    """
     try:
         seasons = trakt_client.get_show_seasons(trakt_id)
         latest, label = _latest_aired_from_seasons(seasons)
     except Exception as exc:
+        if getattr(exc, 'status_code', None) == 429:
+            raise
         logger.warning('Latest aired fetch failed for show %s: %s', trakt_id, exc)
         return False
     row = UserMediaState.query.filter_by(
@@ -1151,83 +1167,8 @@ def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
         db.session.add(row)
     row.last_episode_aired_at = latest
     row.last_episode_label = label
+    row.last_aired_checked_at = datetime.utcnow()
     return True
-
-
-def refresh_latest_aired_for_ids(
-    user: User,
-    trakt_ids: list[int],
-    *,
-    force: bool = False,
-    max_age_hours: int = 12,
-    max_workers: int = 2,
-    max_retries: int = 3,
-) -> int:
-    """
-    Fetch season metadata and cache the latest aired episode per show.
-
-    Used by the "Newest aired" My Shows view. Shows with no aired episode yet
-    get a NULL last_episode_aired_at and are hidden by that view.
-
-    Trakt public endpoints can rate-limit quickly, so this uses low concurrency
-    and retries with exponential backoff on HTTP 429.
-    """
-    ids = [int(t) for t in trakt_ids if t]
-    if not ids:
-        return 0
-
-    cutoff = datetime.utcnow() - timedelta(hours=max(1, int(max_age_hours)))
-    rows = {
-        r.trakt_id: r
-        for r in UserMediaState.query.filter(
-            UserMediaState.user_id == user.id,
-            UserMediaState.media_type == 'show',
-            UserMediaState.trakt_id.in_(ids),
-        ).all()
-    }
-    need: list[int] = []
-    for tid in ids:
-        row = rows.get(tid)
-        if force or row is None or not row.last_episode_aired_at or row.last_episode_aired_at < cutoff:
-            need.append(tid)
-    if not need:
-        return 0
-
-    from concurrent.futures import ThreadPoolExecutor, as_completed
-    from flask import current_app
-    from time import sleep
-
-    app = current_app._get_current_object()
-    # Capture in the main thread: inside workers there is no request context,
-    # so a Flask-Login current_user proxy resolves to None (NoneType.id crash).
-    user_id = user.id
-
-    def _one(tid: int):
-        with app.app_context():
-            for attempt in range(max_retries + 1):
-                if _update_latest_aired_for_show(user_id, tid):
-                    return tid
-                # Check if it was a rate-limit and retry
-                try:
-                    trakt_client.get_show_seasons(tid)
-                except Exception as exc:
-                    is_429 = '429' in str(exc)
-                    if attempt < max_retries and is_429:
-                        sleep(2 ** attempt)  # 1s, 2s, 4s
-                        continue
-                return None
-            return None
-
-    updated = 0
-    workers = max(1, min(int(max_workers), len(need)))
-    with ThreadPoolExecutor(max_workers=workers) as pool:
-        futures = [pool.submit(_one, tid) for tid in need]
-        for fut in as_completed(futures):
-            if fut.result():
-                updated += 1
-    if updated:
-        db.session.commit()
-    return updated
 
 
 def sync_providers_for_media(media: CachedMedia) -> list[str]:
@@ -1308,6 +1249,8 @@ def start_scheduler(app: Flask):
     except Exception:
         pass
     scheduler.start()
+    # Exposed so routes can queue one-off jobs (e.g. manual My Shows refresh).
+    app.extensions['shows_scheduler'] = scheduler
     app.logger.info(
         'Scheduler started (catalog every %sm, alerts every %sh, first alert run in %ss)',
         minutes, hours, startup_delay,

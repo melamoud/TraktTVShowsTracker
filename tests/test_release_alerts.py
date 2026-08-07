@@ -513,3 +513,53 @@ def test_show_release_date_only_moves_earlier(app):
         db.session.commit()
         row = CachedMedia.query.filter_by(media_type='show', trakt_id=9971).one()
         assert row.released_at == date(2023, 5, 5)
+
+
+def test_rate_limited_calendar_skips_per_show_fallback(app, user):
+    """A 429 on the bulk calendar call must NOT trigger per-show scans."""
+    from services.trakt_client import TraktError
+
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=9980, title='Throttled Show',
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        db.session.add(UserListMembership(
+            user_id=user, list_id='55', media_type='show', trakt_id=9980,
+        ))
+        db.session.commit()
+
+        with patch(
+            'services.alerts.ensure_user_calendar_fresh',
+            side_effect=TraktError('Trakt API error on /calendars/my (429)', 429),
+        ), patch(
+            'services.alerts.trakt_client.get_show_seasons'
+        ) as get_seasons:
+            run_media_alerts(app)
+
+        get_seasons.assert_not_called()
+
+
+def test_rate_limit_mid_fallback_stops_remaining_scans(app, user):
+    """A 429 from one per-show fetch stops the rest of the fallback loop."""
+    from services.trakt_client import TraktError
+
+    with app.app_context():
+        for tid in (9981, 9982):
+            db.session.add(CachedMedia(
+                media_type='show', trakt_id=tid, title=f'Show {tid}',
+                trakt_listed_at=datetime.utcnow(),
+            ))
+            db.session.add(UserListMembership(
+                user_id=user, list_id='55', media_type='show', trakt_id=tid,
+            ))
+        db.session.commit()
+
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), patch(
+            'services.alerts.trakt_client.get_show_seasons',
+            side_effect=TraktError('429', 429),
+        ) as get_seasons:
+            run_media_alerts(app)
+
+        assert get_seasons.call_count == 1

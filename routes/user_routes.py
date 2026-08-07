@@ -54,7 +54,8 @@ from help_utils import get_help_toc, render_help_markdown
 from models import (
     CachedMedia, MediaFoundOn, MediaProviderAvailability, Notification,
     ReviewMarker, StreamingService, StreamingServiceSuggestion,
-    UserListMembership, UserMediaState, UserPreference, UserStreamingService, db,
+    UserCalendarEvent, UserListMembership, UserMediaState, UserPreference,
+    UserStreamingService, db,
 )
 from services import trakt_client
 from services.alerts import STREAMING_OFFER_TYPES
@@ -73,8 +74,6 @@ from routes.catalog_routes import _pagination_pages, _per_page
 from services.sync_jobs import (
     ensure_media_cached,
     enrich_media_list_for_display,
-    refresh_latest_aired_for_ids,
-    refresh_show_progress_for_ids,
 )
 from services.user_media_sync import ensure_user_media_fresh
 
@@ -459,15 +458,24 @@ def _my_media(media_type: str):
         filt = 'unwatched_episodes'
 
     # Local DB is a cache: auto-sync when Trakt last_activities advanced
-    # (wishlist / watched / lists). Manual Refresh forces a full pull.
+    # (wishlist / watched / lists). Manual Refresh forces a full pull and
+    # queues a background cycle for progress/episode data (page never blocks).
     try:
         synced = ensure_user_media_fresh(
             current_user,
             media_types=(media_type,),
             force=request.args.get('refresh') == '1',
         )
-        if synced and request.args.get('refresh') == '1':
-            flash('Updated from Trakt.', 'success')
+        if request.args.get('refresh') == '1':
+            from services.shows_cache import queue_user_media_cycle
+            queue_user_media_cycle(current_app._get_current_object(), current_user.id)
+            flash(
+                'Updated from Trakt. Episode and progress data refresh in the '
+                'background — check back in a minute.',
+                'success',
+            )
+        # New shows discovered by the sync are last-aired-seeded inside
+        # sync_user_media_state (bounded), so Newest-aired picks them up.
     except Exception as exc:
         current_app.logger.warning('Sync before my-media failed: %s', exc)
         flash('Could not refresh from Trakt right now. Showing cached titles.', 'warning')
@@ -615,32 +623,13 @@ def _my_media(media_type: str):
         q = q.filter(CachedMedia.id.in_(streaming_ids))
 
     # Newest-aired view: hide future-only titles and sort by latest aired/release date.
+    # Pure cache read — last-aired/progress are maintained by the 6h media job.
     newest_aired = display_mode == 'newest_aired'
     if newest_aired:
         from sqlalchemy import func as sa_func
         today = date.today()
         today_end = datetime.combine(today, datetime.max.time())
         if media_type == 'show':
-            candidate_ids = [
-                int(tid)
-                for tid in db.session.scalars(
-                    q.statement.with_only_columns(
-                        UserMediaState.trakt_id,
-                        maintain_column_froms=True,
-                    ).distinct()
-                ).all()
-            ]
-            try:
-                refresh_show_progress_for_ids(
-                    current_user, candidate_ids,
-                    force=request.args.get('refresh') == '1',
-                )
-                refresh_latest_aired_for_ids(
-                    current_user, candidate_ids,
-                    force=request.args.get('refresh') == '1',
-                )
-            except Exception as exc:
-                current_app.logger.warning('Newest-aired refresh failed: %s', exc)
             q = q.filter(
                 UserMediaState.last_episode_aired_at.isnot(None),
                 sa_func.date(UserMediaState.last_episode_aired_at) <= today,
@@ -736,23 +725,33 @@ def _my_media(media_type: str):
     except Exception as exc:
         current_app.logger.warning('Title enrich for my-media failed: %s', exc)
 
-    # Shows only: fill x/y + next episode for the visible page (not full Refresh).
+    # Upcoming episode per show from the cached calendar (fed by the 6h job's
+    # forward window) — powers the "Next: S#E# · date" card line.
+    next_ep_map: dict[int, dict] = {}
     if media_type == 'show' and trakt_ids:
-        try:
-            refresh_show_progress_for_ids(
-                current_user,
-                trakt_ids,
-                force=request.args.get('refresh') == '1',
+        future_events = (
+            UserCalendarEvent.query
+            .filter(
+                UserCalendarEvent.user_id == current_user.id,
+                UserCalendarEvent.media_type == 'show',
+                UserCalendarEvent.trakt_id.in_(trakt_ids),
+                UserCalendarEvent.event_date > date.today(),
             )
-            # Re-load states so template sees fresh progress columns.
-            state_by_id = {
-                s.id: s for s in UserMediaState.query.filter(
-                    UserMediaState.id.in_([st.id for st in states])
-                ).all()
+            .order_by(UserCalendarEvent.event_date.asc())
+            .all()
+        )
+        for e in future_events:
+            tid = int(e.trakt_id)
+            if tid in next_ep_map:
+                continue  # ascending order → first seen is soonest
+            label = None
+            if e.season_number is not None and e.episode_number is not None:
+                label = f'S{int(e.season_number):02d}E{int(e.episode_number):02d}'
+            next_ep_map[tid] = {
+                'date': e.event_date,
+                'label': label,
+                'title': e.episode_title,
             }
-            states = [state_by_id.get(st.id, st) for st in states]
-        except Exception as exc:
-            current_app.logger.warning('Show progress enrich failed: %s', exc)
 
     media_rows = {
         m.trakt_id: m
@@ -841,6 +840,7 @@ def _my_media(media_type: str):
             'other_providers': other_providers,
             'found_on': found_map.get(st.trakt_id, []),
             'list_names': membership_names.get(st.trakt_id, []),
+            'next_ep': next_ep_map.get(st.trakt_id),
         }
         attach_availability(row)
         rows.append(row)

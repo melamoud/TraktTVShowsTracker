@@ -6,17 +6,17 @@ Extra status filter: **Unwatched episodes** — titles on your selected lists th
 
 Sorted by in-progress first, then most recently watched (`last_watched_at` from Trakt). Titles you haven’t started are last.
 
-Each show card shows **x / y episodes watched** and **Next: SxEy — title** when known. That summary is loaded for the **current page only** (a few Trakt progress calls) and cached ~12 hours — it is not part of full **Refresh from Trakt**, so Refresh stays about as fast as before.
+Each show card shows **x / y episodes watched** and **Next: SxEy — title · air date** when known. This data is maintained by the background media job (runs every ~6 hours and after **Refresh from Trakt**), not at page load — so pages render instantly from cache. A show you just added gets its first data within a minute of the sync that discovers it (a few titles per sync), or on the next job run.
 
 Filter choices (status, Lists…, titles per page) are remembered for your account. Leaving My shows and coming back via the menu restores the same settings.
 
-**View: List / Newest aired / Weekly / Daily / Monthly** — switch between the normal title rows, a **Newest aired** sort (shows sorted by the air date of their latest episode, movies by release date — future titles hidden), and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** (episode air dates for watchlist + watched shows) limited to your current **Lists… / Watched** filters; click an entry to open the title. View modes are remembered.
+**View: List / Newest aired / Weekly / Daily / Monthly** — switch between the normal title rows, a **Newest aired** sort (shows sorted by the air date of their latest episode, movies by release date — future titles hidden), and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** (episode air dates for watchlist + watched shows) limited to your current **Lists… / Watched** filters; click an entry to open the title. View modes are remembered. **Newest aired** is a pure cache view: the background job keeps last-aired dates fresh (33 days back / 33 ahead via My calendar for watchlisted shows, plus per-show checks for list-only titles), so the page loads instantly even on big collections.
 
 **Search titles in this list…** filters by title/year across the full filtered set (query is not remembered). Missing local titles are backfilled from Trakt before the filter runs. For titles not on your lists yet, use nav **Search**.
 
 **Upcoming / Theater window / Streaming** chips sit under the poster; the same names are filter pills (Theater = ±30 days, Upcoming = >30 days out).
 
-Opening the page uses a local cache, but it **auto-invalidates**: a cheap Trakt `/sync/last_activities` check runs on each visit, and watchlist / watched / lists re-sync when those timestamps advanced (e.g. you added a show on Trakt.tv). In-app rate / watch / list actions only mark *those* activity slices fresh, so a Trakt.tv watchlist add is not skipped. **Refresh from Trakt** forces a full re-pull. Sync is **read-only** — it never writes episode history.
+Opening the page uses a local cache, but it **auto-invalidates**: a cheap Trakt `/sync/last_activities` check runs on each visit, and watchlist / watched / lists re-sync when those timestamps advanced (e.g. you added a show on Trakt.tv). In-app rate / watch / list actions only mark *those* activity slices fresh, so a Trakt.tv watchlist add is not skipped. **Refresh from Trakt** forces a full re-pull of membership **and** queues a background pass over episode/progress data (results appear within a minute). Sync is **read-only** — it never writes episode history.
 
 **Pin** keeps a show at the top of My shows (local only — for “watching now” / “soon”). Newest pin wins among pinned titles. **Unpin** returns it to normal sort.
 

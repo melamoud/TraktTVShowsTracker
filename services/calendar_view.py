@@ -75,12 +75,23 @@ def _display_bounds(period: str, day: date) -> tuple[date, date]:
     return period_bounds(period, day)
 
 
-def ensure_user_calendar_fresh(user, start: date, days: int, *, max_age_hours: int = 6) -> bool:
+def ensure_user_calendar_fresh(
+    user,
+    start: date,
+    days: int,
+    *,
+    max_age_hours: int = 6,
+    media_types: tuple[str, ...] = ('movie', 'show'),
+    raise_on_rate_limit: bool = False,
+) -> bool:
     """
-    Cache /calendars/my movies+shows for [start, start+days) into UserCalendarEvent.
+    Cache /calendars/my for [start, start+days) into UserCalendarEvent.
 
     Returns True when a fetch ran. Existing rows in the window are replaced only
     when the fetch succeeds, so a Trakt error never blanks the calendar.
+    ``media_types`` limits which feeds are fetched/replaced (alerts only need
+    shows). With ``raise_on_rate_limit``, a 429 propagates so callers can back
+    off instead of hammering Trakt with fallback calls.
     """
     end = start + timedelta(days=days - 1)
     try:
@@ -97,7 +108,7 @@ def ensure_user_calendar_fresh(user, start: date, days: int, *, max_age_hours: i
                 remaining -= step
 
         entries: list[tuple[str, dict]] = []
-        for media_type in ('movie', 'show'):
+        for media_type in media_types:
             for chunk_start, chunk_days in chunks:
                 payload = trakt_client.get_calendar_entries(
                     user, media_type, chunk_start.isoformat(), chunk_days,
@@ -106,9 +117,11 @@ def ensure_user_calendar_fresh(user, start: date, days: int, *, max_age_hours: i
                     entries.append((media_type, entry))
     except Exception as exc:
         logger.warning('Calendar sync failed for user %s: %s', user.id, exc)
+        if raise_on_rate_limit and getattr(exc, 'status_code', None) == 429:
+            raise
         return False
 
-    for media_type in ('movie', 'show'):
+    for media_type in media_types:
         UserCalendarEvent.query.filter(
             UserCalendarEvent.user_id == user.id,
             UserCalendarEvent.media_type == media_type,

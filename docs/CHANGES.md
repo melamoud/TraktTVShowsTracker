@@ -1,5 +1,20 @@
 # Changes log
 
+## 2026-08-07 — My Shows renders from cache only (instant pages)
+
+- My Shows/Movies pages no longer call Trakt for episode/progress data — the **Newest aired** view used to fire 10+ per-show API calls *while rendering*, taking 1–3 minutes whenever progress or last-aired data was stale. Both the newest-aired branch and the list view's per-page progress fill are gone
+- The periodic media job (every `ALERTS_INTERVAL_HOURS`, default 6h) now maintains that cache: last-aired dates are derived for free from the My-calendar rows (window widened from 4 days to **33 days back / 33 days ahead** — same job, 2 calls instead of 1), list-only shows the calendar never covers get a sequential per-show seed, and progress refreshes for every show not known finished
+- Throttle-aware: if the calendar fetch gets a 429, the whole per-show phase is skipped for that run; a 429 mid-seed stops the loop immediately. Nothing blocks a page either way
+- Shows added on trakt.tv get seeded when the membership sync discovers them (bounded to a few per page load — a big list import can't slow a request; the job finishes the rest)
+- **Refresh from Trakt** on My pages now queues a one-off background cycle (alerts + cache) instead of doing it inline; flash tells you to check back in a minute
+- Show cards now append the **next episode's air date** (`Next: S02E01 — title · 2026-08-12`) from the cached calendar, and unwatched shows with an upcoming premiere get a Next line even without progress data
+
+## 2026-08-07 — Alert runs back off under Trakt rate limits
+
+- A 429 on the bulk calendar call no longer triggers per-show episode scans for every list-only show — that turned one throttle response into ~15 extra doomed calls. The run now skips fallbacks when throttled and catches up on the next run (the 3-day grace window means no episode is missed)
+- A 429 mid-fallback stops the remaining per-show scans immediately
+- Alert runs fetch only the shows calendar; the movies calendar was fetched on every run but never used by alerts
+
 ## 2026-08-07 — Fix duplicate show alerts (release + episode)
 
 - Every new episode used to fire **two** alerts: "New episode" and "Released". Root cause: calendar sync stamped the *episode's* air date onto the show's `released_at`, and the date-keyed release payload then re-fired per episode. Show rows now only ever take their real premiere date (item-level episode dates ignored; `released_at` never moves later — existing polluted rows self-heal on the next sync)

@@ -267,6 +267,8 @@ class UserMediaState(db.Model):
     # Latest aired episode for the "Newest aired" view (shows with future-only eps hidden).
     last_episode_aired_at = db.Column(db.DateTime)
     last_episode_label = db.Column(db.String(100))
+    # When we last checked Trakt for the above (prevents re-seeding never-aired shows).
+    last_aired_checked_at = db.Column(db.DateTime)
     # Local-only pin to keep “watching now / soon” titles at the top of My pages.
     pinned = db.Column(db.Boolean, default=False, nullable=False)
     pinned_at = db.Column(db.DateTime)
