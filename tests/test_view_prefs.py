@@ -69,7 +69,7 @@ def test_latest_remembers_hide_watched_off(app, client, user):
     """Latest Show watched toggle persists across bare navigation."""
     login_client(client, app, user)
     empty_stats = {
-        'cached_total': 0, 'after_year': 0, 'after_watched': 0, 'visible': 0,
+        'cached_total': 0, 'after_year': 0, 'after_watched': 0, 'after_lists': 0, 'visible': 0,
     }
     with patch('routes.catalog_routes.feed_count', return_value=1), \
          patch('routes.catalog_routes.ensure_catalog_through_marker'), \

@@ -10,6 +10,7 @@ By default Latest applies two local filters:
 
 1. **Recent years** — keep production year ≥ this year (or ≥ last year in Jan–Jun). Toggle **Include older years** to see classics that just got a DB edit.  
 2. **Matches only** — purple genres/keywords. Toggle **All titles** for the unfiltered (but still year-filtered) feed.  
+3. **Hide list titles** — hides titles already saved to your personal Trakt lists (e.g., “TV Show Favs”) so Latest only surfaces new discoveries. Toggle **Show list titles** to see them again.  
 
 Without genres/keywords, Matches only is empty — use the setup wizard / Preferences, or All titles.
 
@@ -46,6 +47,7 @@ Trakt’s `/updates` API **cannot** filter by genre/keyword server-side. Matches
 - **Matches only / Show all**  
 - **10 / 50 / 100** per page  
 - **Hide watched** on by default  
+- **Hide list titles** on by default (personal Trakt lists)  
 - Preference highlights (genres/keywords only), **Add to lists…** / watched, **Rate…** / **Favorite**, review marker (set / clear)  
 - Poster, description, genres  
 - **Streaming:** read-only TMDB/JustWatch list (needs free `TMDB_API_KEY`)  

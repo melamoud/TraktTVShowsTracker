@@ -2,8 +2,10 @@
 TraktTV Shows Tracker - Flask application factory / app instance.
 """
 
+import json
 import logging
 import os
+from datetime import datetime
 from logging.handlers import RotatingFileHandler
 
 from flask import Flask, flash, jsonify, redirect, request, url_for
@@ -234,6 +236,53 @@ def _ensure_schema(app):
                 app.logger.info('Added user_media_state progress / pin / rating columns')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
+
+    _repair_trakt_listed_at(app)
+
+
+def _repair_trakt_listed_at(app):
+    """
+    One-time repair: cached trakt_listed_at was set to future release dates for
+    catalog updates, hiding recent updates under future-dated rows.
+
+    Reset trakt_listed_at for trakt_db_updates rows to the actual updated_at from
+    the raw JSON. This is idempotent via the app_meta flag.
+    """
+    from models import AppMeta, CachedMedia
+
+    try:
+        flag = AppMeta.query.filter_by(key='trakt_listed_at_repaired').first()
+        if flag and flag.value == '1':
+            return
+
+        rows = (
+            CachedMedia.query
+            .filter_by(feed_source='trakt_db_updates')
+            .filter(CachedMedia.trakt_listed_at.isnot(None))
+            .all()
+        )
+        fixed = 0
+        for row in rows:
+            try:
+                raw = json.loads(row.raw_json or '{}')
+                updated = raw.get('updated_at')
+                if not updated:
+                    continue
+                dt = datetime.fromisoformat(str(updated).replace('Z', '+00:00')).replace(tzinfo=None)
+                if dt != row.trakt_listed_at:
+                    row.trakt_listed_at = dt
+                    fixed += 1
+            except Exception:
+                continue
+        db.session.commit()
+
+        if not flag:
+            db.session.add(AppMeta(key='trakt_listed_at_repaired', value='1'))
+            db.session.commit()
+        app.logger.info('Repaired trakt_listed_at for %s trakt_db_updates rows', fixed)
+    except Exception as exc:
+        app.logger.warning('trakt_listed_at repair failed: %s', exc)
+        db.session.rollback()
 
 
 def _configure_logging(app):

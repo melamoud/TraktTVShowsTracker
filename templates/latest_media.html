@@ -4,8 +4,9 @@
 {% set hw = 1 if hide_watched else 0 %}
 {% set mo = 1 if match_only else 0 %}
 {% set ry = 1 if recent_years else 0 %}
-{% macro qs(page_n=None, per=None, hw_v=None, mo_v=None, ry_v=None, q_v=None, avail_v=None) -%}
-page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&match_only={{ mo_v if mo_v is not none else mo }}&recent_years={{ ry_v if ry_v is not none else ry }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}
+{% set hl = 1 if hide_lists else 0 %}
+{% macro qs(page_n=None, per=None, hw_v=None, mo_v=None, ry_v=None, hl_v=None, q_v=None, avail_v=None) -%}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&match_only={{ mo_v if mo_v is not none else mo }}&recent_years={{ ry_v if ry_v is not none else ry }}&hide_lists={{ hl_v if hl_v is not none else hl }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 %}
@@ -66,6 +67,13 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <a class="pill on" href="?{{ qs(page_n=1, hw_v=0) }}">Showing watched</a>
       <a class="pill" href="?{{ qs(page_n=1, hw_v=1) }}">Hide watched</a>
     {% endif %}
+    {% if hide_lists %}
+      <a class="pill" href="?{{ qs(page_n=1, hl_v=0) }}">Show list titles</a>
+      <span class="pill on">Hiding list titles</span>
+    {% else %}
+      <a class="pill" href="?{{ qs(page_n=1, hl_v=1) }}">Hide list titles</a>
+      <span class="pill on">Showing list titles</span>
+    {% endif %}
   </div>
   <div class="actions">
     <button class="btn btn-small" data-action="sync-catalog" data-media-type="{{ media_type }}" data-trakt-id="0">Refresh from Trakt</button>
@@ -78,6 +86,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     <input type="hidden" name="hide_watched" value="{{ hw }}">
     <input type="hidden" name="match_only" value="{{ mo }}">
     <input type="hidden" name="recent_years" value="{{ ry }}">
+    <input type="hidden" name="hide_lists" value="{{ hl }}">
     <input type="hidden" name="page" value="1">
     {% if avail %}<input type="hidden" name="avail" value="{{ avail }}">{% endif %}
     <label class="sr-only" for="latest-search-q">Search in this list</label>
@@ -100,6 +109,9 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   {% endif %}
   {% if hide_watched %}
     · after hiding watched: {{ filter_stats.after_watched }}
+  {% endif %}
+  {% if hide_lists %}
+    · after hiding list titles: {{ filter_stats.after_lists }}
   {% endif %}
   {% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}.
   {% if has_more_older %}

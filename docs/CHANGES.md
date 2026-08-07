@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-07 — Latest movies/shows: hide list titles + stale-sort fix
+
+- Latest movies/shows now default to **Hide list titles** (titles already on personal Trakt lists are hidden)
+- Toggle **Show list titles** in the toolbar to see them again; choice is remembered per view
+- Fixed `trakt_listed_at` sort key so catalog updates use the real Trakt `updated_at` instead of getting stuck on future release dates
+- One-time startup migration repairs existing rows whose `trakt_listed_at` was set to a future release date
+
 ## 2026-08-06 — My Shows/Movies: Newest aired view
 
 - New **Newest aired** view (beside List / Weekly / Daily / Monthly)

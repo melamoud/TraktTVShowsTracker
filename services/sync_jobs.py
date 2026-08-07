@@ -300,6 +300,11 @@ def _upsert_update_items(media_type: str, items: list) -> int:
             feed_source='trakt_db_updates',
         )
         if row:
+            # For catalog updates, the API's updated_at is the authoritative sort
+            # time. Never let a previously cached release date or older listed_at
+            # keep the row at the top of Latest with a future/stale date.
+            if listed_at:
+                row.trakt_listed_at = listed_at
             count += 1
     return count
 

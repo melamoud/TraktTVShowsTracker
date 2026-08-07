@@ -609,6 +609,7 @@ def _latest_visible_rows(
     media_type: str,
     hide_watched: bool,
     match_only: bool,
+    hide_lists: bool = False,
     *,
     min_year: int | None = None,
 ) -> tuple[list[dict], dict]:
@@ -639,6 +640,9 @@ def _latest_visible_rows(
     if hide_watched:
         rows_all = [r for r in rows_all if not r['watched']]
     after_watched = len(rows_all)
+    if hide_lists:
+        rows_all = [r for r in rows_all if not r.get('list_names')]
+    after_lists = len(rows_all)
     if match_only:
         rows_all = [r for r in rows_all if r.get('match') and r['match'].get('matched')]
     _apply_marker_to_visible_rows(rows_all, media_type)
@@ -646,6 +650,7 @@ def _latest_visible_rows(
         'cached_total': cached_total,
         'after_year': after_year,
         'after_watched': after_watched,
+        'after_lists': after_lists,
         'visible': len(rows_all),
     }
     return rows_all, stats
@@ -663,6 +668,10 @@ def _latest_page(media_type: str):
     # Default: hide titles already watched on Trakt (still “in DB”, just less noise).
     hide_watched = view_prefs.resolve_bool(
         current_user, view, 'hide_watched', 'hide_watched', default=True,
+    )
+    # Default: hide titles already saved in personal lists so Latest only surfaces new discoveries.
+    hide_lists = view_prefs.resolve_bool(
+        current_user, view, 'hide_lists', 'hide_lists', default=True,
     )
     # Default: preference matches only (purple) when the user has match prefs.
     # Persist across visits (replaces session-only toggle).
@@ -721,7 +730,7 @@ def _latest_page(media_type: str):
     from services.tmdb_client import is_configured as tmdb_is_configured
 
     rows_all, filter_stats = _latest_visible_rows(
-        media_type, hide_watched, match_only, min_year=min_year,
+        media_type, hide_watched, match_only, hide_lists, min_year=min_year,
     )
     from services.availability import filter_rows_by_avail, normalize_avail
 
@@ -792,12 +801,13 @@ def _latest_page(media_type: str):
     marker = _marker(media_type)
     has_match_prefs = user_has_match_prefs(current_user)
     current_app.logger.info(
-        'Latest %s filters: cached=%s after_year=%s after_watched=%s visible=%s page=%s/%s',
+        'Latest %s filters: cached=%s after_year=%s after_watched=%s after_lists=%s visible=%s page=%s/%s',
         media_type,
-        filter_stats['cached_total'],
-        filter_stats['after_year'],
-        filter_stats['after_watched'],
-        filter_stats['visible'],
+        filter_stats.get('cached_total'),
+        filter_stats.get('after_year'),
+        filter_stats.get('after_watched'),
+        filter_stats.get('after_lists'),
+        filter_stats.get('visible'),
         page,
         pages,
     )
@@ -814,6 +824,7 @@ def _latest_page(media_type: str):
         filter_stats=filter_stats,
         marker=marker,
         hide_watched=hide_watched,
+        hide_lists=hide_lists,
         match_only=match_only,
         recent_years=recent_years,
         min_discovery_year=min_year,
