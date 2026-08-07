@@ -8,6 +8,7 @@ from models import (
     CachedMedia,
     Notification,
     User,
+    UserCalendarEvent,
     UserListMembership,
     UserMediaState,
     UserPreference,
@@ -141,7 +142,10 @@ def test_season_drop_one_alert(app, user):
             tmdb_id=777, trakt_listed_at=datetime.utcnow(),
         )
         db.session.add(media)
-        _watchlist(user, 'show', 9401)
+        # List-only (not watchlisted/watched) → per-show fallback path.
+        db.session.add(UserListMembership(
+            user_id=user, list_id='55', media_type='show', trakt_id=9401,
+        ))
         db.session.commit()
 
         drop_day = date.today().isoformat()
@@ -161,12 +165,14 @@ def test_season_drop_one_alert(app, user):
             ],
         }]
 
-        with patch('services.alerts.tmdb_configured', return_value=False), patch(
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), patch(
             'services.alerts.trakt_client.get_show_seasons', return_value=seasons_baseline
         ):
             run_media_alerts(app)  # baseline
 
-        with patch('services.alerts.tmdb_configured', return_value=False), patch(
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), patch(
             'services.alerts.trakt_client.get_show_seasons', return_value=seasons_new
         ):
             created = run_media_alerts(app)
@@ -210,12 +216,14 @@ def test_episode_alert_weekly(app, user):
             ],
         }]
 
-        with patch('services.alerts.tmdb_configured', return_value=False), patch(
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), patch(
             'services.alerts.trakt_client.get_show_seasons', return_value=baseline
         ):
             run_media_alerts(app)
 
-        with patch('services.alerts.tmdb_configured', return_value=False), patch(
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), patch(
             'services.alerts.trakt_client.get_show_seasons', return_value=after
         ):
             created = run_media_alerts(app)
@@ -225,6 +233,136 @@ def test_episode_alert_weekly(app, user):
             user_id=user, alert_type=ALERT_EPISODE_AIRED
         ).one()
         assert 'S01E02' in note.message
+
+
+def test_first_pass_alerts_recent_episode(app, user):
+    """First-ever scan must still alert episodes inside the grace window."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=9601, title='Silo',
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        # List-only membership → per-show fallback path.
+        db.session.add(UserListMembership(
+            user_id=user, list_id='55', media_type='show', trakt_id=9601,
+        ))
+        db.session.commit()
+
+        today = date.today().isoformat()
+        old = (date.today() - timedelta(days=30)).isoformat()
+        seasons = [{
+            'number': 3,
+            'episodes': [
+                {'number': 1, 'title': 'Old', 'first_aired': f'{old}T00:00:00.000Z'},
+                {'number': 2, 'title': 'Today Ep', 'first_aired': f'{today}T08:00:00.000Z'},
+            ],
+        }]
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), patch(
+            'services.alerts.trakt_client.get_show_seasons', return_value=seasons
+        ):
+            created = run_media_alerts(app)
+
+        assert created == 1
+        note = Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_EPISODE_AIRED
+        ).one()
+        assert 'Silo' in note.title
+        assert 'S03E02' in note.message
+        # Old episode recorded silently, never alerts later.
+        assert AlertEvent.query.filter_by(
+            user_id=user, alert_type=ALERT_EPISODE_AIRED, payload_key='ep:3:1'
+        ).count() == 1
+
+
+def test_calendar_event_alerts_without_per_show_fetch(app, user):
+    """Watchlisted show with an in-window calendar row alerts via the bulk path."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=9901, title='Cal Show',
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        _watchlist(user, 'show', 9901)
+        db.session.add(UserCalendarEvent(
+            user_id=user, media_type='show', trakt_id=9901,
+            event_date=date.today(), season_number=3, episode_number=8,
+            episode_title='Fresh Episode',
+        ))
+        db.session.commit()
+
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.alerts.trakt_client.get_show_seasons') as get_seasons:
+            created = run_media_alerts(app)
+
+        assert created == 1
+        get_seasons.assert_not_called()  # bulk calendar path — no per-show call
+        note = Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_EPISODE_AIRED
+        ).one()
+        assert 'Cal Show' in note.title
+        assert 'S03E08' in note.message
+
+
+def test_calendar_same_day_cluster_confirms_season_drop(app, user):
+    """>=2 same-day episodes of one season confirm via one Trakt call."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=9902, title='Drop Show',
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        _watchlist(user, 'show', 9902)
+        today = date.today()
+        for ep in (1, 2, 3):
+            db.session.add(UserCalendarEvent(
+                user_id=user, media_type='show', trakt_id=9902,
+                event_date=today, season_number=2, episode_number=ep,
+                episode_title=f'E{ep}',
+            ))
+        db.session.commit()
+
+        day = today.isoformat()
+        seasons = [{
+            'number': 2,
+            'episodes': [
+                {'number': n, 'title': f'E{n}', 'first_aired': f'{day}T08:00:00.000Z'}
+                for n in (1, 2, 3)
+            ],
+        }]
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.alerts.trakt_client.get_show_seasons', return_value=seasons):
+            created = run_media_alerts(app)
+
+        assert created == 1
+        note = Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_SEASON_AIRED
+        ).one()
+        assert 'Season 2' in note.title
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_EPISODE_AIRED
+        ).count() == 0
+
+
+def test_calendar_ignores_events_older_than_grace(app, user):
+    """Calendar rows older than the grace window never alert."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=9903, title='Old Cal Show',
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        _watchlist(user, 'show', 9903)
+        db.session.add(UserCalendarEvent(
+            user_id=user, media_type='show', trakt_id=9903,
+            event_date=date.today() - timedelta(days=9), season_number=1,
+            episode_number=4, episode_title='Old Ep',
+        ))
+        db.session.commit()
+
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False):
+            assert run_media_alerts(app) == 0
+        assert Notification.query.filter_by(user_id=user).count() == 0
 
 
 def test_notify_admins_new_user(app, admin_user, user):
@@ -266,3 +404,112 @@ def test_preferences_alert_toggles(app, client, user):
         assert prefs.alert_release_day is False
         assert prefs.alert_new_streaming is False
         assert prefs.alert_episode_aired is False
+
+
+def test_show_premiere_gets_episode_alert_not_release_day(app, user):
+    """Shows never get release_day - S01E01 episode alert covers the premiere."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=9950, title='Fresh Show',
+            released_at=date.today(),  # premieres today
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        _watchlist(user, 'show', 9950)
+        db.session.add(UserCalendarEvent(
+            user_id=user, media_type='show', trakt_id=9950,
+            event_date=date.today(), season_number=1, episode_number=1,
+            episode_title='Pilot',
+        ))
+        db.session.commit()
+
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False):
+            created = run_media_alerts(app)
+
+        assert created == 1
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_RELEASE_DAY
+        ).count() == 0
+        note = Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_EPISODE_AIRED
+        ).one()
+        assert 'S01E01' in note.message
+
+
+def test_movie_release_and_streaming_alerts_both_fire(app, user):
+    """Movies keep release-day AND new-streaming alerts."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=9960, title='Movie Night',
+            released_at=date.today(), tmdb_id=555,
+        ))
+        _watchlist(user, 'movie', 9960)
+        db.session.commit()
+
+        with patch('services.alerts.tmdb_configured', return_value=True), patch(
+            'services.sync_jobs.tmdb_configured', return_value=True
+        ), patch('services.sync_jobs.get_watch_providers', return_value=[
+            {'provider_name': 'Netflix', 'offer_type': 'flatrate'},
+        ]):
+            run_media_alerts(app)  # streaming baseline + release alert
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_RELEASE_DAY
+        ).count() == 1
+
+        with patch('services.alerts.tmdb_configured', return_value=True), patch(
+            'services.sync_jobs.tmdb_configured', return_value=True
+        ), patch('services.sync_jobs.get_watch_providers', return_value=[
+            {'provider_name': 'Netflix', 'offer_type': 'flatrate'},
+            {'provider_name': 'Hulu', 'offer_type': 'flatrate'},
+        ]):
+            run_media_alerts(app)
+
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_NEW_STREAMING
+        ).count() == 1
+
+
+def test_calendar_upsert_does_not_stamp_episode_date_on_show(app):
+    """Calendar entries carry the EPISODE first_aired at item level - the show
+    row must keep its real premiere date, else release_day fires per episode."""
+    from services.sync_jobs import upsert_cached_media
+
+    with app.app_context():
+        upsert_cached_media('show', {
+            'first_aired': '2026-08-07T00:00:00.000Z',  # episode air date
+            'show': {
+                'ids': {'trakt': 9970},
+                'title': 'Polluted Show',
+                'first_aired': '2023-05-05T00:00:00.000Z',
+            },
+            'episode': {'season': 3, 'number': 6},
+        })
+        db.session.commit()
+        row = CachedMedia.query.filter_by(media_type='show', trakt_id=9970).one()
+        assert row.released_at == date(2023, 5, 5)
+
+
+def test_show_release_date_only_moves_earlier(app):
+    """Premiere dates never move later; an earlier entity date self-heals."""
+    from services.sync_jobs import upsert_cached_media
+
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=9971, title='Healed Show',
+            released_at=date(2026, 8, 7),  # previously polluted by an episode
+        ))
+        db.session.commit()
+
+        upsert_cached_media('show', {
+            'ids': {'trakt': 9971},
+            'title': 'Healed Show',
+            'first_aired': '2026-08-20T00:00:00.000Z',  # later: ignored
+        })
+        upsert_cached_media('show', {
+            'ids': {'trakt': 9971},
+            'title': 'Healed Show',
+            'first_aired': '2023-05-05T00:00:00.000Z',  # real premiere: heals
+        })
+        db.session.commit()
+        row = CachedMedia.query.filter_by(media_type='show', trakt_id=9971).one()
+        assert row.released_at == date(2023, 5, 5)

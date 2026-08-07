@@ -360,6 +360,8 @@ class Notification(db.Model):
     title = db.Column(db.String(300), nullable=False)
     message = db.Column(db.Text, nullable=False)
     link = db.Column(db.String(500))
+    media_type = db.Column(db.String(16))  # movie|show when title-linked
+    trakt_id = db.Column(db.Integer)
     is_read = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 

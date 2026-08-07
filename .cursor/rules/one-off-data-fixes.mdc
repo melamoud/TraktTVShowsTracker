@@ -1,0 +1,24 @@
+---
+description: One-off data fixes/cleanups go in scripts/, never in the app boot path
+alwaysApply: true
+---
+
+# One-off data fixes are scripts, not boot code
+
+Never add one-time data repairs, cleanups, or backfills to the app runtime
+(`app.py` boot, `_ensure_schema`, route handlers, or scheduler jobs) — not even
+behind an `AppMeta` "already ran" flag. Code that stays in the run environment
+after doing its job is future-bug real estate.
+
+Instead:
+
+- Put the fix in a standalone script (e.g. `scripts/fix_<thing>.py`) that opens
+  the DB/app context itself, prints what it changed, and is run manually once
+  per environment.
+- Delete or archive the script once every environment is fixed.
+- Past boot-time repairs in this repo (e.g. `_repair_trakt_listed_at`) are
+  legacy, not a pattern to copy.
+
+Allowed in boot: permanent, always-relevant checks — e.g. idempotent *schema*
+column additions in `_ensure_schema` (that is this project's migration system).
+The line is: schema DDL = boot OK; row-level data surgery = script.

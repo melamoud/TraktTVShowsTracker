@@ -105,3 +105,6 @@ class Config:
     # Background sync
     CATALOG_SYNC_INTERVAL_MINUTES = int(os.environ.get('CATALOG_SYNC_INTERVAL_MINUTES', '60'))
     PROVIDER_SYNC_INTERVAL_HOURS = int(os.environ.get('PROVIDER_SYNC_INTERVAL_HOURS', '12'))
+    # Media alerts (release day / streaming / episodes): run at startup, then on this cadence.
+    ALERTS_INTERVAL_HOURS = float(os.environ.get('ALERTS_INTERVAL_HOURS', '6'))
+    ALERTS_STARTUP_DELAY_SECONDS = int(os.environ.get('ALERTS_STARTUP_DELAY_SECONDS', '120'))

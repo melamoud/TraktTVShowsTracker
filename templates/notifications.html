@@ -13,36 +13,66 @@
 <p class="meta" style="margin-top:.35rem;">Unread alerts are brighter. Dimmed rows are already read.</p>
 
 <div class="media-list">
-  {% for n in notifications %}
-    <article class="media-row {% if n.is_read %}dimmed{% endif %}">
-      <h2 class="media-title">
-        {{ n.title }}
-        {% if n.is_read %}
-          <span class="tag">Read</span>
-        {% else %}
-          <span class="tag found">Unread</span>
+  {% for card in cards %}
+    {% set n = card.n %}
+    {% set m = card.media %}
+    <article class="media-row alert-row {% if n.is_read %}dimmed{% endif %} {% if not m %}no-poster{% endif %}">
+      {% if m %}
+        <div class="media-poster-col">
+          <a class="media-poster"
+             href="{{ url_for('catalog.media_detail', media_type=m.media_type, trakt_id=m.trakt_id) }}">
+            {% if m.poster_url %}
+              <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
+            {% else %}
+              <div class="poster-missing-sm">No image</div>
+            {% endif %}
+          </a>
+        </div>
+      {% endif %}
+      <div class="media-body">
+        <h2 class="media-title">
+          {% if m %}
+            <a href="{{ url_for('catalog.media_detail', media_type=m.media_type, trakt_id=m.trakt_id) }}">{{ m.title }}</a>
+          {% else %}
+            {{ n.title }}
+          {% endif %}
+          <span class="tag alert-{{ n.alert_type or 'info' }}">{{ card.type_label }}</span>
+          {% if not n.is_read %}<span class="tag found">Unread</span>{% endif %}
+        </h2>
+        <div class="meta">{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        <p class="alert-message">{{ n.message }}</p>
+        {% if card.my_providers or card.other_providers %}
+          <div class="tags">
+            {% for p in card.my_providers %}<span class="tag found">{{ p }}</span>{% endfor %}
+            {% for p in card.other_providers %}<span class="tag">{{ p }}</span>{% endfor %}
+          </div>
         {% endif %}
-      </h2>
-      <div class="meta">
-        {{ n.created_at }}
-        {% if n.alert_type %} · {{ n.alert_type | replace('_', ' ') }}{% endif %}
-        · {{ n.message }}
-      </div>
-      <div class="actions">
-        {% if n.link %}
-          <a class="btn btn-small" href="{{ n.link }}">Open</a>
-        {% endif %}
-        {% if n.is_read %}
-          <form method="post" action="{{ url_for('user.notification_unread', notif_id=n.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-small" type="submit">Mark unread</button>
-          </form>
-        {% else %}
-          <form method="post" action="{{ url_for('user.notification_read', notif_id=n.id) }}">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button class="btn btn-small" type="submit">Mark read</button>
-          </form>
-        {% endif %}
+        <div class="actions">
+          {% if n.media_type == 'show' and n.trakt_id and n.alert_type in ('episode_aired', 'season_aired') %}
+            <button class="btn btn-primary btn-small" type="button"
+                    data-action="progress-open"
+                    data-media-type="show"
+                    data-trakt-id="{{ n.trakt_id }}"
+                    data-title="{{ (m.title if m else n.title)|e }}">Progress</button>
+          {% endif %}
+          {% if m %}
+            <a class="btn btn-small"
+               href="{{ url_for('catalog.media_detail', media_type=m.media_type, trakt_id=m.trakt_id) }}">Details</a>
+          {% elif n.link %}
+            <a class="btn btn-small" href="{{ n.link }}">View</a>
+          {% endif %}
+          {% if n.is_read %}
+            <form method="post" action="{{ url_for('user.notification_unread', notif_id=n.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-small" type="submit">Mark unread</button>
+            </form>
+          {% else %}
+            <form method="post" action="{{ url_for('user.notification_read', notif_id=n.id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-small" type="submit">Mark read</button>
+            </form>
+          {% endif %}
+        </div>
       </div>
     </article>
   {% else %}

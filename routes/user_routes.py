@@ -57,6 +57,7 @@ from models import (
     UserListMembership, UserMediaState, UserPreference, UserStreamingService, db,
 )
 from services import trakt_client
+from services.alerts import STREAMING_OFFER_TYPES
 from services.seed import COMMON_GENRES
 from services.streaming_matcher import (
     WATCHLIST_LIST_ID,
@@ -677,17 +678,27 @@ def _my_media(media_type: str):
         page = pages
 
     if newest_aired:
-        # Sort by latest aired / release date descending (newest first).
+        # Pinned first (newest pin first), then latest aired / release date desc.
         if media_type == 'show':
             states = (
-                q.order_by(UserMediaState.last_episode_aired_at.desc(), UserMediaState.id.desc())
+                q.order_by(
+                    UserMediaState.pinned.desc(),
+                    UserMediaState.pinned_at.desc(),
+                    UserMediaState.last_episode_aired_at.desc(),
+                    UserMediaState.id.desc(),
+                )
                 .offset((page - 1) * per_page)
                 .limit(per_page)
                 .all()
             )
         else:
             states = (
-                q.order_by(CachedMedia.released_at.desc(), UserMediaState.id.desc())
+                q.order_by(
+                    UserMediaState.pinned.desc(),
+                    UserMediaState.pinned_at.desc(),
+                    CachedMedia.released_at.desc(),
+                    UserMediaState.id.desc(),
+                )
                 .offset((page - 1) * per_page)
                 .limit(per_page)
                 .all()
@@ -1108,6 +1119,15 @@ def api_season_unwatched(trakt_id, season_number):
         }), 400
 
 
+ALERT_TYPE_LABELS = {
+    'release_day': 'Released',
+    'new_streaming': 'Now streaming',
+    'episode_aired': 'New episode',
+    'season_aired': 'Season out',
+    'new_user_login': 'New login',
+}
+
+
 @user_bp.route('/notifications')
 @login_required
 def notifications():
@@ -1120,9 +1140,48 @@ def notifications():
         .all()
     )
     unread_count = sum(1 for n in rows if not n.is_read)
+
+    pairs = {
+        (n.media_type, int(n.trakt_id))
+        for n in rows
+        if n.media_type and n.trakt_id
+    }
+    media_map = {}
+    if pairs:
+        found = CachedMedia.query.filter(
+            db.tuple_(CachedMedia.media_type, CachedMedia.trakt_id).in_(pairs)
+        ).all()
+        media_map = {(m.media_type, m.trakt_id): m for m in found}
+
+    from services.streaming_matcher import split_providers_for_user
+    cards = []
+    for n in rows:
+        media = (
+            media_map.get((n.media_type, n.trakt_id))
+            if n.media_type and n.trakt_id else None
+        )
+        my_providers: list[str] = []
+        other_providers: list[str] = []
+        if media is not None:
+            names = [
+                r.provider_name for r in media.providers
+                if r.provider_name and r.offer_type in STREAMING_OFFER_TYPES
+            ]
+            my_providers, other_providers = split_providers_for_user(
+                sorted(set(names)), current_user,
+            )
+        cards.append({
+            'n': n,
+            'media': media,
+            'my_providers': my_providers,
+            'other_providers': other_providers,
+            'type_label': ALERT_TYPE_LABELS.get(
+                n.alert_type, (n.alert_type or '').replace('_', ' '),
+            ),
+        })
     return render_template(
         'notifications.html',
-        notifications=rows,
+        cards=cards,
         unread_count=unread_count,
     )
 

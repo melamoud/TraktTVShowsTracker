@@ -184,12 +184,22 @@ def _ensure_schema(app):
                 app.logger.info('Added user_preferences preference columns')
         if 'notifications' in tables:
             ncols = {c['name'] for c in insp.get_columns('notifications')}
-            if 'alert_type' not in ncols:
+            n_alters = []
+            for col, ddl in (
+                ('alert_type',
+                 'ALTER TABLE notifications ADD COLUMN alert_type VARCHAR(32)'),
+                ('media_type',
+                 'ALTER TABLE notifications ADD COLUMN media_type VARCHAR(16)'),
+                ('trakt_id',
+                 'ALTER TABLE notifications ADD COLUMN trakt_id INTEGER'),
+            ):
+                if col not in ncols:
+                    n_alters.append(ddl)
+            if n_alters:
                 with db.engine.begin() as conn:
-                    conn.execute(text(
-                        'ALTER TABLE notifications ADD COLUMN alert_type VARCHAR(32)'
-                    ))
-                app.logger.info('Added notifications.alert_type column')
+                    for stmt in n_alters:
+                        conn.execute(text(stmt))
+                app.logger.info('Added notifications columns')
         if 'users' in tables:
             user_cols = {c['name'] for c in insp.get_columns('users')}
             if 'trakt_activities_json' not in user_cols:

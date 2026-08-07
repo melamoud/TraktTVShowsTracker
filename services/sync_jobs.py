@@ -231,19 +231,31 @@ def upsert_cached_media(
 
     released = release_date
     if not released:
-        raw_released = (
-            item.get('released')
-            or entity.get('released')
-            or item.get('first_aired')
-            or entity.get('first_aired')
-        )
+        if media_type == 'show':
+            # Calendar entries carry the EPISODE's first_aired at item level —
+            # stamping that on the show row would make released_at chase the
+            # latest episode and fire a bogus "Released" alert per episode.
+            raw_released = entity.get('released') or entity.get('first_aired')
+        else:
+            raw_released = (
+                item.get('released')
+                or entity.get('released')
+                or item.get('first_aired')
+                or entity.get('first_aired')
+            )
         if raw_released:
             try:
                 released = date.fromisoformat(str(raw_released)[:10])
             except ValueError:
                 released = None
     if released:
-        row.released_at = released
+        if media_type == 'show':
+            # A show premiere never moves later — only accept earlier dates.
+            # This also self-heals rows already polluted with episode dates.
+            if row.released_at is None or released < row.released_at:
+                row.released_at = released
+        else:
+            row.released_at = released
 
     candidate_listed = listed_at
     if not candidate_listed and released:
@@ -1186,11 +1198,14 @@ def refresh_latest_aired_for_ids(
     from time import sleep
 
     app = current_app._get_current_object()
+    # Capture in the main thread: inside workers there is no request context,
+    # so a Flask-Login current_user proxy resolves to None (NoneType.id crash).
+    user_id = user.id
 
     def _one(tid: int):
         with app.app_context():
             for attempt in range(max_retries + 1):
-                if _update_latest_aired_for_show(user.id, tid):
+                if _update_latest_aired_for_show(user_id, tid):
                     return tid
                 # Check if it was a rate-limit and retry
                 try:
@@ -1274,13 +1289,17 @@ def start_scheduler(app: Flask):
 
     scheduler = BackgroundScheduler(daemon=True)
     minutes = app.config.get('CATALOG_SYNC_INTERVAL_MINUTES', 60)
-    hours = app.config.get('PROVIDER_SYNC_INTERVAL_HOURS', 12)
+    hours = app.config.get('ALERTS_INTERVAL_HOURS', app.config.get('PROVIDER_SYNC_INTERVAL_HOURS', 12))
+    startup_delay = app.config.get('ALERTS_STARTUP_DELAY_SECONDS', 120)
     scheduler.add_job(
         run_catalog_sync_job, 'interval', minutes=minutes, args=[app], id='catalog_sync',
         replace_existing=True,
     )
+    # Run alerts once shortly after boot — a pure interval job never fires when
+    # the app restarts before the first interval elapses.
     scheduler.add_job(
         check_release_watches, 'interval', hours=hours, args=[app], id='media_alerts',
+        next_run_time=datetime.now() + timedelta(seconds=startup_delay),
         replace_existing=True,
     )
     # Keep old job id replaced if a previous process registered it.
@@ -1289,5 +1308,8 @@ def start_scheduler(app: Flask):
     except Exception:
         pass
     scheduler.start()
-    app.logger.info('Scheduler started (catalog every %sm, alerts every %sh)', minutes, hours)
+    app.logger.info(
+        'Scheduler started (catalog every %sm, alerts every %sh, first alert run in %ss)',
+        minutes, hours, startup_delay,
+    )
     return scheduler

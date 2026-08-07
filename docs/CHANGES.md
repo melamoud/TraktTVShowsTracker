@@ -1,5 +1,29 @@
 # Changes log
 
+## 2026-08-07 — Fix duplicate show alerts (release + episode)
+
+- Every new episode used to fire **two** alerts: "New episode" and "Released". Root cause: calendar sync stamped the *episode's* air date onto the show's `released_at`, and the date-keyed release payload then re-fired per episode. Show rows now only ever take their real premiere date (item-level episode dates ignored; `released_at` never moves later — existing polluted rows self-heal on the next sync)
+- Shows no longer get release-day alerts at all: the S01E01 episode alert already announces a premiere, and full-season drops get the season alert. Movies keep **release-day** and **new-streaming** alerts unchanged
+- Alerts page fallback button renamed **Open → View**; Preferences label clarified to "Movie release date"
+
+## 2026-08-07 — Alerts page redesign
+
+- Alert cards now show the poster, a linked title, a colored type tag (New episode / Season out / Released / Now streaming), and the episode line `S#E# — episode title · aired date`
+- Streaming providers render as live tags (teal = on your services) instead of being baked into the message text; notifications now store `media_type`/`trakt_id` (auto-migrated) to power this
+- Episode/season alerts get a **Progress** button that opens the progress side panel in place (previously "Open" navigated away to the full progress page); **Details** links to the title page
+
+## 2026-08-07 — Episode alerts actually fire
+
+- The alerts job was interval-only (every 12h) with no startup run, so frequent restarts meant it never ran; it now runs once ~2 minutes after boot, then every `ALERTS_INTERVAL_HOURS` (default 6h)
+- Episode detection is **calendar-driven**: one bulk `/calendars/my` call per run covers every watchlisted or in-progress show for the whole 3-day grace window — no per-show scan queue, no rotation; newly added shows alert on the very next run
+- List-only shows the calendar cannot cover (never watched, not watchlisted) fall back to a per-show Trakt fetch; suspected full-season drops confirm with a single extra call
+- First-ever scan of a show now still alerts episodes/seasons aired within the 3-day grace window instead of swallowing them into the baseline
+- Fixed Newest-aired refresh crashing with `'NoneType' object has no attribute 'id'` (login proxy was read inside worker threads)
+
+## 2026-08-07 — Pin fix in Newest aired view
+
+- **Pinned** titles sort at the top again in the My movies/shows **Newest aired** view; the mode used to ignore pins and sort purely by aired/release date
+
 ## 2026-08-07 — Latest movies/shows: hide list titles + stale-sort fix
 
 - Latest movies/shows now default to **Hide list titles** (titles already on personal Trakt lists are hidden)

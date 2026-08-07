@@ -89,3 +89,76 @@ def test_newest_aired_movies_sort_by_release_date(app, client, user):
     assert 'Old Movie' in html
     assert 'Future Movie' not in html
     assert html.index('New Movie') < html.index('Old Movie')
+
+
+def test_newest_aired_pinned_shows_stay_on_top(app, client, user):
+    """Pinned titles sort above everything else, even in newest-aired view."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        for tid, title, aired, aired_count, completed, pinned_at in (
+            (1, 'Newest Show', datetime(2026, 8, 6), 8, 3, None),
+            (2, 'Pinned Old Show', datetime(2024, 1, 1), 10, 5, datetime(2026, 8, 4)),
+        ):
+            _seed_state(user, trakt_id=tid, on_watchlist=True)
+            db.session.add(CachedMedia(
+                media_type='show', trakt_id=tid, title=title, year=2024,
+            ))
+            st = UserMediaState.query.filter_by(
+                user_id=user, media_type='show', trakt_id=tid,
+            ).first()
+            st.last_episode_aired_at = aired
+            st.last_episode_label = f'{title} latest'
+            st.episodes_aired = aired_count
+            st.episodes_completed = completed
+            if pinned_at:
+                st.pinned = True
+                st.pinned_at = pinned_at
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.refresh_show_progress_for_ids', return_value=0), \
+         patch('routes.user_routes.refresh_latest_aired_for_ids', return_value=0), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        resp = client.get('/my/shows?lists_set=1&lists=watchlist&filter=lists&display=newest_aired')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'Pinned Old Show' in html
+    assert 'Newest Show' in html
+    assert html.index('Pinned Old Show') < html.index('Newest Show')
+
+
+def test_newest_aired_pinned_movies_stay_on_top(app, client, user):
+    """Pinned movies sort above newer releases in newest-aired view."""
+    from datetime import date
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        for tid, title, released, pinned_at in (
+            (10, 'Newest Movie', date(2026, 8, 6), None),
+            (11, 'Pinned Old Movie', date(2020, 1, 1), datetime(2026, 8, 4)),
+        ):
+            db.session.add(UserMediaState(
+                user_id=user, media_type='movie', trakt_id=tid, on_watchlist=True,
+                pinned=bool(pinned_at), pinned_at=pinned_at,
+            ))
+            db.session.add(CachedMedia(
+                media_type='movie', trakt_id=tid, title=title, year=2024,
+                released_at=released,
+            ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        resp = client.get('/my/movies?lists_set=1&lists=watchlist&filter=lists&display=newest_aired')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'Pinned Old Movie' in html
+    assert 'Newest Movie' in html
+    assert html.index('Pinned Old Movie') < html.index('Newest Movie')
