@@ -220,6 +220,10 @@ def _ensure_schema(app):
                  'ALTER TABLE user_media_state ADD COLUMN rating INTEGER'),
                 ('favorited',
                  'ALTER TABLE user_media_state ADD COLUMN favorited BOOLEAN DEFAULT 0 NOT NULL'),
+                ('last_episode_aired_at',
+                 'ALTER TABLE user_media_state ADD COLUMN last_episode_aired_at DATETIME'),
+                ('last_episode_label',
+                 'ALTER TABLE user_media_state ADD COLUMN last_episode_label VARCHAR(100)'),
             ):
                 if col not in ucols:
                     u_alters.append(ddl)

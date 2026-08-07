@@ -72,6 +72,7 @@ from routes.catalog_routes import _pagination_pages, _per_page
 from services.sync_jobs import (
     ensure_media_cached,
     enrich_media_list_for_display,
+    refresh_latest_aired_for_ids,
     refresh_show_progress_for_ids,
 )
 from services.user_media_sync import ensure_user_media_fresh
@@ -481,10 +482,10 @@ def _my_media(media_type: str):
     )
     avail = normalize_avail(request.args.get('avail'))
 
-    # Calendar view mode (List = normal rows; Weekly is the default calendar).
+    # View mode: List (rows), calendar grid, or newest-aired sort.
     display_mode = view_prefs.resolve_choice(
         current_user, view, 'display', 'display',
-        allowed=('list', 'daily', 'weekly', 'monthly'), default='list',
+        allowed=('list', 'daily', 'weekly', 'monthly', 'newest_aired'), default='list',
     )
     calendar_ctx = None
     if display_mode in ('daily', 'weekly', 'monthly'):
@@ -612,6 +613,59 @@ def _my_media(media_type: str):
         )
         q = q.filter(CachedMedia.id.in_(streaming_ids))
 
+    # Newest-aired view: hide future-only titles and sort by latest aired/release date.
+    newest_aired = display_mode == 'newest_aired'
+    if newest_aired:
+        from sqlalchemy import func as sa_func
+        today = date.today()
+        today_end = datetime.combine(today, datetime.max.time())
+        if media_type == 'show':
+            candidate_ids = [
+                int(tid)
+                for tid in db.session.scalars(
+                    q.statement.with_only_columns(
+                        UserMediaState.trakt_id,
+                        maintain_column_froms=True,
+                    ).distinct()
+                ).all()
+            ]
+            try:
+                refresh_show_progress_for_ids(
+                    current_user, candidate_ids,
+                    force=request.args.get('refresh') == '1',
+                )
+                refresh_latest_aired_for_ids(
+                    current_user, candidate_ids,
+                    force=request.args.get('refresh') == '1',
+                )
+            except Exception as exc:
+                current_app.logger.warning('Newest-aired refresh failed: %s', exc)
+            q = q.filter(
+                UserMediaState.last_episode_aired_at.isnot(None),
+                sa_func.date(UserMediaState.last_episode_aired_at) <= today,
+            )
+            # Hide shows that are fully caught up: nothing left to watch.
+            q = q.filter(
+                UserMediaState.episodes_aired.isnot(None),
+                UserMediaState.episodes_completed.isnot(None),
+                UserMediaState.episodes_aired > UserMediaState.episodes_completed,
+            )
+        else:  # movie
+            if not needs_media_join:
+                q = q.outerjoin(
+                    CachedMedia,
+                    and_(
+                        CachedMedia.media_type == UserMediaState.media_type,
+                        CachedMedia.trakt_id == UserMediaState.trakt_id,
+                    ),
+                )
+            q = q.filter(
+                CachedMedia.released_at.isnot(None),
+                CachedMedia.released_at <= today,
+            )
+        # Avoid unused variable lint warning.
+        _ = today_end
+
     total = q.count()
     per_page = _per_page(f'my_{media_type}')
     pages = max((total + per_page - 1) // per_page, 1) if total else 1
@@ -622,32 +676,49 @@ def _my_media(media_type: str):
     if page > pages:
         page = pages
 
-    # Meaningful DB sort (page-only; no full fetch):
-    # Pinned first (newest pin first), then:
-    # 0 = in progress, 1 = has watch history, 2 = never started.
-    # Within those: most recently watched first.
-    in_progress = and_(
-        UserMediaState.progress_percent.isnot(None),
-        UserMediaState.progress_percent > 0,
-        UserMediaState.progress_percent < 100,
-    )
-    sort_bucket = case(
-        (in_progress, 0),
-        (UserMediaState.last_watched_at.isnot(None), 1),
-        else_=2,
-    )
-    states = (
-        q.order_by(
-            UserMediaState.pinned.desc(),
-            UserMediaState.pinned_at.desc(),
-            sort_bucket.asc(),
-            UserMediaState.last_watched_at.desc(),
-            UserMediaState.id.desc(),
+    if newest_aired:
+        # Sort by latest aired / release date descending (newest first).
+        if media_type == 'show':
+            states = (
+                q.order_by(UserMediaState.last_episode_aired_at.desc(), UserMediaState.id.desc())
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+                .all()
+            )
+        else:
+            states = (
+                q.order_by(CachedMedia.released_at.desc(), UserMediaState.id.desc())
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+                .all()
+            )
+    else:
+        # Meaningful DB sort (page-only; no full fetch):
+        # Pinned first (newest pin first), then:
+        # 0 = in progress, 1 = has watch history, 2 = never started.
+        # Within those: most recently watched first.
+        in_progress = and_(
+            UserMediaState.progress_percent.isnot(None),
+            UserMediaState.progress_percent > 0,
+            UserMediaState.progress_percent < 100,
         )
-        .offset((page - 1) * per_page)
-        .limit(per_page)
-        .all()
-    )
+        sort_bucket = case(
+            (in_progress, 0),
+            (UserMediaState.last_watched_at.isnot(None), 1),
+            else_=2,
+        )
+        states = (
+            q.order_by(
+                UserMediaState.pinned.desc(),
+                UserMediaState.pinned_at.desc(),
+                sort_bucket.asc(),
+                UserMediaState.last_watched_at.desc(),
+                UserMediaState.id.desc(),
+            )
+            .offset((page - 1) * per_page)
+            .limit(per_page)
+            .all()
+        )
     trakt_ids = [s.trakt_id for s in states]
     try:
         ensure_media_cached(media_type, trakt_ids)

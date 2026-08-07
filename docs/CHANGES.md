@@ -1,5 +1,13 @@
 # Changes log
 
+## 2026-08-06 — My Shows/Movies: Newest aired view
+
+- New **Newest aired** view (beside List / Weekly / Daily / Monthly)
+- Shows are sorted by the air date of their most recently aired episode (newest first)
+- Movies are sorted by release date
+- Titles whose latest episode / release is in the future are hidden
+- Per-episode data is fetched from Trakt once and cached in `user_media_state.last_episode_aired_at`
+
 ## 2026-08-06 — Personal-list tags on all title cards
 
 - Detail page, Latest, Search, and Recommendations now show personal-list tags (not just `Watchlist`)

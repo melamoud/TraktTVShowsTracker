@@ -84,6 +84,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     <span class="meta">View:</span>
     <a class="pill {% if display_mode == 'list' %}on{% endif %}"
        href="?{{ qs(page_n=1, mode_v='list') }}">List</a>
+    <a class="pill {% if display_mode == 'newest_aired' %}on{% endif %}"
+       href="?{{ qs(page_n=1, mode_v='newest_aired') }}">Newest aired</a>
     <a class="pill {% if display_mode == 'weekly' %}on{% endif %}"
        href="?{{ qs(page_n=1, mode_v='weekly') }}">Weekly</a>
     <a class="pill {% if display_mode == 'daily' %}on{% endif %}"
@@ -232,6 +234,16 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
               · complete
             {% elif st.next_episode_season is not none and st.next_episode_number is not none %}
               · Next: S{{ st.next_episode_season }}E{{ st.next_episode_number }}{% if st.next_episode_title %} — {{ st.next_episode_title }}{% endif %}
+            {% endif %}
+          </div>
+        {% endif %}
+        {% if display_mode == 'newest_aired' %}
+          <div class="meta show-progress-line">
+            {% if media_type == 'show' and st.last_episode_aired_at %}
+              Latest aired: {{ st.last_episode_aired_at.strftime('%Y-%m-%d') }}
+              {% if st.last_episode_label %} · {{ st.last_episode_label }}{% endif %}
+            {% elif media_type == 'movie' and m and m.released_at %}
+              Released: {{ m.released_at }}
             {% endif %}
           </div>
         {% endif %}

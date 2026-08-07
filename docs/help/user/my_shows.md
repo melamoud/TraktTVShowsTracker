@@ -10,7 +10,7 @@ Each show card shows **x / y episodes watched** and **Next: SxEy — title** whe
 
 Filter choices (status, Lists…, titles per page) are remembered for your account. Leaving My shows and coming back via the menu restores the same settings.
 
-**View: List / Weekly / Daily / Monthly** — switch between the normal title rows and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** (episode air dates for watchlist + watched shows) limited to your current **Lists… / Watched** filters; click an entry to open the title. Daily/Weekly/Monthly modes are remembered.
+**View: List / Newest aired / Weekly / Daily / Monthly** — switch between the normal title rows, a **Newest aired** sort (shows sorted by the air date of their latest episode, movies by release date — future titles hidden), and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** (episode air dates for watchlist + watched shows) limited to your current **Lists… / Watched** filters; click an entry to open the title. View modes are remembered.
 
 **Search titles in this list…** filters by title/year across the full filtered set (query is not remembered). Missing local titles are backfilled from Trakt before the filter runs. For titles not on your lists yet, use nav **Search**.
 

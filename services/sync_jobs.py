@@ -756,6 +756,20 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
 
     user.last_sync_at = datetime.utcnow()
     db.session.commit()
+
+    # Pre-populate latest aired dates for show rows touched by this sync.
+    # This keeps the "Newest aired" My Shows view fast without hammering Trakt
+    # on every page load. Failures are logged but do not fail the overall sync.
+    if 'show' in types:
+        show_ids = sorted(wl_ids | watched_ids)
+        if show_ids:
+            try:
+                refresh_latest_aired_for_ids(
+                    user, show_ids, force=False, max_age_hours=12, max_workers=2,
+                )
+            except Exception as exc:
+                logger.warning('Latest-aired pre-population after sync failed: %s', exc)
+
     return all_ok
 
 
@@ -810,6 +824,12 @@ def sync_user_list_memberships(
                 _upsert_list_membership(user.id, lid, media_type, tid)
                 _upsert_state(user.id, media_type, tid)
                 upsert_cached_media(media_type, entry)
+                # Pre-populate latest aired for personal-list shows too.
+                if media_type == 'show':
+                    try:
+                        _update_latest_aired_for_show(user.id, tid)
+                    except Exception as exc:
+                        logger.warning('Latest aired pre-pop failed for list show %s: %s', tid, exc)
 
             existing = UserListMembership.query.filter_by(
                 user_id=user.id, list_id=lid, media_type=media_type
@@ -1056,6 +1076,135 @@ def refresh_show_progress_for_ids(
                 next_episode=progress.get('next_episode'),
             )
             updated += 1
+    if updated:
+        db.session.commit()
+    return updated
+
+
+def _parse_first_aired(value: str | None) -> datetime | None:
+    """Parse Trakt first_aired / released timestamp to naive UTC datetime."""
+    if not value:
+        return None
+    try:
+        text = str(value).strip().replace('Z', '+00:00')
+        if len(text) == 10 and text[4] == '-' and text[7] == '-':
+            return datetime.fromisoformat(text)
+        return datetime.fromisoformat(text).replace(tzinfo=None)
+    except ValueError:
+        return None
+
+
+def _latest_aired_from_seasons(seasons: list) -> tuple[datetime | None, str | None]:
+    """Return (latest aired datetime, label) from Trakt seasons payload."""
+    now = datetime.utcnow()
+    latest: datetime | None = None
+    label: str | None = None
+    for season in seasons or []:
+        s_no = season.get('number')
+        if s_no is None:
+            continue
+        for ep in season.get('episodes') or []:
+            air = _parse_first_aired(ep.get('first_aired'))
+            if air and air <= now and (latest is None or air > latest):
+                latest = air
+                e_no = ep.get('number')
+                title = ep.get('title')
+                parts = [f'S{s_no:02d}']
+                if e_no is not None:
+                    parts.append(f'E{e_no:02d}')
+                if title:
+                    parts.append(str(title))
+                label = ' · '.join(parts)
+    return latest, label
+
+
+def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
+    """Fetch and store latest aired episode for a single show. Returns True if updated."""
+    try:
+        seasons = trakt_client.get_show_seasons(trakt_id)
+        latest, label = _latest_aired_from_seasons(seasons)
+    except Exception as exc:
+        logger.warning('Latest aired fetch failed for show %s: %s', trakt_id, exc)
+        return False
+    row = UserMediaState.query.filter_by(
+        user_id=user_id, media_type='show', trakt_id=trakt_id,
+    ).first()
+    if not row:
+        row = UserMediaState(user_id=user_id, media_type='show', trakt_id=trakt_id)
+        db.session.add(row)
+    row.last_episode_aired_at = latest
+    row.last_episode_label = label
+    return True
+
+
+def refresh_latest_aired_for_ids(
+    user: User,
+    trakt_ids: list[int],
+    *,
+    force: bool = False,
+    max_age_hours: int = 12,
+    max_workers: int = 2,
+    max_retries: int = 3,
+) -> int:
+    """
+    Fetch season metadata and cache the latest aired episode per show.
+
+    Used by the "Newest aired" My Shows view. Shows with no aired episode yet
+    get a NULL last_episode_aired_at and are hidden by that view.
+
+    Trakt public endpoints can rate-limit quickly, so this uses low concurrency
+    and retries with exponential backoff on HTTP 429.
+    """
+    ids = [int(t) for t in trakt_ids if t]
+    if not ids:
+        return 0
+
+    cutoff = datetime.utcnow() - timedelta(hours=max(1, int(max_age_hours)))
+    rows = {
+        r.trakt_id: r
+        for r in UserMediaState.query.filter(
+            UserMediaState.user_id == user.id,
+            UserMediaState.media_type == 'show',
+            UserMediaState.trakt_id.in_(ids),
+        ).all()
+    }
+    need: list[int] = []
+    for tid in ids:
+        row = rows.get(tid)
+        if force or row is None or not row.last_episode_aired_at or row.last_episode_aired_at < cutoff:
+            need.append(tid)
+    if not need:
+        return 0
+
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from flask import current_app
+    from time import sleep
+
+    app = current_app._get_current_object()
+
+    def _one(tid: int):
+        with app.app_context():
+            for attempt in range(max_retries + 1):
+                if _update_latest_aired_for_show(user.id, tid):
+                    return tid
+                # Check if it was a rate-limit and retry
+                try:
+                    trakt_client.get_show_seasons(tid)
+                except Exception as exc:
+                    is_429 = '429' in str(exc)
+                    if attempt < max_retries and is_429:
+                        sleep(2 ** attempt)  # 1s, 2s, 4s
+                        continue
+                return None
+            return None
+
+    updated = 0
+    workers = max(1, min(int(max_workers), len(need)))
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_one, tid) for tid in need]
+        for fut in as_completed(futures):
+            if fut.result():
+                updated += 1
     if updated:
         db.session.commit()
     return updated
