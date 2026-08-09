@@ -76,9 +76,9 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     {% endif %}
   </div>
   <div class="actions">
-    <button class="btn btn-small" data-action="sync-catalog" data-media-type="{{ media_type }}" data-trakt-id="0">Refresh from Trakt</button>
+    <button class="btn btn-small" data-action="sync-catalog" data-loading-message="Refreshing from Trakt…" data-media-type="{{ media_type }}" data-trakt-id="0">Refresh from Trakt</button>
     {% if has_more_older %}
-      <a class="btn btn-small" href="?{{ qs(page_n=1) }}&load_older=1">Load older Trakt page</a>
+      <a class="btn btn-small" data-loading data-loading-message="Loading older Trakt page…" href="?{{ qs(page_n=1) }}&load_older=1">Load older Trakt page</a>
     {% endif %}
   </div>
   <form class="search-fields" method="get" action="" style="width:100%;">
@@ -241,7 +241,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <p class="muted">No preference matches in the loaded cache yet
         ({{ filter_stats.cached_total }} cached titles scanned).
         {% if has_more_older %}
-          <a href="?{{ qs(page_n=1) }}&load_older=1">Load older Trakt page</a>
+          <a data-loading data-loading-message="Loading older Trakt page…" href="?{{ qs(page_n=1) }}&load_older=1">Load older Trakt page</a>
           or
         {% endif %}
         <a href="?{{ qs(page_n=1, mo_v=0) }}">show all titles</a>.

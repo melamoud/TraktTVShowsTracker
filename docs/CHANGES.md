@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-09 — Global loading overlay during refresh and navigation
+
+- A full-page **loading overlay** with a spinner now covers the screen whenever a server action is in progress or a page is leaving
+- Applies to **Refresh from Trakt**, **Load older Trakt page**, all `[data-action]` buttons (watchlist, watched, pin, favorite, review markers, etc.), form submissions, and normal page navigation
+- The overlay dims the page and blocks further clicks, preventing accidental double-actions while Trakt calls are in flight
+- Disabled buttons are now visually muted so it’s obvious a click was already registered
+
 ## 2026-08-07 — Admin scheduler controls
 
 - New **Admin → Scheduler** page lets admins change background sync schedules without editing `.env` or restarting the server

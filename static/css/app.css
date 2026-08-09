@@ -664,3 +664,59 @@ body.modal-open { overflow: hidden; }
 .tag.alert-release_day { color: #fde68a; border-color: #f59e0b; }
 .tag.alert-new_streaming { color: #bbf7d0; border-color: #22c55e; }
 .tag.alert-new_user_login { color: #fecaca; border-color: #ef4444; }
+
+/* Global page-loading overlay: shown during any action that leaves or reloads the page. */
+.page-loading {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  display: grid;
+  place-items: center;
+}
+.page-loading[hidden] { display: none !important; }
+.page-loading-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 8, 14, 0.78);
+  backdrop-filter: blur(3px);
+}
+.page-loading-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem 2.4rem;
+  border-radius: 16px;
+  background: var(--bg1);
+  border: 1px solid var(--line);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: loading-in .18s ease-out;
+}
+.page-loading-content p {
+  margin: 0;
+  font-weight: 600;
+  color: var(--text);
+}
+.spinner {
+  width: 44px;
+  height: 44px;
+  border: 3px solid rgba(61, 214, 198, 0.2);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes loading-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Make disabled buttons visually obvious so users know they already clicked. */
+.btn:disabled,
+.pill:disabled,
+button.pill:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+}

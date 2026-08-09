@@ -76,7 +76,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <a class="pill {% if per_page == n %}on{% endif %}"
          href="?{{ qs(page_n=1, per=n) }}">{{ n }} / page</a>
     {% endfor %}
-    <a class="pill" href="?{{ qs(page_n=1) }}&refresh=1" title="Force full re-download of watchlist/watched/lists from Trakt">
+    <a class="pill" data-loading data-loading-message="Refreshing from Trakt…" href="?{{ qs(page_n=1) }}&refresh=1" title="Force full re-download of watchlist/watched/lists from Trakt">
       Refresh from Trakt
     </a>
   </div>

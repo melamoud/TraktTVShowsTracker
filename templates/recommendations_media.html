@@ -85,7 +85,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     {% endif %}
   </div>
   <div class="actions">
-    <a class="btn btn-small" href="?{{ qs(page_n=1) }}">Refresh</a>
+    <a class="btn btn-small" data-loading data-loading-message="Refreshing recommendations…" href="?{{ qs(page_n=1) }}">Refresh</a>
   </div>
   <form class="search-fields" method="get" action="" style="width:100%;">
     <input type="hidden" name="per_page" value="{{ per_page }}">

@@ -17,6 +17,7 @@ You must log in with TraktTV. There are no local passwords for normal users.
 
 ## Important notes
 
+- A **loading overlay** appears whenever the app is talking to Trakt or navigating to a new page; wait for it to clear before clicking again.
 - Latest lists titles recently **added/changed in Trakt’s database** (`/updates` API). Trakt does not publish a separate “first inserted” date. See Help → Latest movies / Trakt sync limit.
 - **Streaming** (TMDB) ≠ **Found on** (your choice). See Help → Streaming vs Found on.
 - Free `TMDB_API_KEY` unlocks Streaming lines and “added to a streaming service” alerts.

@@ -52,6 +52,28 @@ async function apiGet(url) {
   return data;
 }
 
+let pageReloadPending = false;
+
+function requestReload() {
+  /** Mark a reload as pending so loading feedback is not cleared before the page unloads. */
+  pageReloadPending = true;
+  location.reload();
+}
+
+function showPageLoading(message) {
+  const overlay = document.getElementById('page-loading');
+  const msg = document.getElementById('page-loading-message');
+  if (msg) msg.textContent = message || 'Loading…';
+  if (overlay) overlay.hidden = false;
+  document.body.classList.add('page-loading-active');
+}
+
+function hidePageLoading() {
+  const overlay = document.getElementById('page-loading');
+  if (overlay) overlay.hidden = true;
+  document.body.classList.remove('page-loading-active');
+}
+
 function splitPipeList(raw) {
   if (!raw) return [];
   return String(raw).split('|').map(function (s) { return s.trim(); }).filter(Boolean);
@@ -332,7 +354,7 @@ function closeProgressDrawer() {
   progressDrawerDirty = false;
   progressDrawerTraktId = null;
   if (dirty) {
-    location.reload();
+    requestReload();
   }
 }
 
@@ -422,7 +444,7 @@ async function afterProgressMutation() {
     await refreshProgressDrawer();
     return;
   }
-  location.reload();
+  requestReload();
 }
 
 document.addEventListener('change', async function (ev) {
@@ -434,14 +456,45 @@ document.addEventListener('change', async function (ev) {
   const value = el.value;
   if (value === '') return;
   el.disabled = true;
+  showPageLoading('Saving rating…');
   try {
     const rating = value === 'clear' ? null : Number(value);
     await apiPost('/api/rating/' + mediaType + '/' + traktId, { rating: rating });
-    location.reload();
+    requestReload();
   } catch (err) {
     alert(err.message || String(err));
     el.disabled = false;
+    hidePageLoading();
   }
+});
+
+/* Global loading feedback for page leaves/reloads and refresh links. */
+window.addEventListener('beforeunload', function () {
+  const overlay = document.getElementById('page-loading');
+  if (overlay && overlay.hidden) {
+    showPageLoading('Loading page…');
+  }
+});
+
+document.addEventListener('submit', function (ev) {
+  const form = ev.target.closest('form');
+  if (!form) return;
+  const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
+  if (submitBtn) submitBtn.disabled = true;
+  showPageLoading('Submitting…');
+  // If an inline handler cancels the submit, hide the overlay and re-enable the button.
+  setTimeout(function () {
+    if (ev.defaultPrevented) {
+      hidePageLoading();
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }, 0);
+});
+
+document.addEventListener('click', function (ev) {
+  const link = ev.target.closest('a[data-loading], a[href*="refresh=1"], a[href*="load_older=1"]');
+  if (!link) return;
+  showPageLoading(link.getAttribute('data-loading-message') || 'Refreshing…');
 });
 
 document.addEventListener('click', async function (ev) {
@@ -454,6 +507,13 @@ document.addEventListener('click', async function (ev) {
   const ctx = rowContext(btn);
   const mediaType = ctx.mediaType;
   const traktId = ctx.traktId;
+
+  // Show the global loading overlay for any action that will hit the server or leave the page.
+  // Dialog/drawer-only actions handle their own feedback.
+  const noOverlayActions = ['marker-prompt-keep', 'lists-filter', 'progress-open'];
+  if (!noOverlayActions.includes(action)) {
+    showPageLoading(btn.getAttribute('data-loading-message') || 'Working…');
+  }
 
   if (action === 'marker-prompt-keep') {
     const el = document.getElementById('marker-prompt');
@@ -475,11 +535,14 @@ document.addEventListener('click', async function (ev) {
       await apiPost('/api/prefs-reminder', { action: reminderAction });
       const banner = document.getElementById('prefs-reminder');
       if (banner) banner.hidden = true;
-      if (reminderAction === 'enable') location.reload();
+      if (reminderAction === 'enable') requestReload();
     } catch (err) {
       alert(err.message || String(err));
     } finally {
-      btn.disabled = false;
+      if (!pageReloadPending) {
+        btn.disabled = false;
+        hidePageLoading();
+      }
     }
     return;
   }
@@ -490,11 +553,14 @@ document.addEventListener('click', async function (ev) {
     btn.disabled = true;
     try {
       await apiPost('/api/review-marker/' + mt + '/clear', {});
-      location.reload();
+      requestReload();
     } catch (err) {
       alert(err.message || String(err));
     } finally {
-      btn.disabled = false;
+      if (!pageReloadPending) {
+        btn.disabled = false;
+        hidePageLoading();
+      }
     }
     return;
   }
@@ -510,11 +576,14 @@ document.addEventListener('click', async function (ev) {
       const el = document.getElementById('marker-prompt');
       if (el) el.hidden = true;
       alert('Markers updated to newest feed titles.');
-      location.reload();
+      requestReload();
     } catch (err) {
       alert(err.message || String(err));
     } finally {
-      btn.disabled = false;
+      if (!pageReloadPending) {
+        btn.disabled = false;
+        hidePageLoading();
+      }
     }
     return;
   }
@@ -551,11 +620,15 @@ document.addEventListener('click', async function (ev) {
       ) {
         params.set('filter', currentFilter);
       }
+      pageReloadPending = true;
+      showPageLoading('Loading page…');
       location.search = params.toString();
     } catch (err) {
       alert(err.message || String(err));
     } finally {
-      btn.disabled = false;
+      if (!pageReloadPending) {
+        btn.disabled = false;
+      }
     }
     return;
   }
@@ -593,17 +666,17 @@ document.addEventListener('click', async function (ev) {
       await apiPost('/api/lists/membership/' + mediaType + '/' + traktId, {
         selected: Array.isArray(selected) ? selected : [],
       });
-      location.reload();
+      requestReload();
     } else if (action === 'pin-add' || action === 'pin-remove') {
       await apiPost('/api/pin/' + mediaType + '/' + traktId, {
         action: action === 'pin-remove' ? 'unpin' : 'pin',
       });
-      location.reload();
+      requestReload();
     } else if (action === 'favorite-add' || action === 'favorite-remove') {
       await apiPost('/api/favorite/' + mediaType + '/' + traktId, {
         action: action === 'favorite-remove' ? 'remove' : 'add',
       });
-      location.reload();
+      requestReload();
     } else if (action === 'watched-add') {
       const label = ctx.title || 'this title';
       const warn = mediaType === 'show'
@@ -614,7 +687,7 @@ document.addEventListener('click', async function (ev) {
         return;
       }
       await apiPost('/api/watched/' + mediaType + '/' + traktId, { action: 'add' });
-      location.reload();
+      requestReload();
     } else if (action === 'watched-remove') {
       const label = ctx.title || 'this title';
       const warn = mediaType === 'show'
@@ -625,7 +698,7 @@ document.addEventListener('click', async function (ev) {
         return;
       }
       await apiPost('/api/watched/' + mediaType + '/' + traktId, { action: 'remove' });
-      location.reload();
+      requestReload();
     } else if (action === 'review-marker') {
       const expected = ctx.title || '';
       if (expected && !window.confirm(
@@ -635,7 +708,7 @@ document.addEventListener('click', async function (ev) {
       }
       const data = await apiPost('/api/review-marker/' + mediaType + '/' + traktId, {});
       alert('Marker set on: ' + data.title);
-      location.reload();
+      requestReload();
     } else if (action === 'recommendation-hide') {
       const expected = ctx.title || '';
       if (expected && !window.confirm(
@@ -648,7 +721,7 @@ document.addEventListener('click', async function (ev) {
       if (row) {
         row.remove();
       } else {
-        location.reload();
+        requestReload();
       }
     } else if (action === 'found-on') {
       const labels = await openFoundOnDialog({
@@ -658,7 +731,7 @@ document.addEventListener('click', async function (ev) {
       });
       if (labels === null) return;
       await apiPost('/api/found-on/' + mediaType + '/' + traktId, { service_labels: labels });
-      location.reload();
+      requestReload();
     } else if (action === 'episode-watched' || action === 'episode-unwatched') {
       const ids = JSON.parse(btn.getAttribute('data-ids') || '{}');
       await apiPost('/api/episode/watched', {
@@ -699,11 +772,14 @@ document.addEventListener('click', async function (ev) {
       await afterProgressMutation();
     } else if (action === 'sync-catalog') {
       await apiPost('/api/sync-catalog/' + mediaType, {});
-      location.reload();
+      requestReload();
     }
   } catch (err) {
     alert(err.message || String(err));
   } finally {
-    btn.disabled = false;
+    if (!pageReloadPending) {
+      btn.disabled = false;
+      hidePageLoading();
+    }
   }
 });
