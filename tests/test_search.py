@@ -63,7 +63,7 @@ def test_search_page_renders_multiple_results(app, client, user):
     assert 'data-trakt-id="1390"' in html
     assert 'data-trakt-id="1400"' in html
     assert 'data-action="lists-edit"' in html
-    assert 'Add to lists' in html
+    assert 'Set lists' in html
 
 
 def test_search_titles_dedupes_exact_before_broad(app, user):

@@ -48,7 +48,7 @@ Trakt’s `/updates` API **cannot** filter by genre/keyword server-side. Matches
 - **10 / 50 / 100** per page  
 - **Hide watched** on by default  
 - **Hide list titles** on by default (personal Trakt lists)  
-- Preference highlights (genres/keywords only), **Add to lists…** / watched, **Rate…** / **Favorite**, review marker (set / clear)  
+- Preference highlights (genres/keywords only), **Set lists…** / watched, **Rate…** / **Favorite**, review marker (set / clear)  
 - Poster, description, genres  
 - **Streaming:** read-only TMDB/JustWatch list (needs free `TMDB_API_KEY`)  
 

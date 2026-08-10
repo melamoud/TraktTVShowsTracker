@@ -124,12 +124,16 @@ function namesMatch(a, b) {
   return x === y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1;
 }
 
-function renderListsOptions(optionsEl, lists) {
+function renderListsOptions(optionsEl, lists, defaults) {
   optionsEl.innerHTML = '';
   if (!lists.length) {
     optionsEl.innerHTML = '<p class="muted">No lists available.</p>';
     return;
   }
+  const defaultSet = {};
+  (defaults || []).forEach(function (id) {
+    defaultSet[String(id)] = true;
+  });
   lists.forEach(function (lst) {
     const label = document.createElement('label');
     if (lst.kind === 'watchlist') {
@@ -145,6 +149,12 @@ function renderListsOptions(optionsEl, lists) {
     name.textContent = lst.name || lst.id;
     label.appendChild(input);
     label.appendChild(name);
+    if (defaultSet[String(lst.id)]) {
+      const mark = document.createElement('span');
+      mark.className = 'muted list-default-mark';
+      mark.textContent = 'default';
+      label.appendChild(mark);
+    }
     optionsEl.appendChild(label);
   });
 }
@@ -160,12 +170,15 @@ function openListsDialog(opts) {
   const modal = document.getElementById('lists-modal');
   const headingEl = document.getElementById('lists-heading');
   const titleEl = document.getElementById('lists-title');
+  const statusEl = document.getElementById('lists-status');
   const hintEl = document.getElementById('lists-hint');
   const options = document.getElementById('lists-options');
   const loadingEl = document.getElementById('lists-loading');
   const errorEl = document.getElementById('lists-error');
   const saveBtn = document.getElementById('lists-save');
   const cancelBtn = document.getElementById('lists-cancel');
+  const applyDefaultsBtn = document.getElementById('lists-apply-defaults');
+  const removeAllBtn = document.getElementById('lists-remove-all');
 
   if (!modal || !options || !saveBtn || !cancelBtn) {
     return Promise.resolve(null);
@@ -175,12 +188,16 @@ function openListsDialog(opts) {
   }
 
   if (headingEl) {
-    headingEl.textContent = mode === 'filter' ? 'Filter by lists' : 'Add to lists';
+    headingEl.textContent = mode === 'filter' ? 'Filter by lists' : 'Set lists';
+  }
+  if (statusEl) {
+    statusEl.textContent = '';
+    statusEl.hidden = mode === 'filter';
   }
   if (hintEl) {
     hintEl.textContent = mode === 'filter'
       ? 'Choose which lists to show on this page. Same lists as Preferences (Show in menu).'
-      : 'Check the lists to keep this title on. Uncheck all and Save to remove it from every list shown.';
+      : 'Toggle lists and Save to set membership for this title.';
   }
   if (titleEl) {
     titleEl.textContent = mode === 'filter'
@@ -194,11 +211,20 @@ function openListsDialog(opts) {
   }
   if (loadingEl) loadingEl.hidden = mode !== 'membership';
   saveBtn.disabled = mode === 'membership';
+  if (applyDefaultsBtn) {
+    applyDefaultsBtn.hidden = mode !== 'membership';
+    applyDefaultsBtn.disabled = true;
+  }
+  if (removeAllBtn) {
+    removeAllBtn.hidden = mode !== 'membership';
+    removeAllBtn.disabled = true;
+  }
   modal.hidden = false;
   document.body.classList.add('modal-open');
 
   return new Promise(function (resolve) {
     let settled = false;
+    let defaultIds = [];
 
     function cleanup(result) {
       if (settled) return;
@@ -207,6 +233,8 @@ function openListsDialog(opts) {
       document.body.classList.remove('modal-open');
       saveBtn.removeEventListener('click', onSave);
       cancelBtn.removeEventListener('click', onCancel);
+      if (applyDefaultsBtn) applyDefaultsBtn.removeEventListener('click', onApplyDefaults);
+      if (removeAllBtn) removeAllBtn.removeEventListener('click', onRemoveAll);
       modal.removeEventListener('click', onBackdrop);
       document.removeEventListener('keydown', onKey);
       resolve(result);
@@ -229,6 +257,23 @@ function openListsDialog(opts) {
       cleanup(null);
     }
 
+    function onApplyDefaults(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      options.querySelectorAll('input[name="list_membership"]').forEach(function (el) {
+        if (defaultIds.indexOf(el.value) !== -1) {
+          el.checked = true;
+        }
+      });
+    }
+
+    function onRemoveAll(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (!window.confirm('Remove this title from all lists shown here?')) return;
+      cleanup([]);
+    }
+
     function onBackdrop(ev) {
       if (ev.target === modal) cleanup(null);
     }
@@ -239,6 +284,8 @@ function openListsDialog(opts) {
 
     saveBtn.addEventListener('click', onSave);
     cancelBtn.addEventListener('click', onCancel);
+    if (applyDefaultsBtn) applyDefaultsBtn.addEventListener('click', onApplyDefaults);
+    if (removeAllBtn) removeAllBtn.addEventListener('click', onRemoveAll);
     modal.addEventListener('click', onBackdrop);
     document.addEventListener('keydown', onKey);
 
@@ -253,7 +300,24 @@ function openListsDialog(opts) {
       .then(function (data) {
         if (settled) return;
         if (loadingEl) loadingEl.hidden = true;
-        renderListsOptions(options, data.lists || []);
+        defaultIds = (data.defaults || []).map(String);
+        const lists = data.lists || [];
+        renderListsOptions(options, lists, defaultIds);
+        const onNames = lists.filter(function (lst) { return lst.on_list; })
+          .map(function (lst) { return lst.name || lst.id; });
+        if (statusEl) {
+          statusEl.hidden = false;
+          statusEl.textContent = onNames.length
+            ? ('Currently on: ' + onNames.join(', '))
+            : 'Not on any list yet';
+        }
+        if (hintEl) {
+          hintEl.textContent = onNames.length
+            ? 'Toggle lists and Save to update membership. Use Remove from all lists to clear everything.'
+            : 'Auto-select defaults are pre-checked. Adjust and Save to add this title.';
+        }
+        if (applyDefaultsBtn) applyDefaultsBtn.disabled = false;
+        if (removeAllBtn) removeAllBtn.disabled = !onNames.length;
         saveBtn.disabled = false;
       })
       .catch(function (err) {
@@ -264,6 +328,8 @@ function openListsDialog(opts) {
           errorEl.textContent = err.message || String(err);
         }
         saveBtn.disabled = true;
+        if (applyDefaultsBtn) applyDefaultsBtn.disabled = true;
+        if (removeAllBtn) removeAllBtn.disabled = true;
       });
   });
 }

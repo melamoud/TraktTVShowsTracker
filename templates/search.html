@@ -146,7 +146,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
                     data-action="lists-edit"
                     data-media-type="{{ media_type }}"
                     data-trakt-id="{{ m.trakt_id }}"
-                    data-title="{{ m.title|e }}">Add to lists…</button>
+                    data-title="{{ m.title|e }}">Set lists…</button>
             {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
             {% include '_rate_favorite_actions.html' %}
             {% if row.watched %}

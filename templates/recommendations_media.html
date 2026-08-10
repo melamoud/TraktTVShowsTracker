@@ -222,7 +222,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
                   data-action="lists-edit"
                   data-media-type="{{ media_type }}"
                   data-trakt-id="{{ m.trakt_id }}"
-                  data-title="{{ m.title|e }}">Add to lists…</button>
+                  data-title="{{ m.title|e }}">Set lists…</button>
           {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
           {% include '_rate_favorite_actions.html' %}
           {% if row.watched %}

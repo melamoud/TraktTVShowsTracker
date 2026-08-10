@@ -1067,7 +1067,8 @@ def api_lists_membership(media_type, trakt_id):
     Read or update Wishlist + personal-list membership for one title.
 
     Wishlist is always first. Personal lists respect Preferences → show/hide.
-    Initial checks = already on the list OR marked as default-selected in prefs.
+    GET selected = actual membership when already on any list; otherwise
+    Preferences Auto-select defaults (first-time add).
     """
     if media_type not in ('movie', 'show'):
         return jsonify({'success': False, 'message': 'Invalid media type'}), 400
@@ -1089,21 +1090,21 @@ def api_lists_membership(media_type, trakt_id):
 
     hidden = set(get_hidden_list_ids(current_user))
     visible = [lst for lst in personal if lst['id'] not in hidden]
+    visible_ids = {lst['id'] for lst in visible}
     default_selected = set(get_default_selected_list_ids(current_user))
+    # Only expose defaults that appear in this dialog (Wishlist + visible personal).
+    defaults_out = [
+        lid for lid in get_default_selected_list_ids(current_user)
+        if lid == WATCHLIST_LIST_ID or lid in visible_ids
+    ]
 
     if request.method == 'GET':
         try:
             # Local cache only — never paginate personal lists here. My pages
             # sync memberships via last_activities; a live scan per list made
-            # opening Add to lists hang on the 2nd/3rd title.
+            # opening Set lists hang on the 2nd/3rd title.
             on_watchlist = bool(st and st.on_watchlist)
-            lists_out = [{
-                'id': WATCHLIST_LIST_ID,
-                'name': 'Wishlist',
-                'kind': 'watchlist',
-                'selected': on_watchlist or (WATCHLIST_LIST_ID in default_selected),
-                'on_list': on_watchlist,
-            }]
+            membership_rows = []
             for lst in visible:
                 on_list = UserListMembership.query.filter_by(
                     user_id=current_user.id,
@@ -1111,18 +1112,35 @@ def api_lists_membership(media_type, trakt_id):
                     media_type=media_type,
                     trakt_id=trakt_id,
                 ).first() is not None
+                membership_rows.append((lst, on_list))
+            any_on_list = on_watchlist or any(on for _, on in membership_rows)
+
+            def _selected(on_list: bool, list_id: str) -> bool:
+                if any_on_list:
+                    return on_list
+                return list_id in default_selected
+
+            lists_out = [{
+                'id': WATCHLIST_LIST_ID,
+                'name': 'Wishlist',
+                'kind': 'watchlist',
+                'selected': _selected(on_watchlist, WATCHLIST_LIST_ID),
+                'on_list': on_watchlist,
+            }]
+            for lst, on_list in membership_rows:
                 lists_out.append({
                     'id': lst['id'],
                     'name': lst['name'],
                     'kind': 'list',
                     'slug': lst.get('slug') or '',
-                    'selected': on_list or (lst['id'] in default_selected),
+                    'selected': _selected(on_list, lst['id']),
                     'on_list': on_list,
                 })
             return jsonify({
                 'success': True,
                 'title': title,
                 'lists': lists_out,
+                'defaults': defaults_out,
             })
         except Exception as exc:
             return _api_fail(

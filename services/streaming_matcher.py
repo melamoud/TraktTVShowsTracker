@@ -34,7 +34,7 @@ def get_user_genres_keywords(user: User) -> tuple[list[str], list[str]]:
 
 
 def get_hidden_list_ids(user: User) -> list[str]:
-    """Return Trakt personal list ids the user hid from the Add to lists menu."""
+    """Return Trakt personal list ids the user hid from the Set lists menu."""
     prefs = user.preferences
     if not prefs:
         return []
@@ -46,7 +46,7 @@ WATCHLIST_LIST_ID = 'watchlist'
 
 def get_default_selected_list_ids(user: User) -> list[str]:
     """
-    Return list ids pre-checked when opening Add to lists / My list filters.
+    Return list ids pre-checked for first-time Set lists / My list filters.
 
     Includes ``watchlist`` and/or personal list ids. Missing/unset prefs default
     to Wishlist only; an explicit empty JSON list means nothing is pre-checked.

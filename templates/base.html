@@ -92,13 +92,16 @@
   <div id="lists-modal" class="modal-overlay" hidden>
     <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="lists-heading">
       <div class="modal-panel">
-        <h2 id="lists-heading">Add to lists</h2>
+        <h2 id="lists-heading">Set lists</h2>
         <p class="muted" id="lists-title"></p>
-        <p class="meta" id="lists-hint">Check the lists to keep this title on. Uncheck all and Save to remove it from every list shown.</p>
+        <p class="meta" id="lists-status"></p>
+        <p class="meta" id="lists-hint">Toggle lists and Save to set membership for this title.</p>
         <p class="meta" id="lists-loading" hidden>Loading your lists…</p>
         <p class="meta" id="lists-error" hidden></p>
         <div id="lists-options" class="found-on-options"></div>
         <div class="actions" style="margin-top:1rem;">
+          <button class="btn" type="button" id="lists-apply-defaults" hidden>Apply my defaults</button>
+          <button class="btn btn-danger" type="button" id="lists-remove-all" hidden>Remove from all lists</button>
           <button class="btn btn-primary" type="button" id="lists-save">Save</button>
           <button class="btn" type="button" id="lists-cancel">Cancel</button>
         </div>

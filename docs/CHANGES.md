@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-10 — Set lists dialog clarifies membership
+
+- Renamed **Add to lists…** to **Set lists…** (add, update, and clear)
+- Checkboxes show **actual membership** when already on a list; Auto-select defaults only for first-time add
+- Dialog adds status line, **Apply my defaults**, and **Remove from all lists**
+
 ## 2026-08-10 — My Shows/Movies are list-scoped only
 
 - **Watched / Both / Unwatched** are status filters inside the selected **Lists…** — watch history alone no longer puts a title on My shows/movies

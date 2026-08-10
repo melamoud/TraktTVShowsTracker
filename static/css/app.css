@@ -581,6 +581,11 @@ body.modal-open { overflow: hidden; }
   background: rgba(61, 214, 198, 0.08);
 }
 .found-on-name { flex: 1 1 auto; }
+.list-default-mark {
+  flex: 0 0 auto;
+  font-size: .75rem;
+  margin-left: .35rem;
+}
 .found-on-other { margin-top: .25rem; display: grid; gap: .35rem; }
 .found-on-other input { margin-top: 0; }
 .streaming-line {

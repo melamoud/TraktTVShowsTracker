@@ -118,12 +118,12 @@
   </section>
 
   <section>
-    <h2>Trakt lists in Add to lists</h2>
+    <h2>Trakt lists in Set lists</h2>
     <p class="meta">
-      Two settings per list (used by <em>Add to lists…</em> and <em>My movies / My shows</em> filters):
+      Two settings per list (used by <em>Set lists…</em> and <em>My movies / My shows</em> filters):
       <strong>Show in menu</strong> — appears as a filter/menu option (Wishlist is always shown).
-      <strong>Auto-select</strong> — pre-checked by default (you can still change before applying/saving).
-      On Add to lists…, titles already on a list stay checked even if Auto-select is off.
+      <strong>Auto-select</strong> — pre-checked for first-time add and My <em>Lists…</em> filters (you can still change before saving).
+      On Set lists…, if the title is already on any list, checkboxes show actual membership only (use <em>Apply my defaults</em> to check Auto-select lists).
     </p>
     <input type="hidden" name="lists_prefs_present" value="1">
     {% if trakt_lists_error %}

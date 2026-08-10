@@ -8,20 +8,24 @@ Pick from the default list (Netflix, Prime, …) and/or add a custom service (na
 - Check **Remove** next to a custom service, then save, to delete it
 - Optionally check **Suggest this service to admin** so it can be added to the shared defaults list
 
-## Trakt lists in Add to lists
+## Trakt lists in Set lists
 
 Your Trakt **Wishlist** (watchlist) is always first. Personal lists follow.
 
-These settings apply to both **Add to lists…** and **My movies / My shows** filters:
+These settings apply to both **Set lists…** and **My movies / My shows** filters:
 
 | Setting | Meaning |
 |--------|---------|
-| **Show in menu** | List appears in Add to lists… and in the My-page **Lists…** filter menu (Wishlist cannot be hidden; default for personal lists = shown) |
-| **Auto-select** | Pre-checked in Add to lists… and in My **Lists…** until you change the filter (default = Wishlist only) |
+| **Show in menu** | List appears in Set lists… and in the My-page **Lists…** filter menu (Wishlist cannot be hidden; default for personal lists = shown) |
+| **Auto-select** | Pre-checked for first-time Set lists… and in My **Lists…** until you change the filter (default = Wishlist only) |
 
-Example: show three lists, but only Wishlist + List 1 auto-selected — Add to lists… and My movies open with those two checked.
+Example: show three lists, but only Wishlist + List 1 auto-selected — first-time Set lists… and My movies open with those two checked.
 
-On Add to lists…, titles already on a list stay checked even if Auto-select is off for that list. Uncheck every list and Save to remove the title from Wishlist and the personal lists shown in the menu.
+On **Set lists…**:
+
+- If the title is **not** on any list yet, Auto-select lists are pre-checked
+- If it is **already** on any list, checkboxes show **actual membership only** (use **Apply my defaults** to check Auto-select lists without saving yet)
+- **Remove from all lists** clears Wishlist + personal lists shown in the menu (after confirm)
 
 ## Genres & keywords
 

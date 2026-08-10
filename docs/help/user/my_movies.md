@@ -6,7 +6,7 @@ Opening this page uses a local cache that **auto-invalidates** when Trakt report
 
 ## Filters
 
-- **Lists…** — which Wishlist / personal lists to include (same checklist style as Add to lists)
+- **Lists…** — which Wishlist / personal lists to include (same checklist style as Set lists)
 - **Watched** — among those lists, watched titles only  
 - **Both** — every title on the selected lists (watched and not)  
 - **Unwatched** — among those lists, titles that are not watched yet
@@ -23,7 +23,7 @@ Filter choices and page size are remembered for your account when you leave and 
 ## Actions
 
 - **Pin / Unpin** — keep a title at the top of My movies (local only; for “watching now” / “soon”)
-- **Add to lists…** — multi-select Wishlist + Trakt personal lists (uncheck all + Save = remove from those lists)
+- **Set lists…** — set Wishlist + Trakt personal list membership (Save applies checks; **Remove from all lists** clears; first-time opens with Auto-select defaults)
 - **Rate…** — set or clear a 1–10 Trakt rating (same as trakt.tv)
 
 Open the title page for **Write review…** (posts a Trakt comment; optional spoiler). Episode reviews are only in the Progress panel for shows.

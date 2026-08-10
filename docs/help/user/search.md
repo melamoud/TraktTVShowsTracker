@@ -7,7 +7,7 @@ Use **Search** in the top navigation to find movies and shows in Trakt’s datab
 1. Type at least **2 characters**
 2. Choose **Movies**, **Shows**, or **Movies & shows**
 3. Results use the same card layout as Latest: overview, genres, streaming lines, preference tags, watchlist/watched status
-4. **Add to lists…** / **Mark watched** / **Rate…** / **Favorite** work the same as elsewhere; shows also link to **Progress**
+4. **Set lists…** / **Mark watched** / **Rate…** / **Favorite** work the same as elsewhere; shows also link to **Progress**
 
 Exact title matches are listed before broader fuzzy hits.
 

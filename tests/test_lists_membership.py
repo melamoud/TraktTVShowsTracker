@@ -1,8 +1,8 @@
-"""Trakt personal lists + Add to lists membership API tests."""
+"""Trakt personal lists + Set lists membership API tests."""
 
 from unittest.mock import patch
 
-from models import UserMediaState, UserPreference, db
+from models import UserListMembership, UserMediaState, UserPreference, db
 from tests.conftest import login_client
 
 
@@ -33,12 +33,13 @@ def test_lists_membership_get_wishlist_first(app, client, user):
     assert data['lists'][0]['selected'] is True
     assert ids == ['watchlist', '10']
     assert '99' not in ids
+    assert data['defaults'] == ['watchlist']
     # Dialog open must not paginate personal lists (hangs on 2nd+ title).
     contains.assert_not_called()
 
 
 def test_lists_membership_get_applies_default_selected(app, client, user):
-    """Defaults pre-check lists even when the title is not on them yet."""
+    """Defaults pre-check lists when the title is not on any list yet."""
     with app.app_context():
         prefs = UserPreference.query.filter_by(user_id=user).one()
         prefs.default_selected_list_ids_json = '["watchlist", "10"]'
@@ -58,6 +59,59 @@ def test_lists_membership_get_applies_default_selected(app, client, user):
     assert by_id['watchlist']['on_list'] is False
     assert by_id['10']['selected'] is True
     assert by_id['20']['selected'] is False
+    assert data['defaults'] == ['watchlist', '10']
+
+
+def test_lists_membership_get_actual_when_already_on_list(app, client, user):
+    """When already on a list, selected mirrors membership — not Auto-select defaults."""
+    with app.app_context():
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=88, on_watchlist=True
+        ))
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist", "10"]'
+        db.session.commit()
+
+    login_client(client, app, user)
+    personal = [
+        {'id': '10', 'slug': 'a', 'name': 'List 1', 'item_count': 1},
+        {'id': '20', 'slug': 'b', 'name': 'List 2', 'item_count': 1},
+    ]
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
+         patch('routes.catalog_routes.trakt_client.list_contains_item', return_value=False):
+        resp = client.get('/api/lists/membership/movie/88')
+    data = resp.get_json()
+    by_id = {row['id']: row for row in data['lists']}
+    assert by_id['watchlist']['selected'] is True
+    assert by_id['watchlist']['on_list'] is True
+    assert by_id['10']['selected'] is False
+    assert by_id['10']['on_list'] is False
+    assert by_id['20']['selected'] is False
+    assert data['defaults'] == ['watchlist', '10']
+
+
+def test_lists_membership_get_actual_personal_only(app, client, user):
+    """On a personal list only: defaults that are off-list stay unchecked."""
+    with app.app_context():
+        db.session.add(UserListMembership(
+            user_id=user, list_id='20', media_type='show', trakt_id=5
+        ))
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist", "10"]'
+        db.session.commit()
+
+    login_client(client, app, user)
+    personal = [
+        {'id': '10', 'slug': 'a', 'name': 'List 1', 'item_count': 1},
+        {'id': '20', 'slug': 'b', 'name': 'List 2', 'item_count': 1},
+    ]
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal):
+        resp = client.get('/api/lists/membership/show/5')
+    by_id = {row['id']: row for row in resp.get_json()['lists']}
+    assert by_id['watchlist']['selected'] is False
+    assert by_id['10']['selected'] is False
+    assert by_id['20']['selected'] is True
+    assert by_id['20']['on_list'] is True
 
 
 def test_lists_membership_get_wishlist_not_default_when_off(app, client, user):
