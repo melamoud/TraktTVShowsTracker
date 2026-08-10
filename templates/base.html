@@ -166,10 +166,12 @@
     <div class="page-loading-content" role="status" aria-live="polite">
       <div class="spinner" aria-hidden="true"></div>
       <p id="page-loading-message">Loading…</p>
+      <button class="btn" type="button" id="page-loading-dismiss">Stop</button>
+      <p class="meta page-loading-hint">Hides this screen. A request already in flight may still finish.</p>
     </div>
   </div>
 
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=17"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=18"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

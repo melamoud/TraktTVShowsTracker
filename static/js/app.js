@@ -53,6 +53,7 @@ async function apiGet(url) {
 }
 
 let pageReloadPending = false;
+let pageLoadingKeyHandler = null;
 
 function requestReload() {
   /** Mark a reload as pending so loading feedback is not cleared before the page unloads. */
@@ -66,13 +67,42 @@ function showPageLoading(message) {
   if (msg) msg.textContent = message || 'Loading…';
   if (overlay) overlay.hidden = false;
   document.body.classList.add('page-loading-active');
+  if (!pageLoadingKeyHandler) {
+    pageLoadingKeyHandler = function (ev) {
+      if (ev.key === 'Escape') dismissPageLoading();
+    };
+    document.addEventListener('keydown', pageLoadingKeyHandler);
+  }
 }
 
 function hidePageLoading() {
   const overlay = document.getElementById('page-loading');
   if (overlay) overlay.hidden = true;
   document.body.classList.remove('page-loading-active');
+  if (pageLoadingKeyHandler) {
+    document.removeEventListener('keydown', pageLoadingKeyHandler);
+    pageLoadingKeyHandler = null;
+  }
 }
+
+function dismissPageLoading() {
+  /** User bail-out when the overlay is stuck; does not cancel an in-flight fetch. */
+  pageReloadPending = false;
+  hidePageLoading();
+  document.querySelectorAll('button[disabled], select[disabled]').forEach(function (el) {
+    // Re-enable controls that the action handlers disabled under the overlay.
+    if (el.closest('#page-loading')) return;
+    el.disabled = false;
+  });
+}
+
+document.addEventListener('click', function (ev) {
+  const dismissBtn = ev.target.closest('#page-loading-dismiss');
+  if (!dismissBtn) return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  dismissPageLoading();
+});
 
 function splitPipeList(raw) {
   if (!raw) return [];
@@ -750,10 +780,28 @@ document.addEventListener('click', async function (ev) {
   const mediaType = ctx.mediaType;
   const traktId = ctx.traktId;
 
-  // Show the global loading overlay for any action that will hit the server or leave the page.
-  // Dialog/drawer-only actions handle their own feedback.
+  // Show the global loading overlay for immediate server actions only.
+  // Dialogs / confirms / drawers must not sit under the overlay (it is above modals).
   const noOverlayActions = [
-    'marker-prompt-keep', 'lists-filter', 'progress-open', 'review-add', 'episode-rate-review',
+    'marker-prompt-keep',
+    'lists-filter',
+    'lists-edit',
+    'watchlist-add',
+    'watchlist-remove',
+    'progress-open',
+    'review-add',
+    'episode-rate-review',
+    'found-on',
+    'prefs-reminder',
+    'review-marker-clear',
+    'review-marker-caught-up',
+    'watched-add',
+    'watched-remove',
+    'review-marker',
+    'recommendation-hide',
+    'season-watched',
+    'season-unwatched',
+    'series-watched',
   ];
   if (!noOverlayActions.includes(action)) {
     showPageLoading(btn.getAttribute('data-loading-message') || 'Working…');
@@ -849,6 +897,7 @@ document.addEventListener('click', async function (ev) {
       }
     }
     btn.disabled = true;
+    showPageLoading('Saving…');
     try {
       await apiPost('/api/prefs-reminder', { action: reminderAction });
       const banner = document.getElementById('prefs-reminder');
@@ -869,6 +918,7 @@ document.addEventListener('click', async function (ev) {
     const mt = mediaType || 'all';
     if (!window.confirm('Clear review marker for ' + mt + '?')) return;
     btn.disabled = true;
+    showPageLoading('Clearing marker…');
     try {
       await apiPost('/api/review-marker/' + mt + '/clear', {});
       requestReload();
@@ -889,6 +939,7 @@ document.addEventListener('click', async function (ev) {
       'Mark ' + mt + ' feed(s) as caught up as of now?\n\nThe newest title becomes the marker — everything currently listed will be dimmed.'
     )) return;
     btn.disabled = true;
+    showPageLoading('Updating markers…');
     try {
       await apiPost('/api/review-marker/' + mt + '/caught-up', {});
       const el = document.getElementById('marker-prompt');
@@ -981,6 +1032,7 @@ document.addEventListener('click', async function (ev) {
       });
       // null = Cancel. [] = clear all lists (remove from Wishlist + personal lists).
       if (selected === null) return;
+      showPageLoading('Saving lists…');
       await apiPost('/api/lists/membership/' + mediaType + '/' + traktId, {
         selected: Array.isArray(selected) ? selected : [],
       });
@@ -1004,6 +1056,7 @@ document.addEventListener('click', async function (ev) {
       if (!window.confirm(warn)) {
         return;
       }
+      showPageLoading('Marking watched…');
       await apiPost('/api/watched/' + mediaType + '/' + traktId, { action: 'add' });
       requestReload();
     } else if (action === 'watched-remove') {
@@ -1015,6 +1068,7 @@ document.addEventListener('click', async function (ev) {
       if (!window.confirm(warn)) {
         return;
       }
+      showPageLoading('Removing watch…');
       await apiPost('/api/watched/' + mediaType + '/' + traktId, { action: 'remove' });
       requestReload();
     } else if (action === 'review-marker') {
@@ -1024,6 +1078,7 @@ document.addEventListener('click', async function (ev) {
       )) {
         return;
       }
+      showPageLoading('Setting marker…');
       const data = await apiPost('/api/review-marker/' + mediaType + '/' + traktId, {});
       alert('Marker set on: ' + data.title);
       requestReload();
@@ -1034,6 +1089,7 @@ document.addEventListener('click', async function (ev) {
       )) {
         return;
       }
+      showPageLoading('Hiding…');
       await apiPost('/api/recommendations/' + mediaType + '/' + traktId + '/hide', {});
       const row = btn.closest('.media-row');
       if (row) {
@@ -1048,6 +1104,7 @@ document.addEventListener('click', async function (ev) {
         selected: ctx.foundOn,
       });
       if (labels === null) return;
+      showPageLoading('Saving…');
       await apiPost('/api/found-on/' + mediaType + '/' + traktId, { service_labels: labels });
       requestReload();
     } else if (action === 'episode-watched' || action === 'episode-unwatched') {
@@ -1065,6 +1122,7 @@ document.addEventListener('click', async function (ev) {
       )) {
         return;
       }
+      showPageLoading('Marking season watched…');
       await apiPost('/api/show/' + traktId + '/season/' + season + '/watched', {});
       await afterProgressMutation();
     } else if (action === 'season-unwatched') {
@@ -1076,6 +1134,7 @@ document.addEventListener('click', async function (ev) {
       )) {
         return;
       }
+      showPageLoading('Unwatching season…');
       await apiPost('/api/show/' + traktId + '/season/' + season + '/unwatched', {});
       await afterProgressMutation();
     } else if (action === 'series-watched') {
@@ -1086,6 +1145,7 @@ document.addEventListener('click', async function (ev) {
       )) {
         return;
       }
+      showPageLoading('Marking series watched…');
       await apiPost('/api/watched/show/' + traktId, { action: 'add' });
       await afterProgressMutation();
     } else if (action === 'sync-catalog') {

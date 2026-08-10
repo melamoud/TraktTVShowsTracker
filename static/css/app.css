@@ -718,6 +718,16 @@ body.modal-open { overflow: hidden; }
   font-weight: 600;
   color: var(--text);
 }
+.page-loading-content .page-loading-hint {
+  font-weight: 500;
+  color: var(--muted);
+  font-size: .85rem;
+  max-width: 16rem;
+  text-align: center;
+}
+.page-loading-content #page-loading-dismiss {
+  margin-top: .25rem;
+}
 .spinner {
   width: 44px;
   height: 44px;
