@@ -79,9 +79,12 @@ def create_app(config_object=Config):
         unread = 0
         user_service_names = []
         found_on_service_choices = []
+        found_on_service_urls = {}
+        found_on_search_templates = {}
         show_prefs_reminder = False
         if getattr(current_user, 'is_authenticated', False):
             from models import Notification, StreamingService, UserStreamingService
+            from services.found_on_links import service_link_maps
             from services.streaming_matcher import user_needs_prefs_reminder
             unread = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
             owned = (
@@ -99,6 +102,7 @@ def create_app(config_object=Config):
                 if svc.name and svc.name.lower() not in seen:
                     found_on_service_choices.append(svc.name)
                     seen.add(svc.name.lower())
+            found_on_service_urls, found_on_search_templates = service_link_maps(current_user)
             # Skip reminder on the setup wizard itself.
             if request.endpoint != 'user.preferences_setup':
                 show_prefs_reminder = user_needs_prefs_reminder(current_user)
@@ -107,8 +111,13 @@ def create_app(config_object=Config):
             'unread_notifications': unread,
             'user_streaming_service_names': user_service_names,
             'found_on_service_choices': found_on_service_choices,
+            'found_on_service_urls': found_on_service_urls,
+            'found_on_search_templates': found_on_search_templates,
             'show_prefs_reminder': show_prefs_reminder,
         }
+
+    from services.found_on_links import found_on_open_url as _found_on_open_url
+    app.add_template_global(_found_on_open_url, name='found_on_open_url')
 
     from routes import register_routes
     register_routes(app)
@@ -246,6 +255,15 @@ def _ensure_schema(app):
                     for stmt in u_alters:
                         conn.execute(text(stmt))
                 app.logger.info('Added user_media_state progress / pin / rating columns')
+        if 'user_streaming_services' in tables:
+            us_cols = {c['name'] for c in insp.get_columns('user_streaming_services')}
+            if 'custom_search_template' not in us_cols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(
+                        'ALTER TABLE user_streaming_services '
+                        'ADD COLUMN custom_search_template VARCHAR(500)'
+                    ))
+                app.logger.info('Added user_streaming_services.custom_search_template')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
 

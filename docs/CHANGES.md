@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-10 — Found on chips link to services
+
+- **Found on** and **Plays on your services** chips open the service in a new tab (title search for Netflix/Prime/etc.)
+- Custom services support a **Search template** in Preferences (`<title>` placeholder, e.g. `https://toflx.com/search?q=<title>`)
+
 ## 2026-08-10 — Episode ratings + Trakt reviews
 
 - Progress panel: each episode has **Watch** plus **Rate / Review** (dialog with rating, review text, optional mark-watched — one Save)

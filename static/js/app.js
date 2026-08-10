@@ -110,8 +110,16 @@ function splitPipeList(raw) {
 }
 
 function namesMatch(a, b) {
-  const x = String(a || '').toLowerCase();
-  const y = String(b || '').toLowerCase();
+  function norm(s) {
+    return String(s || '')
+      .toLowerCase()
+      .replace(/\+/g, ' plus ')
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  const x = norm(a);
+  const y = norm(b);
   if (!x || !y) return false;
   return x === y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1;
 }

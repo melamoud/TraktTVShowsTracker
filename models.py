@@ -104,6 +104,8 @@ class UserStreamingService(db.Model):
     streaming_service_id = db.Column(db.Integer, db.ForeignKey('streaming_services.id'))
     custom_name = db.Column(db.String(120))
     custom_url = db.Column(db.String(500))
+    # e.g. https://toflx.com/search?q=<title>  — <title> is URL-encoded "Name 2024"
+    custom_search_template = db.Column(db.String(500))
     custom_note = db.Column(db.Text)
     is_custom = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

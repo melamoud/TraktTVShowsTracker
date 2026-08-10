@@ -55,6 +55,30 @@ def test_split_providers_for_user(app, user):
         assert 'Disney Plus' in other
 
 
+def test_disney_plus_matches_disney_plus_brand(app, user):
+    """TMDB 'Disney Plus' matches our seeded Disney+ preference label."""
+    with app.app_context():
+        from models import User
+
+        u = db.session.get(User, user)
+        disney = StreamingService.query.filter_by(name='Disney+').first()
+        if not disney:
+            disney = StreamingService(name='Disney+', is_default=True)
+            db.session.add(disney)
+            db.session.flush()
+        db.session.add(UserStreamingService(
+            user_id=u.id, streaming_service_id=disney.id, is_custom=False,
+        ))
+        db.session.commit()
+        db.session.refresh(u)
+
+        mine, other = split_providers_for_user(['Disney Plus', 'Hulu'], u)
+        assert mine == ['Disney+']
+        assert other == ['Hulu']
+        assert names_match('Disney+', 'Disney Plus')
+        assert names_match('Apple TV+', 'Apple TV Plus')
+
+
 def test_recommendations_page_renders(app, client, user):
     login_client(client, app, user)
     fake = [

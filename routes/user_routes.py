@@ -195,6 +195,7 @@ def preferences():
 
         custom_name = (request.form.get('custom_name') or '').strip()
         custom_url = (request.form.get('custom_url') or '').strip() or None
+        custom_search_template = (request.form.get('custom_search_template') or '').strip() or None
         custom_note = (request.form.get('custom_note') or '').strip() or None
         if custom_name:
             existing = UserStreamingService.query.filter_by(
@@ -202,6 +203,7 @@ def preferences():
             ).first()
             if existing:
                 existing.custom_url = custom_url
+                existing.custom_search_template = custom_search_template
                 existing.custom_note = custom_note
             else:
                 db.session.add(UserStreamingService(
@@ -209,6 +211,7 @@ def preferences():
                     is_custom=True,
                     custom_name=custom_name,
                     custom_url=custom_url,
+                    custom_search_template=custom_search_template,
                     custom_note=custom_note,
                 ))
             if request.form.get('suggest_default') == '1':
@@ -235,6 +238,15 @@ def preferences():
                             link='/admin/streaming-services',
                         ))
             flash(f'Custom service "{custom_name}" saved.', 'success')
+
+        # Update search templates on existing customs (even when not adding a new one).
+        for row in UserStreamingService.query.filter_by(
+            user_id=current_user.id, is_custom=True
+        ).all():
+            field = f'custom_search_template_{row.id}'
+            if field not in request.form:
+                continue
+            row.custom_search_template = (request.form.get(field) or '').strip() or None
 
         old_genres, old_keywords = get_user_genres_keywords(current_user)
         genres = split_csv_terms(request.form.get('genres', ''))

@@ -1,0 +1,18 @@
+{# Linked service chips (Found on / Plays on your services).
+   Expects: labels (list), title, optional year, tag_class (e.g. "found" or "stream mine"),
+   found_on_service_urls, found_on_search_templates. #}
+{% for s in labels %}
+  {% set href = found_on_open_url(
+       s,
+       title=title,
+       year=year,
+       base_urls=found_on_service_urls,
+       search_templates=found_on_search_templates
+     ) %}
+  {% if href %}
+    <a class="tag {{ tag_class }}" href="{{ href }}" target="_blank" rel="noopener noreferrer"
+       title="Open {{ s }} to find this title">{{ s }}</a>
+  {% else %}
+    <span class="tag {{ tag_class }}">{{ s }}</span>
+  {% endif %}
+{% endfor %}

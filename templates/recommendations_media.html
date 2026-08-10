@@ -188,7 +188,10 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
         {% if row.my_providers %}
           <div class="streaming-line mine" title="Services you marked in Preferences that list this title">
             <span class="streaming-label mine">Plays on your services:</span>
-            {% for p in row.my_providers %}<span class="tag stream mine">{{ p }}</span>{% endfor %}
+            {% set labels = row.my_providers %}
+            {% set title = m.title %}{% set year = m.year %}
+            {% set tag_class = 'stream mine' %}
+            {% include '_service_link_tags.html' %}
           </div>
         {% endif %}
         <div class="streaming-line meta">

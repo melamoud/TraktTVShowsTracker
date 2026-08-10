@@ -54,15 +54,25 @@
   <section>
     <h2>Your custom services</h2>
     {% if customs %}
-      <ul class="meta" style="padding-left:1.1rem;">
+      <ul class="meta custom-services-list" style="padding-left:1.1rem;">
         {% for c in customs %}
-          <li style="margin:.35rem 0;">
-            <strong>{{ c.display_name }}</strong>
-            {% if c.custom_url %} — <a href="{{ c.custom_url }}" target="_blank" rel="noopener">{{ c.custom_url }}</a>{% endif %}
-            {% if c.custom_note %} — {{ c.custom_note }}{% endif %}
-            <label style="display:inline-flex;gap:.35rem;margin-left:.75rem;font-weight:500;">
-              <input type="checkbox" name="remove_custom_ids" value="{{ c.id }}"> Remove
+          <li style="margin:.75rem 0;">
+            <div>
+              <strong>{{ c.display_name }}</strong>
+              {% if c.custom_url %} — <a href="{{ c.custom_url }}" target="_blank" rel="noopener">{{ c.custom_url }}</a>{% endif %}
+              {% if c.custom_note %} — {{ c.custom_note }}{% endif %}
+              <label style="display:inline-flex;gap:.35rem;margin-left:.75rem;font-weight:500;">
+                <input type="checkbox" name="remove_custom_ids" value="{{ c.id }}"> Remove
+              </label>
+            </div>
+            <label style="margin-top:.35rem;">Search template
+              <input type="text"
+                     name="custom_search_template_{{ c.id }}"
+                     value="{{ c.custom_search_template or '' }}"
+                     placeholder="https://toflx.com/search?q=&lt;title&gt;"
+                     autocomplete="off">
             </label>
+            <p class="meta" style="margin:.2rem 0 0;">Use <code>&lt;title&gt;</code> for the encoded title (+ year), e.g. <code>https://toflx.com/search?q=&lt;title&gt;</code></p>
           </li>
         {% endfor %}
       </ul>
@@ -73,6 +83,10 @@
     <h3 style="margin-top:1rem;">Add your own service</h3>
     <label>Name <input type="text" name="custom_name" placeholder="e.g. Yes TV" autocomplete="off"></label>
     <label>URL <input type="text" name="custom_url" placeholder="https://..." autocomplete="off"></label>
+    <label>Search template
+      <input type="text" name="custom_search_template" placeholder="https://example.com/search?q=&lt;title&gt;" autocomplete="off">
+    </label>
+    <p class="meta" style="margin:0;">Optional. <code>&lt;title&gt;</code> becomes the URL-encoded show/movie name and year.</p>
     <label>Note <textarea name="custom_note" rows="2"></textarea></label>
     <label style="display:flex;gap:.5rem;align-items:center;font-weight:500;">
       <input type="checkbox" name="suggest_default" value="1">

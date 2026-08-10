@@ -19,3 +19,4 @@ Used on **My movies / My shows** (and detail).
 - Click **Found on…** and select **one or more** services (including your custom ones)
 - Services that TMDB lists for the title are **highlighted** as a hint; you still choose what you actually use
 - The tile shows only the services **you** saved
+- **Found on** and **Plays on your services** chips are links (new tab): known apps open a title search; customs can set a **Search template** in Preferences (e.g. `https://toflx.com/search?q=<title>`) so the title is filled in for you. Cable / Other stay plain text.

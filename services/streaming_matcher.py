@@ -180,10 +180,25 @@ def user_service_display_names(user: User) -> list[str]:
     return names
 
 
+def normalize_service_name(name: str | None) -> str:
+    """
+    Normalize streaming names for matching.
+
+    TMDB often spells brands with words (``Disney Plus``) while our catalog uses
+    ``Disney+`` / ``Apple TV+`` / ``Paramount+``.
+    """
+    x = (name or '').strip().lower()
+    if not x:
+        return ''
+    x = x.replace('+', ' plus ')
+    x = re.sub(r'[^a-z0-9]+', ' ', x)
+    return ' '.join(x.split())
+
+
 def names_match(a: str | None, b: str | None) -> bool:
     """Loose name equality (same heuristic as static/js/app.js namesMatch)."""
-    x = (a or '').strip().lower()
-    y = (b or '').strip().lower()
+    x = normalize_service_name(a)
+    y = normalize_service_name(b)
     if not x or not y:
         return False
     return x == y or x in y or y in x

@@ -1,0 +1,9 @@
+{# Found-on chips; link to service search/homepage when possible.
+   Expects: found_on (list of labels), title; optional year. #}
+{% if found_on %}
+  <div class="streaming-line meta">
+    <span class="streaming-label">Found on:</span>
+    {% set labels = found_on %}{% set tag_class = 'found' %}
+    {% include '_service_link_tags.html' %}
+  </div>
+{% endif %}

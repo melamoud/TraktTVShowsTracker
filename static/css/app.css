@@ -228,6 +228,21 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
 .tag.watched { color: #dcfce7; border-color: #22c55e; }
 .tag.partial { color: #fef3c7; border-color: #f59e0b; }
 .tag.found { color: #ccfbf1; border-color: #14b8a6; }
+a.tag.found,
+a.tag.stream {
+  text-decoration: none;
+  cursor: pointer;
+}
+a.tag.found:hover {
+  color: #f0fdfa;
+  border-color: #2dd4bf;
+  background: rgba(20, 184, 166, .18);
+  text-decoration: underline;
+}
+a.tag.stream:hover {
+  text-decoration: underline;
+  filter: brightness(1.15);
+}
 .tag.pinned { color: #ffe4e6; border-color: #fb7185; background: rgba(251, 113, 133, .12); }
 .tag.rating { color: #fef9c3; border-color: #eab308; background: rgba(234, 179, 8, .12); }
 .tag.favorite { color: #fce7f3; border-color: #ec4899; background: rgba(236, 72, 153, .12); }
