@@ -236,6 +236,19 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
   border: 1px solid var(--line); background: rgba(12, 16, 24, .85);
   color: var(--text); font: inherit; max-width: 7.5rem;
 }
+.review-rating-label,
+.review-text-label { display: grid; gap: .35rem; margin-top: .75rem; font-weight: 600; }
+.review-rating-label select { max-width: 10rem; }
+.review-text-label textarea { resize: vertical; min-height: 7rem; }
+.review-spoiler-label {
+  display: flex; gap: .45rem; align-items: center;
+  margin-top: .65rem; font-weight: 500;
+}
+.review-watch-row {
+  display: flex; flex-wrap: wrap; gap: .55rem; align-items: center;
+  margin-top: .75rem;
+}
+#review-error { color: #fca5a5; }
 .media-row.is-pinned { box-shadow: inset 3px 0 0 #fb7185; }
 .actions { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .65rem; }
 
@@ -447,7 +460,14 @@ input[type=text], input[type=url], textarea, select {
   box-shadow: inset 3px 0 0 #60a5fa;
 }
 .episode.next { box-shadow: inset 3px 0 0 var(--accent); background: rgba(61,214,198,.06); }
-.episode-actions { flex-shrink: 0; }
+.episode-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem;
+  align-items: center;
+  justify-content: flex-end;
+}
 
 .help-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.25rem; }
 .help-toc { border: 1px solid var(--line); border-radius: 12px; padding: .75rem; background: var(--bg1); }

@@ -965,10 +965,17 @@ def series_progress(trakt_id):
                             next_special = candidate
                     elif next_regular is None:
                         next_regular = candidate
+            ep_ids = trakt_client.sanitize_episode_ids(ep.get('ids') or {})
+            ep_trakt = ep_ids.get('trakt')
+            try:
+                ep_trakt_id = int(ep_trakt) if ep_trakt is not None else None
+            except (TypeError, ValueError):
+                ep_trakt_id = None
             episodes.append({
                 'number': ep_no,
                 'title': ep.get('title'),
-                'ids': trakt_client.sanitize_episode_ids(ep.get('ids') or {}),
+                'ids': ep_ids,
+                'trakt_id': ep_trakt_id,
                 'watched': watched,
                 'aired': is_aired,
                 'air_label': air['air_label'],

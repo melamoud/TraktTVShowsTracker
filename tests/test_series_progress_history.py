@@ -107,6 +107,8 @@ def test_series_progress_partial_returns_body_only(app, client, user):
     assert 'progress-header' in html or 'From history' in html
     assert 'Pilot' in html
     assert 'data-action="episode-watched"' in html
+    assert 'data-action="episode-rate-review"' in html
+    assert 'Rate / Review' in html
 
 
 def test_sanitize_episode_ids_strips_nested_plex():

@@ -923,8 +923,8 @@ def api_watchlist(media_type, trakt_id):
 @catalog_bp.route('/api/rating/<media_type>/<int:trakt_id>', methods=['POST'])
 @login_required
 def api_rating(media_type, trakt_id):
-    """Set or clear a 1–10 Trakt rating and update local cache."""
-    if media_type not in ('movie', 'show'):
+    """Set or clear a 1–10 Trakt rating and update local cache (movies/shows)."""
+    if media_type not in ('movie', 'show', 'episode'):
         return jsonify({'success': False, 'message': 'Invalid media type'}), 400
     payload = request.json or {}
     raw = payload.get('rating', payload.get('action'))
@@ -937,23 +937,25 @@ def api_rating(media_type, trakt_id):
             if score < 1 or score > 10:
                 return jsonify({'success': False, 'message': 'Rating must be 1–10'}), 400
             trakt_client.add_rating(current_user, media_type, trakt_id, score)
-        st = UserMediaState.query.filter_by(
-            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
-        ).first()
-        if not st:
-            st = UserMediaState(
-                user_id=current_user.id, media_type=media_type, trakt_id=trakt_id,
-            )
-            db.session.add(st)
-        st.rating = score
-        db.session.commit()
-        try:
-            from services.user_media_sync import note_user_media_write
-            note_user_media_write(
-                current_user, media_types=(media_type,), aspects=('ratings',),
-            )
-        except Exception:
-            pass
+        # Episode ratings are not cached in UserMediaState (progress loads them live).
+        if media_type in ('movie', 'show'):
+            st = UserMediaState.query.filter_by(
+                user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
+            ).first()
+            if not st:
+                st = UserMediaState(
+                    user_id=current_user.id, media_type=media_type, trakt_id=trakt_id,
+                )
+                db.session.add(st)
+            st.rating = score
+            db.session.commit()
+            try:
+                from services.user_media_sync import note_user_media_write
+                note_user_media_write(
+                    current_user, media_types=(media_type,), aspects=('ratings',),
+                )
+            except Exception:
+                pass
         return jsonify({'success': True, 'rating': score})
     except Exception as exc:
         db.session.rollback()
@@ -961,6 +963,59 @@ def api_rating(media_type, trakt_id):
             'Rating action failed',
             exc,
             user_message='Could not update rating. Please try again.',
+        )
+
+
+@catalog_bp.route('/api/feedback/<media_type>/<int:trakt_id>', methods=['GET'])
+@login_required
+def api_feedback(media_type, trakt_id):
+    """Lazy-load the user's Trakt rating + comment for one title/episode."""
+    if media_type not in ('movie', 'show', 'episode'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    try:
+        data = trakt_client.get_media_feedback(current_user, media_type, trakt_id)
+        return jsonify({'success': True, **data})
+    except Exception as exc:
+        return _api_fail(
+            'Feedback load failed',
+            exc,
+            user_message='Could not load your Trakt rating/review. Please try again.',
+        )
+
+
+@catalog_bp.route('/api/comment/<media_type>/<int:trakt_id>', methods=['POST'])
+@login_required
+def api_comment(media_type, trakt_id):
+    """Post or update a Trakt comment/review on a movie, show, or episode."""
+    if media_type not in ('movie', 'show', 'episode'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    payload = request.json or {}
+    text = (payload.get('comment') or '').strip()
+    spoiler = bool(payload.get('spoiler'))
+    comment_id = payload.get('comment_id')
+    if not text:
+        return jsonify({'success': False, 'message': 'Comment text is required'}), 400
+    try:
+        if comment_id:
+            result = trakt_client.update_comment(
+                current_user, int(comment_id), text, spoiler=spoiler,
+            )
+        else:
+            result = trakt_client.add_comment(
+                current_user, media_type, trakt_id, text, spoiler=spoiler,
+            )
+        return jsonify({
+            'success': True,
+            'comment_id': result.get('id') or comment_id,
+            'review': bool(result.get('review')),
+        })
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception as exc:
+        return _api_fail(
+            'Comment post failed',
+            exc,
+            user_message='Could not post review to Trakt. Please try again.',
         )
 
 

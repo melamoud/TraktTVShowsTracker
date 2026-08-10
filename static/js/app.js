@@ -321,6 +321,248 @@ function openFoundOnDialog(opts) {
   });
 }
 
+function openReviewDialog(opts) {
+  opts = opts || {};
+  const mode = opts.mode || 'review'; // 'review' | 'episode'
+  const title = opts.title || '';
+  const mediaType = opts.mediaType || (mode === 'episode' ? 'episode' : null);
+  const traktId = opts.traktId || null;
+  const alreadyWatched = !!opts.watched;
+  const modal = document.getElementById('review-modal');
+  const headingEl = document.getElementById('review-heading');
+  const titleEl = document.getElementById('review-title');
+  const hintEl = document.getElementById('review-hint');
+  const loadingEl = document.getElementById('review-loading');
+  const ratingWrap = document.getElementById('review-rating-wrap');
+  const ratingEl = document.getElementById('review-rating');
+  const textEl = document.getElementById('review-text');
+  const spoilerEl = document.getElementById('review-spoiler');
+  const watchWrap = document.getElementById('review-watch-wrap');
+  const watchBtn = document.getElementById('review-watch-btn');
+  const watchHint = document.getElementById('review-watch-hint');
+  const errorEl = document.getElementById('review-error');
+  const saveBtn = document.getElementById('review-save');
+  const cancelBtn = document.getElementById('review-cancel');
+
+  if (!modal || !textEl || !saveBtn || !cancelBtn) {
+    const fallback = window.prompt('Write a Trakt review (at least 5 words):', '');
+    if (!fallback) return Promise.resolve(null);
+    return Promise.resolve({
+      comment: fallback.trim(),
+      spoiler: false,
+      rating: null,
+      ratingAction: null,
+      commentId: null,
+      markWatched: false,
+    });
+  }
+
+  const isEpisode = mode === 'episode';
+  let initialRating = null;
+  let initialComment = '';
+  let initialSpoiler = false;
+  let commentId = null;
+
+  if (headingEl) {
+    headingEl.textContent = isEpisode ? 'Rate / Review episode' : 'Write a review';
+  }
+  if (hintEl) {
+    hintEl.textContent = isEpisode
+      ? 'Loaded from Trakt when available. Change rating, review, and/or mark watched — then Save once.'
+      : 'Loads your existing Trakt comment when available. Use at least 5 words.';
+  }
+  if (titleEl) {
+    titleEl.textContent = title ? ('About: ' + title) : '';
+  }
+  if (ratingWrap) ratingWrap.hidden = !isEpisode;
+  if (watchWrap) watchWrap.hidden = !isEpisode;
+  if (ratingEl) {
+    // Hide Clear until we know there is an existing rating.
+    const clearOpt = ratingEl.querySelector('option[value="clear"]');
+    if (clearOpt) clearOpt.hidden = true;
+    ratingEl.value = '';
+  }
+  textEl.value = '';
+  if (spoilerEl) spoilerEl.checked = false;
+  if (errorEl) {
+    errorEl.hidden = true;
+    errorEl.textContent = '';
+  }
+  if (loadingEl) loadingEl.hidden = true;
+  saveBtn.disabled = false;
+
+  let markWatched = false;
+  function syncWatchBtn() {
+    if (!watchBtn) return;
+    if (alreadyWatched) {
+      markWatched = false;
+      watchBtn.disabled = true;
+      watchBtn.setAttribute('aria-pressed', 'false');
+      watchBtn.classList.remove('btn-primary');
+      watchBtn.textContent = 'Already watched';
+      if (watchHint) watchHint.textContent = 'This episode is already in your Trakt history.';
+      return;
+    }
+    watchBtn.disabled = false;
+    watchBtn.setAttribute('aria-pressed', markWatched ? 'true' : 'false');
+    watchBtn.classList.toggle('btn-primary', markWatched);
+    watchBtn.textContent = markWatched ? 'Will mark watched' : 'Mark watched';
+    if (watchHint) {
+      watchHint.textContent = markWatched
+        ? 'Save will also add this episode to watch history.'
+        : 'Optional — include a watch mark when you save.';
+    }
+  }
+  syncWatchBtn();
+
+  if (saveBtn) {
+    saveBtn.textContent = isEpisode ? 'Save to Trakt' : 'Post to Trakt';
+  }
+
+  function applyFeedback(data) {
+    data = data || {};
+    initialRating = data.rating != null ? Number(data.rating) : null;
+    initialComment = String(data.comment || '');
+    initialSpoiler = !!data.spoiler;
+    commentId = data.comment_id || null;
+    if (ratingEl && isEpisode) {
+      const clearOpt = ratingEl.querySelector('option[value="clear"]');
+      if (clearOpt) clearOpt.hidden = !initialRating;
+      ratingEl.value = initialRating ? String(initialRating) : '';
+    }
+    textEl.value = initialComment;
+    if (spoilerEl) spoilerEl.checked = initialSpoiler;
+  }
+
+  modal.hidden = false;
+  document.body.classList.add('modal-open');
+
+  const loadPromise = (mediaType && traktId)
+    ? (async function () {
+      if (loadingEl) loadingEl.hidden = false;
+      saveBtn.disabled = true;
+      try {
+        const data = await apiGet('/api/feedback/' + mediaType + '/' + traktId);
+        applyFeedback(data);
+      } catch (err) {
+        if (errorEl) {
+          errorEl.textContent = err.message || 'Could not load existing Trakt data.';
+          errorEl.hidden = false;
+        }
+      } finally {
+        if (loadingEl) loadingEl.hidden = true;
+        saveBtn.disabled = false;
+        if (isEpisode && ratingEl) ratingEl.focus();
+        else textEl.focus();
+      }
+    })()
+    : Promise.resolve().then(function () {
+      if (isEpisode && ratingEl) ratingEl.focus();
+      else textEl.focus();
+    });
+
+  return new Promise(function (resolve) {
+    function cleanup(result) {
+      modal.hidden = true;
+      document.body.classList.remove('modal-open');
+      saveBtn.removeEventListener('click', onSave);
+      cancelBtn.removeEventListener('click', onCancel);
+      if (watchBtn) watchBtn.removeEventListener('click', onWatchToggle);
+      modal.removeEventListener('click', onBackdrop);
+      document.removeEventListener('keydown', onKey);
+      resolve(result);
+    }
+
+    function showError(msg) {
+      if (!errorEl) {
+        alert(msg);
+        return;
+      }
+      errorEl.textContent = msg;
+      errorEl.hidden = false;
+    }
+
+    function onWatchToggle(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      if (alreadyWatched) return;
+      markWatched = !markWatched;
+      syncWatchBtn();
+    }
+
+    function onSave(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const comment = String(textEl.value || '').trim();
+      const words = comment.split(/\s+/).filter(Boolean);
+      const ratingRaw = ratingEl ? String(ratingEl.value || '') : '';
+      let rating = null;
+      let ratingAction = null; // 'set' | 'clear' | null
+      if (isEpisode) {
+        if (ratingRaw === 'clear') {
+          if (initialRating) ratingAction = 'clear';
+        } else if (ratingRaw) {
+          rating = Number(ratingRaw);
+          if (rating !== initialRating) ratingAction = 'set';
+        }
+      }
+
+      const spoilerOn = !!(spoilerEl && spoilerEl.checked);
+      const commentChanged = comment !== initialComment || spoilerOn !== initialSpoiler;
+      const shouldWriteComment = !!comment && (commentChanged || (!commentId && comment));
+
+      if (comment && words.length < 5) {
+        showError(isEpisode
+          ? 'Reviews need at least 5 words (or clear the text).'
+          : 'Trakt needs at least 5 words.');
+        return;
+      }
+
+      if (isEpisode) {
+        if (!ratingAction && !shouldWriteComment && !markWatched) {
+          showError('Change the rating, edit the review, or mark watched.');
+          return;
+        }
+      } else if (!shouldWriteComment) {
+        showError('Trakt needs at least 5 words.');
+        return;
+      }
+
+      cleanup({
+        comment: shouldWriteComment ? comment : null,
+        spoiler: spoilerOn,
+        commentId: commentId,
+        rating: rating,
+        ratingAction: ratingAction,
+        markWatched: isEpisode && markWatched && !alreadyWatched,
+      });
+    }
+
+    function onCancel(ev) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      cleanup(null);
+    }
+
+    function onBackdrop(ev) {
+      if (ev.target === modal) cleanup(null);
+    }
+
+    function onKey(ev) {
+      if (ev.key === 'Escape') cleanup(null);
+    }
+
+    saveBtn.addEventListener('click', onSave);
+    cancelBtn.addEventListener('click', onCancel);
+    if (watchBtn) watchBtn.addEventListener('click', onWatchToggle);
+    modal.addEventListener('click', onBackdrop);
+    document.addEventListener('keydown', onKey);
+
+    // Keep handlers active while feedback loads; user can cancel anytime.
+    loadPromise.catch(function () { /* errors surfaced in dialog */ });
+  });
+}
+
 function rowContext(btn) {
   const row = btn.closest('[data-trakt-id]');
   return {
@@ -500,7 +742,7 @@ document.addEventListener('click', function (ev) {
 document.addEventListener('click', async function (ev) {
   const btn = ev.target.closest('[data-action]');
   if (!btn) return;
-  if (btn.closest('#found-on-modal') || btn.closest('#lists-modal')) return;
+  if (btn.closest('#found-on-modal') || btn.closest('#lists-modal') || btn.closest('#review-modal')) return;
   ev.preventDefault();
 
   const action = btn.getAttribute('data-action');
@@ -510,7 +752,9 @@ document.addEventListener('click', async function (ev) {
 
   // Show the global loading overlay for any action that will hit the server or leave the page.
   // Dialog/drawer-only actions handle their own feedback.
-  const noOverlayActions = ['marker-prompt-keep', 'lists-filter', 'progress-open'];
+  const noOverlayActions = [
+    'marker-prompt-keep', 'lists-filter', 'progress-open', 'review-add', 'episode-rate-review',
+  ];
   if (!noOverlayActions.includes(action)) {
     showPageLoading(btn.getAttribute('data-loading-message') || 'Working…');
   }
@@ -518,6 +762,80 @@ document.addEventListener('click', async function (ev) {
   if (action === 'marker-prompt-keep') {
     const el = document.getElementById('marker-prompt');
     if (el) el.hidden = true;
+    return;
+  }
+
+  if (action === 'episode-rate-review') {
+    const id = traktId || btn.getAttribute('data-trakt-id');
+    if (!id) return;
+    let ids = {};
+    try {
+      ids = JSON.parse(btn.getAttribute('data-ids') || '{}');
+    } catch (err) {
+      ids = {};
+    }
+    const watched = btn.getAttribute('data-watched') === '1';
+    btn.disabled = true;
+    try {
+      const draft = await openReviewDialog({
+        mode: 'episode',
+        mediaType: 'episode',
+        traktId: id,
+        title: ctx.title || btn.getAttribute('data-title') || '',
+        watched: watched,
+      });
+      if (!draft) return;
+      showPageLoading('Saving to Trakt…');
+      const jobs = [];
+      if (draft.ratingAction === 'set') {
+        jobs.push(apiPost('/api/rating/episode/' + id, { rating: draft.rating }));
+      } else if (draft.ratingAction === 'clear') {
+        jobs.push(apiPost('/api/rating/episode/' + id, { rating: null }));
+      }
+      if (draft.comment) {
+        const body = { comment: draft.comment, spoiler: draft.spoiler };
+        if (draft.commentId) body.comment_id = draft.commentId;
+        jobs.push(apiPost('/api/comment/episode/' + id, body));
+      }
+      if (draft.markWatched) {
+        jobs.push(apiPost('/api/episode/watched', { ids: ids, action: 'add' }));
+      }
+      await Promise.all(jobs);
+      await afterProgressMutation();
+    } catch (err) {
+      alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+      hidePageLoading();
+    }
+    return;
+  }
+
+  if (action === 'review-add') {
+    const id = traktId || btn.getAttribute('data-trakt-id');
+    const type = mediaType || btn.getAttribute('data-media-type');
+    if (!id || !type) return;
+    btn.disabled = true;
+    try {
+      const draft = await openReviewDialog({
+        mode: 'review',
+        mediaType: type,
+        traktId: id,
+        title: ctx.title || btn.getAttribute('data-title') || '',
+      });
+      if (!draft || !draft.comment) return;
+      showPageLoading('Saving review…');
+      const body = { comment: draft.comment, spoiler: draft.spoiler };
+      if (draft.commentId) body.comment_id = draft.commentId;
+      const data = await apiPost('/api/comment/' + type + '/' + id, body);
+      const kind = data.review ? 'Review' : 'Comment';
+      alert(kind + ' saved on Trakt.');
+    } catch (err) {
+      alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+      hidePageLoading();
+    }
     return;
   }
 

@@ -83,6 +83,11 @@
       {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
       {% set btn_class = 'btn' %}
       {% include '_rate_favorite_actions.html' %}
+      <button class="btn" type="button"
+              data-action="review-add"
+              data-media-type="{{ media_type }}"
+              data-trakt-id="{{ m.trakt_id }}"
+              data-title="{{ m.title|e }}">Write review…</button>
       {% if row.watched %}
         <button class="btn" type="button" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
       {% else %}

@@ -106,6 +106,42 @@
     </div>
   </div>
 
+  <div id="review-modal" class="modal-overlay" hidden>
+    <div class="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="review-heading">
+      <div class="modal-panel">
+        <h2 id="review-heading">Write a review</h2>
+        <p class="muted" id="review-title"></p>
+        <p class="meta" id="review-hint">Posts to Trakt as a comment. Use at least 5 words. Longer text may be marked as a review on Trakt.</p>
+        <p class="meta" id="review-loading" hidden>Loading your Trakt rating / review…</p>
+        <label class="review-rating-label" id="review-rating-wrap" hidden>Rating
+          <select id="review-rating" aria-label="Trakt rating 1–10">
+            <option value="">No rating</option>
+            {% for n in range(1, 11) %}
+              <option value="{{ n }}">{{ n }}/10</option>
+            {% endfor %}
+            <option value="clear">Clear rating</option>
+          </select>
+        </label>
+        <label class="review-text-label" id="review-text-wrap">Your review
+          <textarea id="review-text" name="review_text" rows="6" maxlength="10000" placeholder="What did you think?"></textarea>
+        </label>
+        <label class="review-spoiler-label">
+          <input type="checkbox" id="review-spoiler" name="review_spoiler">
+          <span>Contains spoilers</span>
+        </label>
+        <div class="review-watch-row" id="review-watch-wrap" hidden>
+          <button class="btn" type="button" id="review-watch-btn" aria-pressed="false">Mark watched</button>
+          <span class="meta" id="review-watch-hint">Optional — include a watch mark when you save.</span>
+        </div>
+        <p class="meta" id="review-error" hidden></p>
+        <div class="actions" style="margin-top:1rem;">
+          <button class="btn btn-primary" type="button" id="review-save">Save to Trakt</button>
+          <button class="btn" type="button" id="review-cancel">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div id="progress-drawer" class="drawer-overlay" hidden>
     <aside class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="progress-drawer-heading">
       <header class="drawer-header">
@@ -116,7 +152,7 @@
         <button class="btn btn-small" type="button" id="progress-drawer-close" aria-label="Close progress">Close</button>
       </header>
       <p class="meta drawer-hint">
-        Watched marks come from Trakt watch history. Updates write back immediately.
+        Watched marks come from Trakt watch history. Use <strong>Rate / Review</strong> to rate, comment, and optionally watch in one step.
       </p>
       <p class="meta" id="progress-drawer-loading" hidden>Loading progress…</p>
       <p class="meta" id="progress-drawer-error" hidden></p>

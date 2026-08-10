@@ -120,10 +120,12 @@ def api_request(
     access = ensure_access_token(user) if user else None
     headers = _headers(access)
     collected: list = []
-    page = 1
     params = dict(params or {})
+    # Honor an explicit starting page (needed for early-exit scans).
+    page = int(params.get('page') or 1)
+    end_page = page + paginate_max_pages - 1
 
-    while page <= paginate_max_pages:
+    while page <= end_page:
         params['page'] = page
         resp = requests.request(
             method.upper(),
@@ -602,8 +604,8 @@ def remove_from_watchlist(user: User, media_type: str, trakt_id: int) -> dict:
 
 
 def get_ratings(user: User, media_type: str) -> list:
-    """Return the user's Trakt ratings for movies or shows."""
-    if media_type not in ('movie', 'show'):
+    """Return the user's Trakt ratings for movies, shows, or episodes."""
+    if media_type not in ('movie', 'show', 'episode'):
         raise ValueError(f'Unsupported media_type: {media_type}')
     return api_request(
         'GET',
@@ -615,8 +617,8 @@ def get_ratings(user: User, media_type: str) -> list:
 
 
 def add_rating(user: User, media_type: str, trakt_id: int, rating: int) -> dict:
-    """Set a 1–10 Trakt rating for a movie/show."""
-    if media_type not in ('movie', 'show'):
+    """Set a 1–10 Trakt rating for a movie, show, or episode."""
+    if media_type not in ('movie', 'show', 'episode'):
         raise ValueError(f'Unsupported media_type: {media_type}')
     score = int(rating)
     if score < 1 or score > 10:
@@ -626,11 +628,166 @@ def add_rating(user: User, media_type: str, trakt_id: int, rating: int) -> dict:
 
 
 def remove_rating(user: User, media_type: str, trakt_id: int) -> dict:
-    """Clear the user's Trakt rating for a movie/show."""
-    if media_type not in ('movie', 'show'):
+    """Clear the user's Trakt rating for a movie, show, or episode."""
+    if media_type not in ('movie', 'show', 'episode'):
         raise ValueError(f'Unsupported media_type: {media_type}')
     body = {f'{media_type}s': [{'ids': {'trakt': int(trakt_id)}}]}
     return api_request('POST', '/sync/ratings/remove', user=user, json_body=body) or {}
+
+
+def add_comment(
+    user: User,
+    media_type: str,
+    trakt_id: int,
+    comment: str,
+    *,
+    spoiler: bool = False,
+) -> dict:
+    """
+    Post a Trakt comment (review) on a movie, show, or episode.
+
+    Trakt requires at least 5 words. Longer text may be auto-flagged as a review.
+    """
+    if media_type not in ('movie', 'show', 'episode'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    text = (comment or '').strip()
+    words = [w for w in text.split() if w]
+    if len(words) < 5:
+        raise ValueError('Comment must be at least 5 words')
+    body = {
+        media_type: {'ids': {'trakt': int(trakt_id)}},
+        'comment': text,
+        'spoiler': bool(spoiler),
+    }
+    return api_request('POST', '/comments', user=user, json_body=body) or {}
+
+
+def update_comment(
+    user: User,
+    comment_id: int,
+    comment: str,
+    *,
+    spoiler: bool = False,
+) -> dict:
+    """Update an existing Trakt comment/review."""
+    text = (comment or '').strip()
+    words = [w for w in text.split() if w]
+    if len(words) < 5:
+        raise ValueError('Comment must be at least 5 words')
+    body = {'comment': text, 'spoiler': bool(spoiler)}
+    return api_request(
+        'PUT', f'/comments/{int(comment_id)}', user=user, json_body=body,
+    ) or {}
+
+
+def _paginate_until(user: User, path: str, *, match_fn, limit: int = 100, max_pages: int = 20):
+    """Walk a Trakt list endpoint until match_fn returns a value or pages end."""
+    page = 1
+    while page <= max_pages:
+        rows = api_request(
+            'GET', path, user=user, params={'limit': limit, 'page': page},
+        ) or []
+        if not isinstance(rows, list):
+            return None
+        for row in rows:
+            hit = match_fn(row)
+            if hit is not None:
+                return hit
+        if len(rows) < limit:
+            break
+        page += 1
+    return None
+
+
+def find_user_rating(user: User, media_type: str, trakt_id: int) -> int | None:
+    """Return the user's 1–10 rating for one item, or None (stops paging early)."""
+    if media_type not in ('movie', 'show', 'episode'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    tid = int(trakt_id)
+    key = media_type  # movie | show | episode
+
+    def match(row: dict):
+        item = row.get(key) or {}
+        ids = item.get('ids') or {}
+        try:
+            if int(ids.get('trakt')) != tid:
+                return None
+        except (TypeError, ValueError):
+            return None
+        score = row.get('rating')
+        try:
+            return int(score) if score is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    return _paginate_until(user, f'/sync/ratings/{media_type}s', match_fn=match)
+
+
+def find_user_comment(user: User, media_type: str, trakt_id: int) -> dict | None:
+    """
+    Return the current user's latest comment on one item, if any.
+
+    Shape: {id, comment, spoiler, review, user_rating}.
+    """
+    if media_type not in ('movie', 'show', 'episode'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    tid = int(trakt_id)
+    key = media_type
+
+    def _normalize(row: dict) -> dict | None:
+        item = row.get(key) or {}
+        ids = item.get('ids') or {}
+        try:
+            if int(ids.get('trakt')) != tid:
+                return None
+        except (TypeError, ValueError):
+            return None
+        nested = row.get('comment') if isinstance(row.get('comment'), dict) else None
+        src = nested or row
+        cid = src.get('id') if nested else row.get('id')
+        text = src.get('comment') if nested else row.get('comment')
+        if isinstance(text, dict):
+            text = text.get('comment') or ''
+        try:
+            score_raw = src.get('user_rating')
+            score = int(score_raw) if score_raw is not None else None
+        except (TypeError, ValueError):
+            score = None
+        return {
+            'id': int(cid) if cid is not None else None,
+            'comment': (text or '').strip() if isinstance(text, str) else '',
+            'spoiler': bool(src.get('spoiler')),
+            'review': bool(src.get('review')),
+            'user_rating': score,
+        }
+
+    # /users/me/comments/episodes|movies|shows — newest first on Trakt.
+    return _paginate_until(
+        user, f'/users/me/comments/{media_type}s', match_fn=_normalize,
+    )
+
+
+def get_media_feedback(user: User, media_type: str, trakt_id: int) -> dict:
+    """
+    Lazy-load the user's Trakt rating + comment for one movie/show/episode.
+
+    Does not load whole libraries when the item is near the front of recent lists.
+    """
+    if media_type not in ('movie', 'show', 'episode'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    comment = find_user_comment(user, media_type, trakt_id)
+    rating = None
+    if comment and comment.get('user_rating') is not None:
+        rating = comment['user_rating']
+    else:
+        rating = find_user_rating(user, media_type, trakt_id)
+    return {
+        'rating': rating,
+        'comment_id': (comment or {}).get('id'),
+        'comment': (comment or {}).get('comment') or '',
+        'spoiler': bool((comment or {}).get('spoiler')),
+        'review': bool((comment or {}).get('review')),
+    }
 
 
 def get_favorites(user: User, media_type: str) -> list:

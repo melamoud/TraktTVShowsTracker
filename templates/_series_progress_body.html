@@ -78,6 +78,16 @@
             </span>
           </div>
           <div class="episode-actions">
+            {% if ep.trakt_id %}
+              <button class="btn btn-small"
+                      type="button"
+                      data-action="episode-rate-review"
+                      data-media-type="episode"
+                      data-trakt-id="{{ ep.trakt_id }}"
+                      data-ids='{{ ep.ids | tojson }}'
+                      data-watched="{{ '1' if ep.watched else '0' }}"
+                      data-title="E{{ ep.number }}{% if ep.title %} — {{ ep.title|e }}{% endif %}">Rate / Review</button>
+            {% endif %}
             {% if ep.watched %}
               <button class="btn btn-small btn-watched"
                       data-action="episode-unwatched"

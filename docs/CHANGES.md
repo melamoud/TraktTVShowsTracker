@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-10 — Episode ratings + Trakt reviews
+
+- Progress panel: each episode has **Watch** plus **Rate / Review** (dialog with rating, review text, optional mark-watched — one Save)
+- Dialog **lazy-loads** your existing Trakt rating + comment for that episode (and updates the comment in place when you already have one)
+- Progress list load does not fetch all episode ratings up front
+- Movie/show **title detail** only: **Write review…** posts/updates a Trakt comment with optional spoiler flag (min. 5 words)
+
 ## 2026-08-09 — Global loading overlay during refresh and navigation
 
 - A full-page **loading overlay** with a spinner now covers the screen whenever a server action is in progress or a page is leaving

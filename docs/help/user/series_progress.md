@@ -17,9 +17,10 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 ## Episode list
 
 - Header counts are **regular seasons only** (season 1+). Specials are listed separately at the bottom and do not make a show look like “0 watched” when you’ve finished season 1.  
-- One line per episode: title, air date (`Aired …` / `Airs … · Not aired yet`), and the action button  
+- One line per episode: title, air date (`Aired …` / `Airs … · Not aired yet`), and action controls  
 - Future episodes use a blue highlight  
-- Buttons: **Watch** (not in history) vs **Watched** (in history; click to unwatch)  
+- **Watch** / **Watched** — quick history toggle on the row  
+- **Rate / Review** — opens a dialog that **loads your existing Trakt rating/review** (if any), then lets you set a 1–10 rating, edit the comment, and optionally mark watched in one save  
 - **Next up** prefers the next unwatched regular-season episode, not a special; title and Watch sit side-by-side so long names stay readable  
 - Expand **Episodes** under each season header to mark individual episodes  
 
@@ -28,6 +29,7 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 
 - **Watch** / next-up **Watch** — writes the episode to Trakt history (must succeed before the button flips)  
 - **Watched** (click) — removes it from Trakt history  
+- **Rate / Review** — dialog: rating menu, review text (optional spoiler), **Mark watched**, then **Save to Trakt**  
 - **Mark season watched** — on each incomplete season row; marks all **aired** episodes in that season on Trakt (same as marking a season on Trakt.tv)  
 - **Unwatch season** — on each complete season row; removes that season’s plays from Trakt history only  
 - **Mark series watched** — next to the header counts; marks **all** aired episodes of the show (every remaining season). Confirm carefully — this is not the same as marking one season.  
