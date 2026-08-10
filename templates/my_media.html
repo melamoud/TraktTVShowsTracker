@@ -37,7 +37,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
 {% endmacro %}
 <h1>{{ title }}</h1>
 <p class="muted">
-  Shows your local cache of TraktTV Wishlist, personal lists (shown in Preferences), and watched history.
+  Titles on the Trakt lists you pick under <strong>Lists…</strong> (Wishlist + personal lists from Preferences).
+  <strong>Watched</strong> / <strong>Both</strong> / <strong>Unwatched</strong> only filter status inside those lists — watch history alone never adds a title here.
   Sorted by in-progress first, then most recently watched; titles you haven’t started are last.
   Wishlist / watched / list changes on Trakt are picked up automatically when this page opens (via Trakt activity timestamps). Use <strong>Refresh from Trakt</strong> only to force a full re-pull.
   “Found on” is your local choice of where you actually have it — independent of the Streaming list from TMDB/JustWatch.

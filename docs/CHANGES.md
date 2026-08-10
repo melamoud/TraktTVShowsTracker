@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-10 — My Shows/Movies are list-scoped only
+
+- **Watched / Both / Unwatched** are status filters inside the selected **Lists…** — watch history alone no longer puts a title on My shows/movies
+
 ## 2026-08-10 — Found on chips link to services
 
 - **Found on** and **Plays on your services** chips open the service in a new tab (title search for Netflix/Prime/etc.)

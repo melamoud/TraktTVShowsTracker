@@ -433,6 +433,34 @@ def test_refresh_show_progress_skips_fresh_cache(app, user):
         prog.assert_not_called()
 
 
+def test_my_shows_both_excludes_watch_history_only(app, client, user):
+    """Both / Watched never include titles that are off every selected list."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        _seed_state(user, media_type='show', trakt_id=232779, on_watchlist=True, watched=True)
+        _seed_state(
+            user, media_type='show', trakt_id=999001, on_watchlist=False, watched=True,
+            progress_percent=16.7,
+        )
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        both = client.get('/my/shows?lists_set=1&lists=watchlist&filter=both')
+        watched = client.get('/my/shows?lists_set=1&lists=watchlist&filter=watched')
+    assert both.status_code == 200
+    both_html = both.get_data(as_text=True)
+    assert 'data-trakt-id="232779"' in both_html
+    assert 'data-trakt-id="999001"' not in both_html
+    watched_html = watched.get_data(as_text=True)
+    assert 'data-trakt-id="232779"' in watched_html
+    assert 'data-trakt-id="999001"' not in watched_html
+
+
 def test_my_movies_unwatched_filter(app, client, user):
     """My movies Unwatched shows list titles that are not watched."""
     with app.app_context():

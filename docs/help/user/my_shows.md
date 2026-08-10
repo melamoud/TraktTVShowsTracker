@@ -1,8 +1,8 @@
 # My shows
 
-Same as [My movies](my_movies) for series — **Lists…** checklist filter from Preferences, plus watched filters.
+Same as [My movies](my_movies) for series — only titles on your selected **Lists…**, with watched / unwatched as status filters inside that set.
 
-Extra status filter: **Unwatched episodes** — titles on your selected lists that are **not finished**, plus any watched show with incomplete progress. Fully watched shows (100%) drop out even if they stay on a list.
+Extra status filter: **Unwatched episodes** — selected-list titles that are **not finished**. Fully watched shows (100%) drop out even if they stay on a list.
 
 Sorted by in-progress first, then most recently watched (`last_watched_at` from Trakt). Titles you haven’t started are last.
 
@@ -10,7 +10,7 @@ Each show card shows **x / y episodes watched** and **Next: SxEy — title · ai
 
 Filter choices (status, Lists…, titles per page) are remembered for your account. Leaving My shows and coming back via the menu restores the same settings.
 
-**View: List / Newest aired / Weekly / Daily / Monthly** — switch between the normal title rows, a **Newest aired** sort (shows sorted by the air date of their latest episode, movies by release date — future titles hidden), and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** (episode air dates for watchlist + watched shows) limited to your current **Lists… / Watched** filters; click an entry to open the title. View modes are remembered. **Newest aired** is a pure cache view: the background job keeps last-aired dates fresh (33 days back / 33 ahead via My calendar for watchlisted shows, plus per-show checks for list-only titles), so the page loads instantly even on big collections.
+**View: List / Newest aired / Weekly / Daily / Monthly** — switch between the normal title rows, a **Newest aired** sort (shows sorted by the air date of their latest episode, movies by release date — future titles hidden), and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** limited to your current **Lists…** selection and status filter; click an entry to open the title. View modes are remembered. **Newest aired** is a pure cache view: the background job keeps last-aired dates fresh (33 days back / 33 ahead via My calendar for watchlisted shows, plus per-show checks for list-only titles), so the page loads instantly even on big collections.
 
 **Search titles in this list…** filters by title/year across the full filtered set (query is not remembered). Missing local titles are backfilled from Trakt before the filter runs. For titles not on your lists yet, use nav **Search**.
 

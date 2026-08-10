@@ -430,17 +430,41 @@ def _trakt_ids_for_lists(user_id: int, media_type: str, selected_lists: list[str
 def _calendar_trakt_ids(
     user_id: int, media_type: str, filt: str, list_trakt_ids: set[int],
 ) -> set[int]:
-    """Title ids whose air/release events the calendar should show."""
-    watched_ids = {
-        int(tid)
-        for tid, in UserMediaState.query.filter_by(
-            user_id=user_id, media_type=media_type, watched=True,
-        ).with_entities(UserMediaState.trakt_id).all()
-    }
+    """Title ids on selected lists whose air/release events the calendar should show."""
+    if not list_trakt_ids:
+        return set()
     if filt == 'watched':
+        watched_ids = {
+            int(tid)
+            for tid, in UserMediaState.query.filter(
+                UserMediaState.user_id == user_id,
+                UserMediaState.media_type == media_type,
+                UserMediaState.watched.is_(True),
+                UserMediaState.trakt_id.in_(list_trakt_ids),
+            ).with_entities(UserMediaState.trakt_id).all()
+        }
         return watched_ids
-    if filt == 'both':
-        return watched_ids | set(list_trakt_ids)
+    if filt in ('unwatched', 'unwatched_episodes'):
+        # Same membership set as list/both for calendar — unfinished detail is
+        # hard to express for air-date grids; list scope is what matters.
+        unfinished = {
+            int(tid)
+            for tid, in UserMediaState.query.filter(
+                UserMediaState.user_id == user_id,
+                UserMediaState.media_type == media_type,
+                UserMediaState.trakt_id.in_(list_trakt_ids),
+                or_(
+                    UserMediaState.watched.is_(False),
+                    and_(
+                        UserMediaState.progress_percent.isnot(None),
+                        UserMediaState.progress_percent < 100,
+                    ),
+                    UserMediaState.progress_detail_at.is_(None),
+                ),
+            ).with_entities(UserMediaState.trakt_id).all()
+        }
+        return unfinished
+    # lists / both — every selected-list title
     return set(list_trakt_ids)
 
 
@@ -530,33 +554,31 @@ def _my_media(media_type: str):
         calendar_ctx = cal_view.build_calendar_view(
             current_user.id, media_type, display_mode, anchor, cal_ids,
         )
-        if not cal_ids and filt in ('lists', 'unwatched', 'unwatched_episodes'):
+        if not cal_ids and filt in ('lists', 'unwatched', 'unwatched_episodes', 'watched', 'both'):
             flash(
-                'Calendar covers titles on your selected lists and watched history '
-                '— nothing matches the current filters.',
+                'Calendar covers titles on your selected lists — nothing matches '
+                'the current filters.',
                 'info',
             )
 
+    # My movies/shows are always scoped to selected lists. Watched / Both /
+    # Unwatched are status sub-filters within that membership — never pull in
+    # watch-history-only titles that are off every selected list.
     q = UserMediaState.query.filter_by(user_id=current_user.id, media_type=media_type)
-    if filt == 'lists':
-        if list_trakt_ids:
-            q = q.filter(UserMediaState.trakt_id.in_(list_trakt_ids))
-        else:
-            q = q.filter(UserMediaState.trakt_id == -1)
+    if not list_trakt_ids:
+        q = q.filter(UserMediaState.trakt_id == -1)
     elif filt == 'watched':
-        q = q.filter_by(watched=True)
+        q = q.filter(
+            UserMediaState.trakt_id.in_(list_trakt_ids),
+            UserMediaState.watched.is_(True),
+        )
     elif filt == 'unwatched':
-        # Movies (or titles) on selected lists that are not watched yet.
-        if list_trakt_ids:
-            q = q.filter(
-                UserMediaState.trakt_id.in_(list_trakt_ids),
-                UserMediaState.watched.is_(False),
-            )
-        else:
-            q = q.filter(UserMediaState.trakt_id == -1)
+        q = q.filter(
+            UserMediaState.trakt_id.in_(list_trakt_ids),
+            UserMediaState.watched.is_(False),
+        )
     elif filt == 'unwatched_episodes':
-        # Still has something to watch: unfinished titles on selected lists,
-        # or any watched show with known incomplete progress.
+        # Still has something to watch among selected-list titles.
         # Only trust progress>=100 when progress_detail_at was set from a real
         # episode summary (otherwise old fake 100%s hide shows like Lioness).
         trusted_complete = and_(
@@ -564,25 +586,13 @@ def _my_media(media_type: str):
             UserMediaState.progress_percent >= 100,
             UserMediaState.progress_detail_at.isnot(None),
         )
-        not_finished = ~trusted_complete
-        clauses = []
-        if list_trakt_ids:
-            clauses.append(
-                and_(UserMediaState.trakt_id.in_(list_trakt_ids), not_finished)
-            )
-        clauses.append(
-            and_(
-                UserMediaState.watched.is_(True),
-                UserMediaState.progress_percent.isnot(None),
-                UserMediaState.progress_percent < 100,
-            )
+        q = q.filter(
+            UserMediaState.trakt_id.in_(list_trakt_ids),
+            ~trusted_complete,
         )
-        q = q.filter(or_(*clauses))
-    else:  # both
-        clauses = [UserMediaState.watched.is_(True)]
-        if list_trakt_ids:
-            clauses.append(UserMediaState.trakt_id.in_(list_trakt_ids))
-        q = q.filter(or_(*clauses))
+    else:
+        # lists / both — every title on the selected lists
+        q = q.filter(UserMediaState.trakt_id.in_(list_trakt_ids))
 
     # Title search and/or availability filters need CachedMedia (before pagination).
     # Backfill missing titles for the filtered candidate set first — otherwise
