@@ -66,6 +66,34 @@ def test_notifications_page_renders_episode_card(app, client, user):
     assert 'data-trakt-id="7701"' in html
     assert '/catalog/show/7701' in html              # details link
     assert 'New episode' in html                     # type tag label
+    assert 'Hiding read' in html
+
+
+def test_notifications_hide_read_filter(app, client, user):
+    """Hide read (default) drops read alerts; Show read brings them back."""
+    with app.app_context():
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='Unread show', message='S01E01 · aired today',
+            media_type='show', trakt_id=1, is_read=False,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='Read show', message='S01E02 · aired yesterday',
+            media_type='show', trakt_id=2, is_read=True,
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    hidden = client.get('/notifications').get_data(as_text=True)
+    assert 'Unread show' in hidden
+    assert 'Read show' not in hidden
+    assert 'Hiding read' in hidden
+
+    shown = client.get('/notifications?hide_read=0').get_data(as_text=True)
+    assert 'Unread show' in shown
+    assert 'Read show' in shown
+    assert 'Showing all' in shown
 
 
 def test_notifications_page_without_media_still_works(app, client, user):

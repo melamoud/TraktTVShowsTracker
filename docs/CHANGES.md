@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-11 — Progress air dates readable + trust Trakt aired flag
+
+- Progress episode rows show the full air date (no ellipsis); blue bar = not aired yet, not a queue
+- When Trakt progress already counts an episode as aired, Progress trusts that over a still-future `first_aired` timestamp
+- Alerts: **Hide read** filter (default on, remembered) to cut clutter
+
 ## 2026-08-10 — Set lists checkboxes match membership only
 
 - After **Remove from all lists**, reopening Set lists stays empty (Auto-select defaults are only via **Apply my defaults**, not re-applied on open)

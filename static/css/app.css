@@ -455,18 +455,26 @@ input[type=text], input[type=url], textarea, select {
 }
 .next-up .btn { flex-shrink: 0; }
 .episode {
-  display: flex; justify-content: space-between; gap: 1rem; align-items: center;
+  display: flex; justify-content: space-between; gap: .75rem; align-items: flex-start;
   padding: .45rem 1rem; border-top: 1px solid var(--line);
 }
 .episode-main { min-width: 0; flex: 1; }
 .episode-line {
   display: block;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
   line-height: 1.35;
+  word-break: break-word;
 }
-.episode-air { color: var(--muted); font-weight: 500; font-size: .92em; }
+.episode-air {
+  display: block;
+  margin-top: .15rem;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: .92em;
+  white-space: normal;
+}
 .episode-air.air-aired { color: #86efac; }
 .episode-air.air-future { color: #93c5fd; }
 .episode.is-watched { opacity: .75; background: rgba(34, 197, 94, 0.06); }
@@ -482,6 +490,7 @@ input[type=text], input[type=url], textarea, select {
   gap: .35rem;
   align-items: center;
   justify-content: flex-end;
+  padding-top: .1rem;
 }
 
 .help-layout { display: grid; grid-template-columns: 240px 1fr; gap: 1.25rem; }

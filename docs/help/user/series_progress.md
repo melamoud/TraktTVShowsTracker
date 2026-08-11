@@ -17,8 +17,8 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 ## Episode list
 
 - Header counts are **regular seasons only** (season 1+). Specials are listed separately at the bottom and do not make a show look like “0 watched” when you’ve finished season 1.  
-- One line per episode: title, air date (`Aired …` / `Airs … · Not aired yet`), and action controls  
-- Future episodes use a blue highlight  
+- Title on one line; air date on the next (`Aired …` / `Airs … · Not aired yet`) so dates aren’t cut off  
+- Future (not-yet-aired) episodes use a **blue left bar** — that means upcoming, not a queue  
 - **Watch** / **Watched** — quick history toggle on the row  
 - **Rate / Review** — opens a dialog that **loads your existing Trakt rating/review** (if any), then lets you set a 1–10 rating, edit the comment, and optionally mark watched in one save  
 - **Next up** prefers the next unwatched regular-season episode, not a special; title and Watch sit side-by-side so long names stay readable  

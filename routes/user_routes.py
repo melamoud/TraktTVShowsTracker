@@ -30,12 +30,18 @@ def _episode_air_info(ep: dict, *, progress_says_aired: bool | None) -> dict:
     Build air-date display fields for an episode.
 
     Returns aired (bool), air_date (datetime|None), air_label (str).
+
+    When Trakt progress already marks the episode as aired, trust that over a
+    still-future first_aired timestamp (timezone / same-day air-time skew).
     """
     air_dt = _parse_air_datetime(ep.get('first_aired')) or _parse_air_datetime(ep.get('released'))
     now = datetime.utcnow()
     if air_dt is not None:
-        is_aired = air_dt <= now
         label = air_dt.strftime('%Y-%m-%d')
+        if progress_says_aired is not None:
+            is_aired = bool(progress_says_aired)
+        else:
+            is_aired = air_dt <= now
         if is_aired:
             air_label = f'Aired {label}'
         else:
@@ -1161,14 +1167,16 @@ ALERT_TYPE_LABELS = {
 @login_required
 def notifications():
     """List in-app notifications for the current user."""
-    rows = (
-        Notification.query
-        .filter_by(user_id=current_user.id)
-        .order_by(Notification.created_at.desc())
-        .limit(200)
-        .all()
+    from services import view_prefs
+
+    hide_read = view_prefs.resolve_bool(
+        current_user, 'alerts', 'hide_read', 'hide_read', default=True,
     )
-    unread_count = sum(1 for n in rows if not n.is_read)
+    q = Notification.query.filter_by(user_id=current_user.id)
+    unread_count = q.filter_by(is_read=False).count()
+    if hide_read:
+        q = q.filter_by(is_read=False)
+    rows = q.order_by(Notification.created_at.desc()).limit(200).all()
 
     pairs = {
         (n.media_type, int(n.trakt_id))
@@ -1212,6 +1220,7 @@ def notifications():
         'notifications.html',
         cards=cards,
         unread_count=unread_count,
+        hide_read=hide_read,
     )
 
 

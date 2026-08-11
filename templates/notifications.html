@@ -3,6 +3,15 @@
 {% block content %}
 <div class="toolbar">
   <h1 style="margin:0;">Alerts</h1>
+  <div class="pill-row">
+    {% if hide_read %}
+      <span class="pill on">Hiding read</span>
+      <a class="pill" href="?hide_read=0">Show read</a>
+    {% else %}
+      <a class="pill" href="?hide_read=1">Hide read</a>
+      <span class="pill on">Showing all</span>
+    {% endif %}
+  </div>
   {% if unread_count %}
   <form method="post" action="{{ url_for('user.notifications_read_all') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -10,7 +19,10 @@
   </form>
   {% endif %}
 </div>
-<p class="meta" style="margin-top:.35rem;">Unread alerts are brighter. Dimmed rows are already read.</p>
+<p class="meta" style="margin-top:.35rem;">
+  Unread alerts are brighter. Dimmed rows are already read.
+  {% if hide_read %}Read alerts are hidden — toggle above to show them.{% endif %}
+</p>
 
 <div class="media-list">
   {% for card in cards %}
@@ -76,7 +88,11 @@
       </div>
     </article>
   {% else %}
-    <p class="muted">No alerts yet.</p>
+    {% if hide_read %}
+      <p class="muted">No unread alerts.{% if unread_count == 0 %} <a href="?hide_read=0">Show read</a> to browse older ones.{% endif %}</p>
+    {% else %}
+      <p class="muted">No alerts yet.</p>
+    {% endif %}
   {% endfor %}
 </div>
 {% endblock %}
