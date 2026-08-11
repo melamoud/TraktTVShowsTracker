@@ -17,14 +17,14 @@ These settings apply to both **Set lists…** and **My movies / My shows** filte
 | Setting | Meaning |
 |--------|---------|
 | **Show in menu** | List appears in Set lists… and in the My-page **Lists…** filter menu (Wishlist cannot be hidden; default for personal lists = shown) |
-| **Auto-select** | Pre-checked for first-time Set lists… and in My **Lists…** until you change the filter (default = Wishlist only) |
+| **Auto-select** | Used by **Apply my defaults** in Set lists…; also pre-checked in My **Lists…** until you change the filter (default = Wishlist only) |
 
-Example: show three lists, but only Wishlist + List 1 auto-selected — first-time Set lists… and My movies open with those two checked.
+Example: show three lists, but only Wishlist + List 1 auto-selected — Apply my defaults / My movies filter open with those two checked.
 
 On **Set lists…**:
 
-- If the title is **not** on any list yet, Auto-select lists are pre-checked
-- If it is **already** on any list, checkboxes show **actual membership only** (use **Apply my defaults** to check Auto-select lists without saving yet)
+- Checkboxes always show **actual membership** (empty after Remove from all / when not on any list)
+- **Apply my defaults** checks Auto-select lists without saving yet
 - **Remove from all lists** clears Wishlist + personal lists shown in the menu (after confirm)
 
 ## Genres & keywords

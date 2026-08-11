@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-10 — Set lists checkboxes match membership only
+
+- After **Remove from all lists**, reopening Set lists stays empty (Auto-select defaults are only via **Apply my defaults**, not re-applied on open)
+
 ## 2026-08-10 — Set lists dialog clarifies membership
 
 - Renamed **Add to lists…** to **Set lists…** (add, update, and clear)

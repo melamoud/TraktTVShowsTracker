@@ -314,7 +314,7 @@ function openListsDialog(opts) {
         if (hintEl) {
           hintEl.textContent = onNames.length
             ? 'Toggle lists and Save to update membership. Use Remove from all lists to clear everything.'
-            : 'Auto-select defaults are pre-checked. Adjust and Save to add this title.';
+            : 'Not on any list — check lists or Apply my defaults, then Save.';
         }
         if (applyDefaultsBtn) applyDefaultsBtn.disabled = false;
         if (removeAllBtn) removeAllBtn.disabled = !onNames.length;

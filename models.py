@@ -63,7 +63,7 @@ class UserPreference(db.Model):
     # Trakt personal list ids (stringified trakt ids) hidden from Set lists menu.
     # Empty/default = all lists shown (Wishlist is always shown).
     hidden_list_ids_json = db.Column(db.Text, default='[]')
-    # List ids pre-checked for first-time Set lists / My list filters (includes "watchlist").
+    # List ids for Apply my defaults / My list filters (includes "watchlist").
     # Default: Wishlist only. Empty array = nothing pre-checked.
     default_selected_list_ids_json = db.Column(db.Text, default='["watchlist"]')
     # Per-screen UI filters / page size (My, Latest, Recs), JSON object keyed by view.

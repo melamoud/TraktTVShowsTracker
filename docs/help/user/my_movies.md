@@ -23,7 +23,7 @@ Filter choices and page size are remembered for your account when you leave and 
 ## Actions
 
 - **Pin / Unpin** — keep a title at the top of My movies (local only; for “watching now” / “soon”)
-- **Set lists…** — set Wishlist + Trakt personal list membership (Save applies checks; **Remove from all lists** clears; first-time opens with Auto-select defaults)
+- **Set lists…** — set Wishlist + Trakt personal list membership (checkboxes = actual membership; **Apply my defaults** / **Remove from all lists**)
 - **Rate…** — set or clear a 1–10 Trakt rating (same as trakt.tv)
 
 Open the title page for **Write review…** (posts a Trakt comment; optional spoiler). Episode reviews are only in the Progress panel for shows.

@@ -39,7 +39,7 @@ def test_lists_membership_get_wishlist_first(app, client, user):
 
 
 def test_lists_membership_get_applies_default_selected(app, client, user):
-    """Defaults pre-check lists when the title is not on any list yet."""
+    """Defaults are returned for Apply my defaults, but checkboxes stay off when not on lists."""
     with app.app_context():
         prefs = UserPreference.query.filter_by(user_id=user).one()
         prefs.default_selected_list_ids_json = '["watchlist", "10"]'
@@ -55,10 +55,39 @@ def test_lists_membership_get_applies_default_selected(app, client, user):
         resp = client.get('/api/lists/membership/movie/99')
     data = resp.get_json()
     by_id = {row['id']: row for row in data['lists']}
-    assert by_id['watchlist']['selected'] is True
+    assert by_id['watchlist']['selected'] is False
     assert by_id['watchlist']['on_list'] is False
-    assert by_id['10']['selected'] is True
+    assert by_id['10']['selected'] is False
     assert by_id['20']['selected'] is False
+    assert data['defaults'] == ['watchlist', '10']
+
+
+def test_lists_membership_get_empty_after_clear_not_defaults(app, client, user):
+    """After clear-all, reopen must not re-check Auto-select defaults."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist", "10"]'
+        db.session.commit()
+
+    login_client(client, app, user)
+    personal = [
+        {'id': '10', 'slug': 'a', 'name': 'List 1', 'item_count': 1},
+    ]
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
+         patch('routes.catalog_routes.trakt_client.remove_from_watchlist'), \
+         patch('routes.catalog_routes.trakt_client.remove_from_list'), \
+         patch('services.user_media_sync.note_user_media_write'):
+        # Simulate a title that was cleared (no membership rows / watchlist).
+        cleared = client.post(
+            '/api/lists/membership/show/77',
+            json={'selected': []},
+        )
+        assert cleared.status_code == 200
+        resp = client.get('/api/lists/membership/show/77')
+    data = resp.get_json()
+    by_id = {row['id']: row for row in data['lists']}
+    assert by_id['watchlist']['selected'] is False
+    assert by_id['10']['selected'] is False
     assert data['defaults'] == ['watchlist', '10']
 
 
@@ -115,7 +144,7 @@ def test_lists_membership_get_actual_personal_only(app, client, user):
 
 
 def test_lists_membership_get_wishlist_not_default_when_off(app, client, user):
-    """Wishlist can stay in the menu without being auto-selected."""
+    """Wishlist stays unchecked when not on it; defaults are separate."""
     with app.app_context():
         prefs = UserPreference.query.filter_by(user_id=user).one()
         prefs.default_selected_list_ids_json = '["10"]'
@@ -126,9 +155,11 @@ def test_lists_membership_get_wishlist_not_default_when_off(app, client, user):
     with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
          patch('routes.catalog_routes.trakt_client.list_contains_item', return_value=False):
         resp = client.get('/api/lists/membership/movie/5')
-    by_id = {row['id']: row for row in resp.get_json()['lists']}
+    data = resp.get_json()
+    by_id = {row['id']: row for row in data['lists']}
     assert by_id['watchlist']['selected'] is False
-    assert by_id['10']['selected'] is True
+    assert by_id['10']['selected'] is False
+    assert data['defaults'] == ['10']
 
 
 def test_lists_membership_post_updates_watchlist_and_list(app, client, user):

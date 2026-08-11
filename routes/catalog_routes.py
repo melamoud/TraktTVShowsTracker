@@ -1067,8 +1067,9 @@ def api_lists_membership(media_type, trakt_id):
     Read or update Wishlist + personal-list membership for one title.
 
     Wishlist is always first. Personal lists respect Preferences → show/hide.
-    GET selected = actual membership when already on any list; otherwise
-    Preferences Auto-select defaults (first-time add).
+    GET selected always mirrors actual membership (on_list). Preferences
+    Auto-select defaults are returned as ``defaults`` for Apply my defaults —
+    they are not pre-checked after a clear or on reopen.
     """
     if media_type not in ('movie', 'show'):
         return jsonify({'success': False, 'message': 'Invalid media type'}), 400
@@ -1091,7 +1092,6 @@ def api_lists_membership(media_type, trakt_id):
     hidden = set(get_hidden_list_ids(current_user))
     visible = [lst for lst in personal if lst['id'] not in hidden]
     visible_ids = {lst['id'] for lst in visible}
-    default_selected = set(get_default_selected_list_ids(current_user))
     # Only expose defaults that appear in this dialog (Wishlist + visible personal).
     defaults_out = [
         lid for lid in get_default_selected_list_ids(current_user)
@@ -1104,7 +1104,13 @@ def api_lists_membership(media_type, trakt_id):
             # sync memberships via last_activities; a live scan per list made
             # opening Set lists hang on the 2nd/3rd title.
             on_watchlist = bool(st and st.on_watchlist)
-            membership_rows = []
+            lists_out = [{
+                'id': WATCHLIST_LIST_ID,
+                'name': 'Wishlist',
+                'kind': 'watchlist',
+                'selected': on_watchlist,
+                'on_list': on_watchlist,
+            }]
             for lst in visible:
                 on_list = UserListMembership.query.filter_by(
                     user_id=current_user.id,
@@ -1112,28 +1118,12 @@ def api_lists_membership(media_type, trakt_id):
                     media_type=media_type,
                     trakt_id=trakt_id,
                 ).first() is not None
-                membership_rows.append((lst, on_list))
-            any_on_list = on_watchlist or any(on for _, on in membership_rows)
-
-            def _selected(on_list: bool, list_id: str) -> bool:
-                if any_on_list:
-                    return on_list
-                return list_id in default_selected
-
-            lists_out = [{
-                'id': WATCHLIST_LIST_ID,
-                'name': 'Wishlist',
-                'kind': 'watchlist',
-                'selected': _selected(on_watchlist, WATCHLIST_LIST_ID),
-                'on_list': on_watchlist,
-            }]
-            for lst, on_list in membership_rows:
                 lists_out.append({
                     'id': lst['id'],
                     'name': lst['name'],
                     'kind': 'list',
                     'slug': lst.get('slug') or '',
-                    'selected': _selected(on_list, lst['id']),
+                    'selected': on_list,
                     'on_list': on_list,
                 })
             return jsonify({

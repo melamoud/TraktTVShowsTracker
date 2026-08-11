@@ -122,8 +122,8 @@
     <p class="meta">
       Two settings per list (used by <em>Set lists…</em> and <em>My movies / My shows</em> filters):
       <strong>Show in menu</strong> — appears as a filter/menu option (Wishlist is always shown).
-      <strong>Auto-select</strong> — pre-checked for first-time add and My <em>Lists…</em> filters (you can still change before saving).
-      On Set lists…, if the title is already on any list, checkboxes show actual membership only (use <em>Apply my defaults</em> to check Auto-select lists).
+      <strong>Auto-select</strong> — used by <em>Apply my defaults</em> in Set lists… and pre-checked in My <em>Lists…</em> filters (you can still change before saving).
+      On Set lists…, checkboxes always show actual membership; after Remove from all they stay empty until you check lists or Apply my defaults.
     </p>
     <input type="hidden" name="lists_prefs_present" value="1">
     {% if trakt_lists_error %}

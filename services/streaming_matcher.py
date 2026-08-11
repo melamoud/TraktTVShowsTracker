@@ -46,7 +46,7 @@ WATCHLIST_LIST_ID = 'watchlist'
 
 def get_default_selected_list_ids(user: User) -> list[str]:
     """
-    Return list ids pre-checked for first-time Set lists / My list filters.
+    Return list ids for Apply my defaults / My list filters.
 
     Includes ``watchlist`` and/or personal list ids. Missing/unset prefs default
     to Wishlist only; an explicit empty JSON list means nothing is pre-checked.
