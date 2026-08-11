@@ -10,10 +10,11 @@ from models import StreamingService, User, UserStreamingService
 
 # Title search pages for known catalog services (homepage alone is weak for queueing).
 # Keys are normalize_service_name() forms (Disney+ → disney plus).
+# Disney+ has no working web search deep link (/search?q= 404s); Google indexes title pages.
 _SEARCH_TEMPLATES = {
     'netflix': 'https://www.netflix.com/search?q={q}',
     'prime video': 'https://www.primevideo.com/search/ref=atv_nb_sr?phrase={q}',
-    'disney plus': 'https://www.disneyplus.com/search?q={q}',
+    'disney plus': 'https://www.google.com/search?q=site%3Adisneyplus.com+{q}',
     'hulu': 'https://www.hulu.com/search?q={q}',
     'max': 'https://www.max.com/search?q={q}',
     'apple tv plus': 'https://tv.apple.com/search?term={q}',

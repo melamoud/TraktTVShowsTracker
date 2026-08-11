@@ -13,6 +13,18 @@ def test_found_on_netflix_uses_search():
     assert '2022' in url
 
 
+def test_found_on_disney_plus_uses_google_site_search():
+    """Disney+ has no web search deep link; chips use Google site:disneyplus.com."""
+    url = found_on_open_url(
+        'Disney+', title='Andor', year=2022, base_urls={}, search_templates=None,
+    )
+    assert 'google.com/search' in url
+    assert 'site%3Adisneyplus.com' in url or 'site:disneyplus.com' in url
+    assert 'Andor' in url
+    assert '2022' in url
+    assert 'disneyplus.com/search' not in url
+
+
 def test_custom_search_template_title_placeholder():
     """User search templates replace <title> with an encoded title+year."""
     url = found_on_open_url(

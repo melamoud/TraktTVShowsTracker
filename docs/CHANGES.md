@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-11 — Disney+ chips use Google site search
+
+- Disney+ no longer deep-links to `disneyplus.com/search` (404); **Found on** / **Plays on** open a Google `site:disneyplus.com` title search instead
+
 ## 2026-08-11 — Progress air dates readable + trust Trakt aired flag
 
 - Progress episode rows show the full air date (no ellipsis); blue bar = not aired yet, not a queue
