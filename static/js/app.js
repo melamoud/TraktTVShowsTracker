@@ -1215,6 +1215,12 @@ document.addEventListener('click', async function (ev) {
         action: action === 'favorite-remove' ? 'remove' : 'add',
       });
       requestReload();
+    } else if (action === 'favorite-actor-add' || action === 'favorite-actor-remove') {
+      showPageLoading(action === 'favorite-actor-remove' ? 'Updating…' : 'Saving favorite actor…');
+      await apiPost('/api/favorite-actor/' + traktId, {
+        action: action === 'favorite-actor-remove' ? 'remove' : 'add',
+      });
+      requestReload();
     } else if (action === 'watched-add') {
       const label = ctx.title || 'this title';
       const warn = mediaType === 'show'

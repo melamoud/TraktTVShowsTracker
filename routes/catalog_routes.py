@@ -59,6 +59,18 @@ def cached_poster(media_type, trakt_id):
     return send_file(path, mimetype=mime, max_age=60 * 60 * 24 * 7, conditional=True)
 
 
+@catalog_bp.route('/cache/actors/<int:trakt_person_id>')
+def cached_actor(trakt_person_id):
+    """Serve a locally cached favorite-actor headshot."""
+    from services.actor_cache import local_actor_path
+
+    path = local_actor_path(trakt_person_id)
+    if not path:
+        abort(404)
+    mime = 'image/webp' if path.suffix.lower() == '.webp' else None
+    return send_file(path, mimetype=mime, max_age=60 * 60 * 24 * 7, conditional=True)
+
+
 def _per_page(view_type: str) -> int:
     """Resolve allowed page size for a catalog view (persisted per user)."""
     from services import view_prefs
@@ -875,11 +887,15 @@ def media_detail(media_type, trakt_id):
         genres = json.loads(media.genres_json or '[]')
     except json.JSONDecodeError:
         genres = []
+    from services.cast_service import MAIN_CAST_LIMIT, cast_for_detail
+    cast = cast_for_detail(media, current_user)
     return render_template(
         'media_detail.html',
         row=rows[0],
         media_type=media_type,
         genres=genres if isinstance(genres, list) else [],
+        cast=cast,
+        main_cast_limit=MAIN_CAST_LIMIT,
     )
 
 
@@ -1057,6 +1073,34 @@ def api_favorite(media_type, trakt_id):
             'Favorite action failed',
             exc,
             user_message='Could not update favorites. Please try again.',
+        )
+
+
+@catalog_bp.route('/api/favorite-actor/<int:trakt_person_id>', methods=['POST'])
+@login_required
+def api_favorite_actor(trakt_person_id):
+    """Add or remove a local favorite actor (Preferences-managed, not Trakt)."""
+    from services.cast_service import set_favorite_actor
+
+    action = (request.json or {}).get('action') or request.form.get('action') or 'add'
+    favorited = action != 'remove'
+    try:
+        person = set_favorite_actor(current_user, trakt_person_id, favorited=favorited)
+        return jsonify({
+            'success': True,
+            'favorited': favorited,
+            'trakt_id': person.trakt_id,
+            'name': person.name,
+            'headshot_url': person.headshot_url if favorited else None,
+        })
+    except ValueError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    except Exception as exc:
+        db.session.rollback()
+        return _api_fail(
+            'Favorite actor action failed',
+            exc,
+            user_message='Could not update favorite actor. Please try again.',
         )
 
 

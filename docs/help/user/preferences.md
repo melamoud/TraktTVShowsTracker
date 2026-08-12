@@ -8,6 +8,14 @@ Pick from the default list (Netflix, Prime, …) and/or add a custom service (na
 - Check **Remove** next to a custom service, then save, to delete it
 - Optionally check **Suggest this service to admin** so it can be added to the shared defaults list
 
+## Favorite actors
+
+On any title detail page, the **Cast** section lists main actors (expand for the full cast). Use **☆ Favorite** on an actor to save them locally.
+
+- Manage removals under Preferences → **Favorite actors**
+- Headshots: one TMDB credits lookup per title; each actor image is downloaded into the local actors cache **at most once** and reused on every title
+- Not synced to Trakt favorites — reserved for a future “new titles with your actors” highlight/alert
+
 ## Trakt lists in Set lists
 
 Your Trakt **Wishlist** (watchlist) is always first. Personal lists follow.

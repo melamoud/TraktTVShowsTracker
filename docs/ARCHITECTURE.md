@@ -27,7 +27,7 @@ Patterns intentionally mirror `D:\dev\AudioBooksReview` (config, security header
 Watchlist, watched history, episode progress, identity.
 
 **Local SQLite**  
-Streaming services owned, found-on labels, genres/keywords, review markers, release watches, notifications, admin flags, encrypted Trakt tokens, cached catalog/providers.
+Streaming services owned, found-on labels, genres/keywords, favorite actors (cast cache + once-per-person headshots), review markers, release watches, notifications, admin flags, encrypted Trakt tokens, cached catalog/providers.
 
 ## Admin bootstrap
 

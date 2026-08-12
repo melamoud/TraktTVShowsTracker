@@ -337,6 +337,18 @@ def fetch_media_summary(media_type: str, trakt_id: int) -> dict:
     ) or {}
 
 
+def fetch_media_people(media_type: str, trakt_id: int) -> dict:
+    """
+    Fetch cast/crew for a movie or show.
+
+    GET /movies/{id}/people or /shows/{id}/people — cast only is what we use;
+    guest_stars extended is intentionally omitted (large payloads).
+    """
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    return api_request('GET', f'/{media_type}s/{trakt_id}/people') or {}
+
+
 def get_watchlist(
     user: User,
     media_type: str,

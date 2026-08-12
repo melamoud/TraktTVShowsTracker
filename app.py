@@ -57,8 +57,8 @@ def create_app(config_object=Config):
     @app.after_request
     def add_security_headers(response):
         """Disable caching of authenticated pages and set basic security headers."""
-        # Local poster cache may be cached briefly; HTML/API stay no-store.
-        if request.path.startswith('/cache/posters/'):
+        # Local poster / actor caches may be cached briefly; HTML/API stay no-store.
+        if request.path.startswith('/cache/posters/') or request.path.startswith('/cache/actors/'):
             response.headers['Cache-Control'] = 'public, max-age=604800'
             response.headers['X-Content-Type-Options'] = 'nosniff'
             return response
@@ -142,12 +142,20 @@ def _ensure_schema(app):
         tables = set(insp.get_table_names())
         if 'cached_media' in tables:
             cols = {c['name'] for c in insp.get_columns('cached_media')}
+            cm_alters = []
             if 'feed_source' not in cols:
+                cm_alters.append(
+                    'ALTER TABLE cached_media ADD COLUMN feed_source VARCHAR(32)'
+                )
+            if 'cast_fetched_at' not in cols:
+                cm_alters.append(
+                    'ALTER TABLE cached_media ADD COLUMN cast_fetched_at DATETIME'
+                )
+            if cm_alters:
                 with db.engine.begin() as conn:
-                    conn.execute(text(
-                        'ALTER TABLE cached_media ADD COLUMN feed_source VARCHAR(32)'
-                    ))
-                app.logger.info('Added cached_media.feed_source column')
+                    for stmt in cm_alters:
+                        conn.execute(text(stmt))
+                app.logger.info('Added cached_media feed_source / cast_fetched_at columns')
         if 'user_preferences' in tables:
             cols = {c['name'] for c in insp.get_columns('user_preferences')}
             alters = []

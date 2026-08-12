@@ -108,4 +108,72 @@
     </div>
   </div>
 </div>
+
+{% if cast %}
+<section class="cast-section" aria-label="Cast">
+  <h2 class="cast-heading">Cast</h2>
+  <ul class="cast-list" id="cast-list">
+    {% for actor in cast %}
+      <li class="cast-item{% if loop.index0 >= main_cast_limit %} cast-extra{% endif %}"
+          {% if loop.index0 >= main_cast_limit %}hidden{% endif %}>
+        <div class="cast-avatar" aria-hidden="true">
+          {% if actor.headshot_url %}
+            <img src="{{ actor.headshot_url }}" alt="" width="40" height="40" loading="lazy">
+          {% else %}
+            <span class="cast-initials">{{ actor.name[:1]|upper }}</span>
+          {% endif %}
+        </div>
+        <div class="cast-info">
+          <div class="cast-name">{{ actor.name }}</div>
+          {% if actor.characters %}
+            <div class="cast-role muted">{{ actor.characters|join(', ') }}</div>
+          {% endif %}
+          {% if actor.episode_count %}
+            <div class="cast-eps muted">{{ actor.episode_count }} ep{% if actor.episode_count != 1 %}s{% endif %}</div>
+          {% endif %}
+        </div>
+        <button class="btn btn-small{% if actor.favorited %} btn-primary{% endif %}"
+                type="button"
+                data-action="{{ 'favorite-actor-remove' if actor.favorited else 'favorite-actor-add' }}"
+                data-trakt-id="{{ actor.trakt_id }}"
+                data-media-type="person"
+                data-title="{{ actor.name|e }}"
+                title="{{ 'Remove from favorite actors' if actor.favorited else 'Add to favorite actors' }}">
+          {{ '★ Favorite' if actor.favorited else '☆ Favorite' }}
+        </button>
+      </li>
+    {% endfor %}
+  </ul>
+  {% if cast|length > main_cast_limit %}
+    <button class="btn btn-small" type="button" id="cast-expand"
+            aria-expanded="false"
+            data-total="{{ cast|length }}">
+      Show all {{ cast|length }} actors
+    </button>
+  {% endif %}
+  <p class="meta cast-hint">Favorite actors are saved in Preferences (local — not Trakt favorites). Headshots are cached once per actor under the actors folder.</p>
+</section>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const btn = document.getElementById('cast-expand');
+  const list = document.getElementById('cast-list');
+  if (!btn || !list) return;
+  const total = btn.getAttribute('data-total') || '';
+  btn.addEventListener('click', function () {
+    const extras = list.querySelectorAll('.cast-extra');
+    const expanded = btn.getAttribute('aria-expanded') === 'true';
+    extras.forEach(function (el) { el.hidden = expanded; });
+    if (expanded) {
+      btn.setAttribute('aria-expanded', 'false');
+      btn.textContent = 'Show all ' + total + ' actors';
+    } else {
+      btn.setAttribute('aria-expanded', 'true');
+      btn.textContent = 'Show fewer';
+    }
+  });
+})();
+</script>
 {% endblock %}

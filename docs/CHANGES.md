@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-12 — Cast + favorite actors
+
+- Title detail shows Trakt cast (main few, expand for all) with local **☆ Favorite** per actor
+- Favorite actors managed in Preferences
+- Cast headshots: one TMDB credits call per title; each person image cached once under `instance/actor_cache` and reused
+- Ready for a future alert/highlight on new titles featuring your actors (not built yet)
+
 ## 2026-08-12 — Show catch-up is dynamic (no stalled 100% alerts)
 
 - Alerts treat a show as finished only from Progress episode counts (or a Progress-stamped 100%), not a bare cached `progress_percent=100`

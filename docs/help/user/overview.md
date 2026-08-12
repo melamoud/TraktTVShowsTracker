@@ -6,12 +6,12 @@ TraktTV Shows Tracker helps you review newly listed movies and shows on Trakt, h
 
 - **Latest movies / shows** — browse Trakt DB updates; defaults to **preference matches**; review marker
 - **Recommended movies / shows** — personalized Trakt picks; genre categories; highlight services you own
-- **Preferences** — your services, genres, keywords, which Trakt lists show in **Set lists…**
+- **Preferences** — your services, genres, keywords, favorite actors, which Trakt lists show in **Set lists…**
 - **My movies / My shows** — multi-select Wishlist + personal lists; **Watched / Both / Unwatched** status filters inside those lists; **Rate…** + **Favorite**; TMDB **Streaming** lines + local **Found on…**; filters remembered; cache auto-refreshes when Trakt activity changes
 - **Search** — Trakt-wide title search (lists / watched / rate / favorite); each list page also has in-list title search
 - **Availability** — under-poster chips + filters for Upcoming (>30d), Theater window (±30d), and Streaming
 - **Series progress** — mark seasons/episodes; **Rate / Review** dialog (rating + comment + optional watch); updates Trakt
-- **Title detail** — open a movie/show page for **Write review…** (Trakt comment) plus rate / favorite / lists
+- **Title detail** — open a movie/show page for cast (favorite actors), **Write review…**, rate / favorite / lists
 - **Alerts** — automatic in-app alerts for collection titles (release date, new streaming, episodes/seasons); toggles in Preferences
 
 You must log in with TraktTV. There are no local passwords for normal users.

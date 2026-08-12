@@ -31,6 +31,7 @@ desktop.ini
 config_local.py
 .flask_secret_key
 instance/poster_cache/
+instance/actor_cache/
 *.db-shm
 *.db-wal
 

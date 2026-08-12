@@ -118,6 +118,37 @@
   </section>
 
   <section>
+    <h2>Favorite actors</h2>
+    <p class="meta">
+      Pick actors from a title’s Cast section (☆ Favorite). Used later to highlight new titles
+      featuring people you follow — not synced to Trakt. Cast headshots are cached once per actor
+      when you open a title (reused across shows).
+    </p>
+    {% if favorite_actors %}
+      <ul class="favorite-actors-list">
+        {% for actor in favorite_actors %}
+          <li class="favorite-actor-row">
+            <div class="cast-avatar" aria-hidden="true">
+              {% if actor.headshot_url %}
+                <img src="{{ actor.headshot_url }}" alt="" width="40" height="40" loading="lazy">
+              {% else %}
+                <span class="cast-initials">{{ actor.name[:1]|upper }}</span>
+              {% endif %}
+            </div>
+            <span class="favorite-actor-name">{{ actor.name }}</span>
+            <label class="favorite-actor-remove">
+              <input type="checkbox" name="remove_favorite_actor_ids" value="{{ actor.trakt_id }}">
+              Remove
+            </label>
+          </li>
+        {% endfor %}
+      </ul>
+    {% else %}
+      <p class="meta">No favorite actors yet. Open any title and star someone in Cast.</p>
+    {% endif %}
+  </section>
+
+  <section>
     <h2>Trakt lists in Set lists</h2>
     <p class="meta">
       Two settings per list (used by <em>Set lists…</em> and <em>My movies / My shows</em> filters):

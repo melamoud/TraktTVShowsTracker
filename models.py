@@ -37,6 +37,7 @@ class User(UserMixin, db.Model):
     streaming_services = db.relationship('UserStreamingService', backref='user', cascade='all, delete-orphan')
     review_markers = db.relationship('ReviewMarker', backref='user', cascade='all, delete-orphan')
     found_on = db.relationship('MediaFoundOn', backref='user', cascade='all, delete-orphan')
+    favorite_actors = db.relationship('UserFavoriteActor', backref='user', cascade='all, delete-orphan')
     notifications = db.relationship('Notification', backref='user', cascade='all, delete-orphan')
     alert_events = db.relationship('AlertEvent', backref='user', cascade='all, delete-orphan')
     sessions = db.relationship('UserSession', backref='user', cascade='all, delete-orphan')
@@ -184,9 +185,65 @@ class CachedMedia(db.Model):
     released_at = db.Column(db.Date)  # public release / first aired
     trakt_listed_at = db.Column(db.DateTime, index=True)  # feed sort time (release/premiere)
     feed_source = db.Column(db.String(32), index=True)  # release_calendar | updates | watchlist
+    cast_fetched_at = db.Column(db.DateTime)  # when MediaCastMember rows were last synced
     first_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     raw_json = db.Column(db.Text)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CachedPerson(db.Model):
+    """Cached Trakt person (actor) metadata; headshots only for favorites."""
+
+    __tablename__ = 'cached_people'
+
+    id = db.Column(db.Integer, primary_key=True)
+    trakt_id = db.Column(db.Integer, unique=True, nullable=False, index=True)
+    slug = db.Column(db.String(200))
+    name = db.Column(db.String(300), nullable=False)
+    tmdb_id = db.Column(db.Integer, index=True)
+    imdb_id = db.Column(db.String(32))
+    # Local app URL (/cache/actors/{trakt_id}) when a favorite headshot was downloaded.
+    headshot_url = db.Column(db.String(500))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class MediaCastMember(db.Model):
+    """Cast credit linking a CachedMedia title to a CachedPerson."""
+
+    __tablename__ = 'media_cast_members'
+    __table_args__ = (
+        db.UniqueConstraint('cached_media_id', 'person_id', name='uq_media_cast_person'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    cached_media_id = db.Column(db.Integer, db.ForeignKey('cached_media.id'), nullable=False, index=True)
+    person_id = db.Column(db.Integer, db.ForeignKey('cached_people.id'), nullable=False, index=True)
+    characters_json = db.Column(db.Text, default='[]')  # JSON list of character names
+    episode_count = db.Column(db.Integer)  # shows only
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+
+    media = db.relationship('CachedMedia', backref=db.backref('cast_members', cascade='all, delete-orphan'))
+    person = db.relationship('CachedPerson', backref=db.backref('cast_credits'))
+
+
+class UserFavoriteActor(db.Model):
+    """
+    Local favorite actor preference (not Trakt favorites).
+
+    Stored for Preferences management and future “titles with your actors” alerts.
+    """
+
+    __tablename__ = 'user_favorite_actors'
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'person_id', name='uq_user_favorite_actor'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    person_id = db.Column(db.Integer, db.ForeignKey('cached_people.id'), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    person = db.relationship('CachedPerson', backref=db.backref('favorited_by'))
 
 
 class MediaProviderAvailability(db.Model):

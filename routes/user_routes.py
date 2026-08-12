@@ -302,6 +302,23 @@ def preferences():
             if current_user.is_admin:
                 prefs.alert_new_user_login = request.form.get('alert_new_user_login') == '1'
 
+        # Favorite actors: remove via Preferences checkboxes (add from title detail).
+        remove_actor_ids = {
+            int(x) for x in request.form.getlist('remove_favorite_actor_ids') if str(x).isdigit()
+        }
+        if remove_actor_ids:
+            from models import CachedPerson, UserFavoriteActor
+            person_ids = [
+                p.id for p in CachedPerson.query.filter(
+                    CachedPerson.trakt_id.in_(remove_actor_ids)
+                ).all()
+            ]
+            if person_ids:
+                UserFavoriteActor.query.filter(
+                    UserFavoriteActor.user_id == current_user.id,
+                    UserFavoriteActor.person_id.in_(person_ids),
+                ).delete(synchronize_session=False)
+
         prefs.updated_at = datetime.utcnow()
         new_genres = json.loads(g_json or '[]')
         new_keywords = json.loads(k_json or '[]')
@@ -346,6 +363,8 @@ def preferences():
         'movie': ReviewMarker.query.filter_by(user_id=current_user.id, media_type='movie').first(),
         'show': ReviewMarker.query.filter_by(user_id=current_user.id, media_type='show').first(),
     }
+    from services.cast_service import list_favorite_actors
+    favorite_actors = list_favorite_actors(current_user)
     return render_template(
         'preferences.html',
         defaults=defaults,
@@ -367,6 +386,7 @@ def preferences():
         alert_new_streaming=bool(getattr(prefs, 'alert_new_streaming', True)),
         alert_episode_aired=bool(getattr(prefs, 'alert_episode_aired', True)),
         alert_new_user_login=bool(getattr(prefs, 'alert_new_user_login', True)),
+        favorite_actors=favorite_actors,
     )
 
 
