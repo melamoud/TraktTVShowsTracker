@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=10">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=11">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -64,15 +64,19 @@
       <div class="modal-panel">
         <h2 id="found-on-heading">Where did you find it?</h2>
         <p class="muted" id="found-on-title"></p>
-        <p class="meta" id="found-on-hint">Select one or more. Services listed as streaming for this title are highlighted.</p>
+        <p class="meta" id="found-on-hint">Select one or more to save. Use <strong>Search</strong> on a row to open that service for this title (no save needed). Services listed as streaming are highlighted.</p>
         <div id="found-on-options" class="found-on-options">
           {% if found_on_service_choices %}
             {% for name in found_on_service_choices %}
-              <label data-service-name="{{ name }}">
-                <input type="checkbox" name="found_on_service" value="{{ name }}">
-                <span class="found-on-name">{{ name }}</span>
-                <span class="tag stream found-on-listed" hidden>Listed streaming</span>
-              </label>
+              <div class="found-on-option" data-service-name="{{ name }}">
+                <label>
+                  <input type="checkbox" name="found_on_service" value="{{ name }}">
+                  <span class="found-on-name">{{ name }}</span>
+                  <span class="tag stream found-on-listed" hidden>Listed streaming</span>
+                </label>
+                <a class="found-on-search btn btn-small" href="#" target="_blank" rel="noopener noreferrer" hidden
+                   title="Search {{ name }} for this title">Search</a>
+              </div>
             {% endfor %}
           {% else %}
             <p class="muted">No services yet — type one below, or add services under Preferences.</p>
@@ -174,7 +178,13 @@
     </div>
   </div>
 
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=19"></script>
+  {% if current_user.is_authenticated %}
+  <script type="application/json" id="found-on-link-maps">{{ {
+    'base_urls': found_on_service_urls,
+    'search_templates': found_on_search_templates
+  }|tojson }}</script>
+  {% endif %}
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=20"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

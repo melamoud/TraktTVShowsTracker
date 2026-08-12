@@ -571,7 +571,8 @@ body.modal-open { overflow: hidden; }
   overflow: auto;
   padding-right: .25rem;
 }
-.found-on-options label {
+.found-on-options > label,
+.found-on-option {
   display: flex;
   gap: .55rem;
   align-items: center;
@@ -581,15 +582,33 @@ body.modal-open { overflow: hidden; }
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #0b0d12;
-  cursor: pointer;
 }
-.found-on-options label:hover { border-color: var(--accent); }
-.found-on-options label.provider-listed {
+.found-on-options > label { cursor: pointer; }
+.found-on-option > label {
+  display: flex;
+  flex: 1 1 auto;
+  gap: .55rem;
+  align-items: center;
+  flex-wrap: wrap;
+  min-width: 0;
+  margin: 0;
+  cursor: pointer;
+  font-weight: 600;
+}
+.found-on-options > label:hover,
+.found-on-option:hover { border-color: var(--accent); }
+.found-on-options > label.provider-listed,
+.found-on-option.provider-listed {
   border-color: var(--accent);
   box-shadow: inset 3px 0 0 var(--accent);
   background: rgba(61, 214, 198, 0.08);
 }
 .found-on-name { flex: 1 1 auto; }
+.found-on-search {
+  flex: 0 0 auto;
+  text-decoration: none;
+}
+.found-on-search[hidden] { display: none !important; }
 .list-default-mark {
   flex: 0 0 auto;
   font-size: .75rem;

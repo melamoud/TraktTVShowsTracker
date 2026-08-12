@@ -124,6 +124,85 @@ function namesMatch(a, b) {
   return x === y || x.indexOf(y) !== -1 || y.indexOf(x) !== -1;
 }
 
+function normalizeServiceName(name) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/\+/g, ' plus ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function foundOnLinkMaps() {
+  const el = document.getElementById('found-on-link-maps');
+  if (!el) return { base_urls: {}, search_templates: {} };
+  try {
+    const data = JSON.parse(el.textContent || '{}');
+    return {
+      base_urls: data.base_urls || {},
+      search_templates: data.search_templates || {},
+    };
+  } catch (err) {
+    return { base_urls: {}, search_templates: {} };
+  }
+}
+
+function applySearchTemplate(tmpl, titleText) {
+  const template = String(tmpl || '').trim();
+  const text = String(titleText || '').trim();
+  if (!template || !text) return null;
+  const encPct = encodeURIComponent(text);
+  const encPlus = encodeURIComponent(text).replace(/%20/g, '+');
+  const out = template
+    .replace(/<title>/g, encPct)
+    .replace(/\{title\}/g, encPct)
+    .replace(/\{q\}/g, encPlus);
+  if (out === template) return null;
+  return out;
+}
+
+function foundOnOpenUrl(serviceLabel, title, year) {
+  /** Mirror services.found_on_links.found_on_open_url for dialog Search links. */
+  const label = String(serviceLabel || '').trim();
+  if (!label) return null;
+  const key = normalizeServiceName(label);
+  if (key === 'cable dvr' || key === 'other' || key === 'cable' || key === 'dvr') {
+    return null;
+  }
+
+  const bits = [];
+  const t = String(title || '').trim();
+  if (t) {
+    bits.push(t);
+    if (year) bits.push(String(year));
+  }
+  const titleText = bits.join(' ');
+  const maps = foundOnLinkMaps();
+  const tmpl = maps.search_templates[key];
+  if (tmpl && titleText) {
+    const filled = applySearchTemplate(tmpl, titleText);
+    if (filled) return filled;
+  }
+
+  const base = maps.base_urls[key] || '';
+  if (base && titleText) {
+    let host = '';
+    try {
+      host = new URL(base).hostname || '';
+    } catch (err) {
+      host = '';
+    }
+    if (host) {
+      return 'https://www.google.com/search?q=' + encodeURIComponent('site:' + host + ' ' + titleText);
+    }
+  }
+  if (base) return base;
+  if (titleText) {
+    return 'https://www.google.com/search?q=' + encodeURIComponent(label + ' ' + titleText);
+  }
+  return null;
+}
+
 function renderListsOptions(optionsEl, lists, defaults) {
   optionsEl.innerHTML = '';
   if (!lists.length) {
@@ -337,6 +416,7 @@ function openListsDialog(opts) {
 function openFoundOnDialog(opts) {
   opts = opts || {};
   const title = opts.title || '';
+  const year = opts.year || null;
   const providers = opts.providers || [];
   const selected = opts.selected || [];
 
@@ -361,19 +441,30 @@ function openFoundOnDialog(opts) {
     other.value = '';
   }
 
-  const labels = modal.querySelectorAll('#found-on-options label[data-service-name]');
-  labels.forEach(function (label) {
-    const name = label.getAttribute('data-service-name') || '';
-    const input = label.querySelector('input[type="checkbox"]');
-    const listed = label.querySelector('.found-on-listed');
+  const rows = modal.querySelectorAll('#found-on-options .found-on-option[data-service-name]');
+  rows.forEach(function (row) {
+    const name = row.getAttribute('data-service-name') || '';
+    const input = row.querySelector('input[type="checkbox"]');
+    const listed = row.querySelector('.found-on-listed');
+    const searchLink = row.querySelector('.found-on-search');
     const isListed = providers.some(function (p) { return namesMatch(p, name); });
     const isSelected = selected.some(function (s) { return namesMatch(s, name); });
-    label.classList.toggle('provider-listed', isListed);
+    row.classList.toggle('provider-listed', isListed);
     if (listed) {
       listed.hidden = !isListed;
     }
     if (input) {
       input.checked = isSelected;
+    }
+    if (searchLink) {
+      const href = foundOnOpenUrl(name, title, year);
+      if (href) {
+        searchLink.href = href;
+        searchLink.hidden = false;
+      } else {
+        searchLink.removeAttribute('href');
+        searchLink.hidden = true;
+      }
     }
   });
 
@@ -669,10 +760,13 @@ function openReviewDialog(opts) {
 
 function rowContext(btn) {
   const row = btn.closest('[data-trakt-id]');
+  const yearRaw = btn.getAttribute('data-year') || (row && row.getAttribute('data-year')) || '';
+  const yearNum = parseInt(yearRaw, 10);
   return {
     mediaType: btn.getAttribute('data-media-type') || (row && row.getAttribute('data-media-type')),
     traktId: btn.getAttribute('data-trakt-id') || (row && row.getAttribute('data-trakt-id')),
     title: btn.getAttribute('data-title') || (row && row.getAttribute('data-title')) || '',
+    year: Number.isFinite(yearNum) ? yearNum : null,
     providers: splitPipeList(btn.getAttribute('data-providers')),
     foundOn: splitPipeList(btn.getAttribute('data-found-on')),
   };
@@ -1174,6 +1268,7 @@ document.addEventListener('click', async function (ev) {
     } else if (action === 'found-on') {
       const labels = await openFoundOnDialog({
         title: ctx.title || '',
+        year: ctx.year,
         providers: ctx.providers,
         selected: ctx.foundOn,
       });

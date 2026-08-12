@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-11 — Found on dialog: Search per service
+
+- **Found on…** dialog: each service row has a **Search** link that opens that site for the title (same URLs as chips) without selecting/saving first
+
 ## 2026-08-11 — Disney+ chips use Google site search
 
 - Disney+ no longer deep-links to `disneyplus.com/search` (404); **Found on** / **Plays on** open a Google `site:disneyplus.com` title search instead

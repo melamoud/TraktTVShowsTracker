@@ -93,7 +93,7 @@
         <button class="btn" type="button" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Mark watched</button>
       {% endif %}
       <button class="btn btn-warn" type="button" data-action="review-marker" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}">Reviewed older than this</button>
-      <button class="btn" type="button" data-action="found-on" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}" data-providers="{{ row.providers|join('|') }}" data-found-on="{{ row.found_on|join('|') }}">Found on…</button>
+      <button class="btn" type="button" data-action="found-on" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}"{% if m.year %} data-year="{{ m.year }}"{% endif %} data-providers="{{ row.providers|join('|') }}" data-found-on="{{ row.found_on|join('|') }}">Found on…</button>
       {% if media_type == 'show' %}
         <button class="btn btn-primary" type="button"
                 data-action="progress-open"
