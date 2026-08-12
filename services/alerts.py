@@ -67,7 +67,9 @@ def is_finished(user_id: int, media_type: str, trakt_id: int) -> bool:
     True when alerts should stop for this title.
 
     Movies: marked watched on Trakt.
-    Shows: progress_percent >= 100 when known (started ≠ finished).
+    Shows: only when episode counts say caught up, or a real Progress summary
+    reports 100%. Bare ``progress_percent=100`` from old bulk sync is ignored
+    (that falsely skipped shows like Reacher when a new season aired).
     """
     state = UserMediaState.query.filter_by(
         user_id=user_id, media_type=media_type, trakt_id=trakt_id
@@ -76,7 +78,15 @@ def is_finished(user_id: int, media_type: str, trakt_id: int) -> bool:
         return False
     if media_type == 'movie':
         return bool(state.watched)
-    if state.progress_percent is not None and state.progress_percent >= 100.0:
+    aired = state.episodes_aired
+    completed = state.episodes_completed
+    if aired is not None and completed is not None:
+        return int(aired) > 0 and int(completed) >= int(aired)
+    if (
+        state.progress_detail_at is not None
+        and state.progress_percent is not None
+        and float(state.progress_percent) >= 100.0
+    ):
         return True
     return False
 
@@ -333,7 +343,7 @@ def _notify_season_drop(
 
 
 def _confirm_full_season_drop(trakt_id: int, season: int) -> date | None:
-    """One Trakt call: verify every aired episode of the season shares one day."""
+    """One Trakt call: true full-season drop = every episode aired on one day."""
     try:
         seasons = trakt_client.get_show_seasons(trakt_id)
     except Exception as exc:
@@ -343,13 +353,17 @@ def _confirm_full_season_drop(trakt_id: int, season: int) -> date | None:
     for s in seasons or []:
         if s.get('number') is None or int(s['number']) != season:
             continue
-        aired = []
+        aired_days: list[date] = []
         for ep in s.get('episodes') or []:
             air = _parse_air_date(ep.get('first_aired') or ep.get('released'))
-            if air and air <= today:
-                aired.append(air)
-        if len(aired) >= 2 and len(set(aired)) == 1:
-            return aired[0]
+            if air is None:
+                return None
+            if air > today:
+                # Remaining unaired episodes → weekly/partial drop, not season.
+                return None
+            aired_days.append(air)
+        if len(aired_days) >= 2 and len(set(aired_days)) == 1:
+            return aired_days[0]
     return None
 
 
@@ -574,23 +588,23 @@ def _run_alerts_for_user(user: User) -> tuple[int, bool]:
         created += _check_new_streaming(user, 'movie', trakt_id, media)
 
     for trakt_id in show_ids:
-        if is_finished(user.id, 'show', trakt_id):
-            continue
         media = CachedMedia.query.filter_by(
             media_type='show', trakt_id=trakt_id
         ).first()
         if not media:
             continue
-        # No release_day for shows: the S01E01 episode alert already announces
-        # a premiere — a separate "Released" alert only duplicates it.
-        created += _check_new_streaming(user, 'show', trakt_id, media)
+        finished = is_finished(user.id, 'show', trakt_id)
+        # Streaming alerts stop when truly caught up; episode alerts still use
+        # the calendar so a new season is not skipped by a stale 100% cache.
+        if not finished:
+            created += _check_new_streaming(user, 'show', trakt_id, media)
         st = states.get(trakt_id)
         covered = bool(st and (st.on_watchlist or st.watched))
         if calendar_ok and covered:
             created += _check_episodes_from_calendar(
                 user, trakt_id, media, show_events.get(trakt_id, []),
             )
-        else:
+        elif not finished:
             # List-only never-watched shows (or calendar fetch failed): per-show fetch.
             # When Trakt is throttling, don't pile on — the next run catches up
             # (grace window means nothing is lost).

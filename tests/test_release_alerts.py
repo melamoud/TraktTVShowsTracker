@@ -344,6 +344,82 @@ def test_calendar_same_day_cluster_confirms_season_drop(app, user):
         ).count() == 0
 
 
+def test_partial_same_day_drop_alerts_per_episode(app, user):
+    """Same-day cluster with later unaired eps is weekly/partial — not season drop."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=9905, title='Reacher-like',
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        # Stale "caught up" cache that used to block all alerts.
+        _watchlist(user, 'show', 9905, watched=True)
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=9905,
+        ).one()
+        st.progress_percent = 100.0
+        st.episodes_aired = 24
+        st.episodes_completed = 24
+        st.progress_detail_at = datetime.utcnow() - timedelta(days=30)
+        today = date.today()
+        for ep in (1, 2, 3):
+            db.session.add(UserCalendarEvent(
+                user_id=user, media_type='show', trakt_id=9905,
+                event_date=today, season_number=4, episode_number=ep,
+                episode_title=f'E{ep}',
+            ))
+        db.session.commit()
+
+        day = today.isoformat()
+        future = (today + timedelta(days=7)).isoformat()
+        seasons = [{
+            'number': 4,
+            'episodes': [
+                {'number': 1, 'title': 'E1', 'first_aired': f'{day}T08:00:00.000Z'},
+                {'number': 2, 'title': 'E2', 'first_aired': f'{day}T08:00:00.000Z'},
+                {'number': 3, 'title': 'E3', 'first_aired': f'{day}T08:00:00.000Z'},
+                {'number': 4, 'title': 'E4', 'first_aired': f'{future}T08:00:00.000Z'},
+            ],
+        }]
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.alerts.trakt_client.get_show_seasons', return_value=seasons):
+            created = run_media_alerts(app)
+
+        assert created == 3
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_SEASON_AIRED
+        ).count() == 0
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_EPISODE_AIRED
+        ).count() == 3
+
+
+def test_is_finished_ignores_stale_percent_without_detail(app, user):
+    from services.alerts import is_finished
+
+    with app.app_context():
+        _watchlist(user, 'show', 9906, watched=True)
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=9906,
+        ).one()
+        st.progress_percent = 100.0
+        st.progress_detail_at = None
+        db.session.commit()
+        assert is_finished(user, 'show', 9906) is False
+
+        st.episodes_aired = 27
+        st.episodes_completed = 24
+        st.progress_detail_at = datetime.utcnow()
+        st.progress_percent = 88.9
+        db.session.commit()
+        assert is_finished(user, 'show', 9906) is False
+
+        st.episodes_completed = 27
+        st.progress_percent = 100.0
+        db.session.commit()
+        assert is_finished(user, 'show', 9906) is True
+
+
 def test_calendar_ignores_events_older_than_grace(app, user):
     """Calendar rows older than the grace window never alert."""
     with app.app_context():

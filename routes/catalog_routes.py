@@ -1259,7 +1259,11 @@ def api_watched(media_type, trakt_id):
         if watched:
             st.plays = max(st.plays or 0, 1)
             st.last_watched_at = datetime.utcnow()
-            st.progress_percent = 100.0
+            # Movies are binary; shows get % from Progress (aired/completed).
+            # Never invent show progress_percent=100 here — that stalled alerts
+            # when a new season aired before Progress refreshed.
+            if media_type == 'movie':
+                st.progress_percent = 100.0
         db.session.commit()
         try:
             from services.user_media_sync import note_user_media_write

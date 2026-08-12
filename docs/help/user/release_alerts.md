@@ -16,8 +16,10 @@ This is separate from **Streaming vs Found on** (where a title plays / where you
 ## When they stop
 
 - Movie marked watched  
-- Show fully watched  
+- Show **caught up** on aired episodes (Progress `watched / aired`, not a sticky “finished” flag). Streaming alerts pause when caught up; **new episode/season** alerts still use your calendar for watchlisted or in-progress shows so a new season is not missed  
 - Title no longer on Wishlist or any personal list  
+
+A batch of episodes airing the same day only counts as a **season** alert when the **whole** season drops that day. If more episodes air later (weekly or a partial drop), you get **per-episode** alerts instead.
 
 ## Reading an alert card
 

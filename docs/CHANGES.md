@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-12 — Show catch-up is dynamic (no stalled 100% alerts)
+
+- Alerts treat a show as finished only from Progress episode counts (or a Progress-stamped 100%), not a bare cached `progress_percent=100`
+- Episode calendar alerts still run for watchlist/watched shows so a new season is not skipped by stale catch-up
+- Partial same-day drops (some episodes aired, more later) alert per episode, not as a full-season drop
+- **Mark series watched** / show Watch no longer invents local show `progress_percent=100` — % comes from Progress aired/completed
+
 ## 2026-08-12 — Fix alerts scheduler boot + 4h EST clock
 
 - Scheduler now starts inside an app context (was silently failing since Aug 9: “Working outside of application context”)

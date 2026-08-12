@@ -32,7 +32,7 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 - **Rate / Review** — dialog: rating menu, review text (optional spoiler), **Mark watched**, then **Save to Trakt**  
 - **Mark season watched** — on each incomplete season row; marks all **aired** episodes in that season on Trakt (same as marking a season on Trakt.tv)  
 - **Unwatch season** — on each complete season row; removes that season’s plays from Trakt history only  
-- **Mark series watched** — next to the header counts; marks **all** aired episodes of the show (every remaining season). Confirm carefully — this is not the same as marking one season.  
+- **Mark series watched** — next to the header counts; marks **all** aired episodes of the show on Trakt (every remaining season). Confirm carefully — this is not the same as marking one season. Local card % is refreshed from Progress counts afterward (the app does not invent a sticky 100%).  
 - Counts at the top are `watched / aired` from history (+ progress plays when history lags)  
 
 My shows auto-syncs watchlist/watched when Trakt activity advances; **Refresh from Trakt** forces a full pull. Neither writes episode history.
