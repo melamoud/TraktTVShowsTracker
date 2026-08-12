@@ -29,6 +29,7 @@
     <div class="actions">
       <form method="post" action="{{ url_for('admin.run_release_check') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ url_for('admin.dashboard') }}">
         <button class="btn btn-small btn-primary" type="submit">Run alert check now</button>
       </form>
     </div>

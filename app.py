@@ -264,6 +264,15 @@ def _ensure_schema(app):
                         'ADD COLUMN custom_search_template VARCHAR(500)'
                     ))
                 app.logger.info('Added user_streaming_services.custom_search_template')
+        if 'scheduler_config' in tables:
+            scols = {c['name'] for c in insp.get_columns('scheduler_config')}
+            if 'media_alerts_timezone' not in scols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(
+                        "ALTER TABLE scheduler_config ADD COLUMN media_alerts_timezone "
+                        "VARCHAR(64) DEFAULT 'America/New_York' NOT NULL"
+                    ))
+                app.logger.info('Added scheduler_config.media_alerts_timezone')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
 

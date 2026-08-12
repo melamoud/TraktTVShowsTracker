@@ -1234,9 +1234,12 @@ DEFAULT_SCHEDULER_CONFIG = {
     'catalog_sync_cron_time': '08:00',
     'media_alerts_enabled': True,
     'media_alerts_mode': 'interval',
-    'media_alerts_interval_hours': 6.0,
+    # Clock-aligned every 4h in America/New_York (0,4,8,12,16,20) — Trakt+TMDB
+    # work makes hourly runs heavier than a pure DB query.
+    'media_alerts_interval_hours': 4.0,
     'media_alerts_cron_time': '08:00',
-    'alerts_startup_delay_seconds': 120,
+    'media_alerts_timezone': 'America/New_York',
+    'alerts_startup_delay_seconds': 0,
 }
 
 
@@ -1254,11 +1257,14 @@ def _env_scheduler_defaults(app: Flask) -> dict:
         'media_alerts_interval_hours': float(
             app.config.get(
                 'ALERTS_INTERVAL_HOURS',
-                app.config.get('PROVIDER_SYNC_INTERVAL_HOURS', 6),
+                app.config.get('PROVIDER_SYNC_INTERVAL_HOURS', 4),
             )
         ),
+        'media_alerts_timezone': (
+            app.config.get('ALERTS_TIMEZONE') or 'America/New_York'
+        ),
         'alerts_startup_delay_seconds': int(
-            app.config.get('ALERTS_STARTUP_DELAY_SECONDS', 120)
+            app.config.get('ALERTS_STARTUP_DELAY_SECONDS', 0)
         ),
     }
 
@@ -1267,6 +1273,10 @@ def get_or_create_scheduler_config(app: Flask | None = None) -> SchedulerConfig:
     """Load the single scheduler config row, creating it from env defaults if absent."""
     row = SchedulerConfig.query.first()
     if row:
+        # Fill columns added after the row was first created.
+        if not getattr(row, 'media_alerts_timezone', None):
+            row.media_alerts_timezone = 'America/New_York'
+            db.session.commit()
         return row
     values = DEFAULT_SCHEDULER_CONFIG.copy()
     if app:
@@ -1284,6 +1294,17 @@ def _parse_cron_time(value: str) -> tuple[int, int]:
     if len(parts) != 2:
         raise ValueError(f'Invalid cron time: {value}')
     return int(parts[0]), int(parts[1])
+
+
+def _alerts_timezone(config: SchedulerConfig):
+    """Resolve IANA timezone for alert clock scheduling."""
+    from zoneinfo import ZoneInfo
+
+    name = (getattr(config, 'media_alerts_timezone', None) or 'America/New_York').strip()
+    try:
+        return ZoneInfo(name)
+    except Exception:
+        return ZoneInfo('America/New_York')
 
 
 def apply_scheduler_config(app: Flask, scheduler=None) -> None:
@@ -1332,11 +1353,18 @@ def apply_scheduler_config(app: Flask, scheduler=None) -> None:
     except Exception:
         pass
     if config.media_alerts_enabled:
+        tz = _alerts_timezone(config)
         if config.media_alerts_mode == 'interval':
+            # Clock-aligned: every N hours at :00 in the configured timezone
+            # (N=4 → 0,4,8,12,16,20). Not a free-running interval from boot.
+            hours = max(1, int(round(float(config.media_alerts_interval_hours))))
+            hour_expr = '*' if hours == 1 else f'*/{hours}'
             scheduler.add_job(
                 check_release_watches,
-                'interval',
-                hours=max(MIN_ALERTS_INTERVAL_HOURS, float(config.media_alerts_interval_hours)),
+                'cron',
+                hour=hour_expr,
+                minute=0,
+                timezone=tz,
                 args=[app],
                 id='media_alerts',
                 replace_existing=True,
@@ -1348,6 +1376,7 @@ def apply_scheduler_config(app: Flask, scheduler=None) -> None:
                 'cron',
                 hour=hour,
                 minute=minute,
+                timezone=tz,
                 args=[app],
                 id='media_alerts',
                 replace_existing=True,
@@ -1387,20 +1416,17 @@ def start_scheduler(app: Flask):
     scheduler.start()
     config = get_or_create_scheduler_config(app)
     apply_scheduler_config(app, scheduler)
-    # On first boot the interval-based alert job should fire soon so users get
-    # notifications without waiting a full interval; on subsequent re-schedules
-    # from the admin UI we do not force this delay.
-    if config.media_alerts_enabled and config.media_alerts_mode == 'interval':
-        try:
-            scheduler.get_job('media_alerts').modify(
-                next_run_time=datetime.now() + timedelta(seconds=config.alerts_startup_delay_seconds)
-            )
-        except Exception as exc:
-            app.logger.warning('Could not set startup delay for media alerts: %s', exc)
+    next_alerts = None
+    try:
+        job = scheduler.get_job('media_alerts')
+        next_alerts = getattr(job, 'next_run_time', None) if job else None
+    except Exception:
+        pass
     app.logger.info(
-        'Scheduler started (catalog every %sm, alerts every %sh, first alert run in %ss)',
+        'Scheduler started (catalog every %sm, alerts every %sh @ :00 %s, next alerts %s)',
         config.catalog_sync_interval_minutes,
         config.media_alerts_interval_hours,
-        config.alerts_startup_delay_seconds,
+        getattr(config, 'media_alerts_timezone', 'America/New_York'),
+        next_alerts,
     )
     return scheduler

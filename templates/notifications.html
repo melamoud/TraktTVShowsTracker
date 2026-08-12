@@ -12,14 +12,22 @@
       <span class="pill on">Showing all</span>
     {% endif %}
   </div>
-  {% if unread_count %}
-  <form method="post" action="{{ url_for('user.notifications_read_all') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <button class="btn btn-small" type="submit">Mark all read ({{ unread_count }})</button>
-  </form>
-  {% endif %}
-</div>
-<p class="meta" style="margin-top:.35rem;">
+  <div class="actions" style="margin:0;">
+    {% if current_user.is_admin %}
+      <form method="post" action="{{ url_for('admin.run_release_check') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="next" value="{{ url_for('user.notifications') }}">
+        <button class="btn btn-small btn-primary" type="submit">Run alert check now</button>
+      </form>
+    {% endif %}
+    {% if unread_count %}
+      <form method="post" action="{{ url_for('user.notifications_read_all') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-small" type="submit">Mark all read ({{ unread_count }})</button>
+      </form>
+    {% endif %}
+  </div>
+</div><p class="meta" style="margin-top:.35rem;">
   Unread alerts are brighter. Dimmed rows are already read.
   {% if hide_read %}Read alerts are hidden — toggle above to show them.{% endif %}
 </p>

@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-12 — Fix alerts scheduler boot + 4h EST clock
+
+- Scheduler now starts inside an app context (was silently failing since Aug 9: “Working outside of application context”)
+- Media alerts default: every **4 hours at :00 America/New_York** (12am/4am/8am/12pm/4pm/8pm) — no run 2 minutes after restart
+- Admins can force **Run alert check now** from Admin, Scheduler, or the Alerts page
+- Alert job logs under the `app` logger so runs show up in `logs/app.log`
+
 ## 2026-08-11 — Found on dialog: Search per service
 
 - **Found on…** dialog: each service row has a **Search** link that opens that site for the title (same URLs as chips) without selecting/saving first

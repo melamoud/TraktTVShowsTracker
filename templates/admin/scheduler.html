@@ -45,7 +45,11 @@
   </div>
 
   <h2>Media alerts</h2>
-  <p class="muted">Release day, new streaming, and episode/season air checks for all users.</p>
+  <p class="muted">
+    Release day, new streaming, and episode/season checks (Trakt calendar + TMDB providers).
+    <strong>Every N hours</strong> means on the clock at :00 in the timezone below
+    (e.g. every 4 → 12am / 4am / 8am / 12pm / 4pm / 8pm).
+  </p>
 
   <label style="display:flex; align-items:center; gap:.5rem; font-weight:500;">
     <input type="checkbox" name="media_alerts_enabled"{% if status.config.media_alerts_enabled %} checked{% endif %}> Enabled
@@ -55,8 +59,8 @@
     <label style="display:flex; align-items:center; gap:.4rem; font-weight:500;">
       <input type="radio" name="media_alerts_mode" value="interval"{% if status.config.media_alerts_mode == 'interval' %} checked{% endif %}> Every
     </label>
-    <input type="number" name="media_alerts_interval_hours" min="1" step="0.5" value="{{ status.config.media_alerts_interval_hours }}" style="width:5rem;">
-    <span class="muted">hours</span>
+    <input type="number" name="media_alerts_interval_hours" min="1" step="1" value="{{ status.config.media_alerts_interval_hours|int }}" style="width:5rem;">
+    <span class="muted">hours at :00</span>
   </div>
 
   <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
@@ -66,12 +70,9 @@
     <input type="time" name="media_alerts_cron_time" value="{{ status.config.media_alerts_cron_time }}" style="width:7rem;">
   </div>
 
-  <h2>Startup delay</h2>
-  <p class="muted">Seconds after boot before the first interval-based media alerts run (does not affect cron or later changes).</p>
-  <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
-    <input type="number" name="alerts_startup_delay_seconds" min="0" value="{{ status.config.alerts_startup_delay_seconds }}" style="width:5rem;">
-    <span class="muted">seconds</span>
-  </div>
+  <label>Timezone (IANA)
+    <input type="text" name="media_alerts_timezone" value="{{ status.config.media_alerts_timezone or 'America/New_York' }}" placeholder="America/New_York">
+  </label>
 
   <div class="actions" style="margin-top:1rem;">
     <button class="btn btn-primary" type="submit">Save and apply</button>
@@ -81,6 +82,7 @@
 <div class="actions" style="margin-top:1.5rem;">
   <form method="post" action="{{ url_for('admin.run_release_check') }}" style="display:inline;">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ url_for('admin.scheduler_config') }}">
     <button class="btn btn-small btn-primary" type="submit">Run alert check now</button>
   </form>
   <form method="post" action="{{ url_for('admin.scheduler_config') }}" style="display:inline; margin-left:0.5rem;">

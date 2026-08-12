@@ -408,7 +408,9 @@ class SchedulerConfig(db.Model):
     catalog_sync_cron_time = db.Column(db.String(8), default='08:00')
     media_alerts_enabled = db.Column(db.Boolean, default=True, nullable=False)
     media_alerts_mode = db.Column(db.String(16), default='interval', nullable=False)  # interval | cron
-    media_alerts_interval_hours = db.Column(db.Float, default=6.0, nullable=False)
+    media_alerts_interval_hours = db.Column(db.Float, default=4.0, nullable=False)
     media_alerts_cron_time = db.Column(db.String(8), default='08:00')
-    alerts_startup_delay_seconds = db.Column(db.Integer, default=120, nullable=False)
+    # IANA tz for alert clock (interval = every N hours at :00; cron = daily HH:MM).
+    media_alerts_timezone = db.Column(db.String(64), default='America/New_York', nullable=False)
+    alerts_startup_delay_seconds = db.Column(db.Integer, default=0, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

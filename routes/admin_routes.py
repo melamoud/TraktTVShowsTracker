@@ -61,6 +61,13 @@ def dashboard():
 def run_release_check():
     """Manually run auto media alerts (release / streaming / episodes)."""
     from services.alerts import run_media_alerts
+    from urllib.parse import urlparse
+
+    next_url = (request.form.get('next') or '').strip() or url_for('admin.dashboard')
+    # Only allow relative same-site redirects.
+    parsed = urlparse(next_url)
+    if parsed.scheme or parsed.netloc or not next_url.startswith('/'):
+        next_url = url_for('admin.dashboard')
 
     try:
         notified = run_media_alerts(current_app._get_current_object())
@@ -68,7 +75,7 @@ def run_release_check():
     except Exception as exc:
         current_app.logger.exception('Manual alert check failed: %s', exc)
         flash(f'Alert check failed: {exc}', 'danger')
-    return redirect(url_for('admin.dashboard'))
+    return redirect(next_url)
 
 
 @admin_bp.route('/users')
@@ -251,7 +258,7 @@ def scheduler_config():
             errors.append('Alerts schedule mode must be interval or cron.')
 
         try:
-            row.media_alerts_interval_hours = float(request.form.get('media_alerts_interval_hours', 6))
+            row.media_alerts_interval_hours = float(request.form.get('media_alerts_interval_hours', 4))
         except (TypeError, ValueError):
             errors.append('Alerts interval must be a number of hours.')
         else:
@@ -266,13 +273,14 @@ def scheduler_config():
         except ValueError:
             errors.append('Alerts time must be HH:MM in 24-hour format.')
 
+        row.media_alerts_timezone = (
+            request.form.get('media_alerts_timezone') or 'America/New_York'
+        ).strip() or 'America/New_York'
         try:
-            row.alerts_startup_delay_seconds = int(request.form.get('alerts_startup_delay_seconds', 120))
-        except (TypeError, ValueError):
-            errors.append('Startup delay must be a whole number of seconds.')
-        else:
-            if row.alerts_startup_delay_seconds < 0:
-                errors.append('Startup delay cannot be negative.')
+            from zoneinfo import ZoneInfo
+            ZoneInfo(row.media_alerts_timezone)
+        except Exception:
+            errors.append('Alerts timezone must be a valid IANA name (e.g. America/New_York).')
 
         if errors:
             for msg in errors:

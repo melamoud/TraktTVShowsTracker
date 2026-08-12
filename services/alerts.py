@@ -34,7 +34,7 @@ from services.calendar_view import ensure_user_calendar_fresh
 from services.sync_jobs import collection_trakt_ids, sync_providers_for_media
 from services.tmdb_client import is_configured as tmdb_configured
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('app')
 
 ALERT_RELEASE_DAY = 'release_day'
 ALERT_NEW_STREAMING = 'new_streaming'

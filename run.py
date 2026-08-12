@@ -59,7 +59,9 @@ def main():
     if not args.no_scheduler:
         try:
             from services.sync_jobs import start_scheduler
-            scheduler = start_scheduler(app)
+            # APScheduler job setup touches the DB (SchedulerConfig) — needs app context.
+            with app.app_context():
+                scheduler = start_scheduler(app)
         except Exception as exc:
             app.logger.warning('Scheduler not started: %s', exc)
 

@@ -34,7 +34,7 @@ Each alert is a card: poster, title (links to the title page), a colored **type 
 
 ## How they arrive
 
-Written in the background: once shortly after the app starts, then on the schedule configured by the admin under **Admin → Scheduler** (default every 6h). You see them next login or page refresh. Admins can also run **Run alert check now** from the Admin dashboard.
+Written in the background on the schedule under **Admin → Scheduler** (default: every 4 hours at :00 **America/New_York** — 12am / 4am / 8am / 12pm / 4pm / 8pm). You see them next login or page refresh. Admins can **Run alert check now** from Admin, Scheduler, or the Alerts page.
 
 - Episode detection uses Trakt's **My calendar** bulk feed — one call per run covers every watchlisted or in-progress show, so a show you **just added** alerts on the very next run. List-only shows (never watched, not watchlisted) get a per-show fallback check.
 - If Trakt is rate-limiting (HTTP 429), the run backs off instead of scanning shows one by one — nothing is lost; the next run catches up within the 3-day window.
