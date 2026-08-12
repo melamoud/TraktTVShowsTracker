@@ -215,8 +215,34 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
   max-width: 70ch;
 }
 .meta { color: var(--muted); font-size: .92rem; line-height: 1.45; }
+
+/* Home hub links: title + blurb side-by-side (not the poster grid). */
+.media-row.home-nav {
+  grid-template-columns: 18rem 1fr;
+  align-items: center;
+  gap: .75rem 1.25rem;
+  color: inherit;
+}
+.media-row.home-nav:hover {
+  text-decoration: none;
+  border-color: #3a4660;
+}
+.media-row.home-nav .media-title {
+  color: var(--accent);
+  line-height: 1.25;
+  min-width: 0;
+}
+.media-row.home-nav .meta {
+  min-width: 0;
+}
+
 @media (max-width: 640px) {
   .media-row { grid-template-columns: 72px 1fr; gap: .65rem; padding: .85rem; }
+  .media-row.home-nav {
+    grid-template-columns: 1fr;
+    gap: .35rem;
+    align-items: start;
+  }
 }
 .tags { display: flex; flex-wrap: wrap; gap: .35rem; margin-top: .5rem; }
 .tag {
