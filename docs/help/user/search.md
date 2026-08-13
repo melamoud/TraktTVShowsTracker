@@ -11,6 +11,15 @@ Use **Search** in the top navigation to find movies and shows in Trakt’s datab
 
 Exact title matches are listed before broader fuzzy hits.
 
+### Filters (remembered)
+
+Defaults keep Search focused on new discoveries:
+
+- **Not watched** (default) — hides titles you already marked watched. Use **Show watched** to include them.
+- **Not in lists** (default) — hides titles on **Wishlist** or any personal Trakt list. Use **In lists** to include them.
+
+Choices are remembered for your next Search visit (same as Latest / My filters).
+
 ## Search within a page
 
 My movies / My shows, Latest, and Recommended each have a **Search titles in this list…** box in the toolbar.

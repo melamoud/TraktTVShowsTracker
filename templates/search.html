@@ -1,8 +1,10 @@
 {% extends "base.html" %}
 {% block title %}{{ title }} — {{ app_name }}{% endblock %}
 {% block content %}
-{% macro qs(page_n=None, type_v=None, q_v=None) -%}
-page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is not none else search_type }}&q={{ (q_v if q_v is not none else q)|urlencode }}
+{% set hw = 1 if hide_watched else 0 %}
+{% set hl = 1 if hide_lists else 0 %}
+{% macro qs(page_n=None, type_v=None, q_v=None, hw_v=None, hl_v=None) -%}
+page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is not none else search_type }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_lists={{ hl_v if hl_v is not none else hl }}&q={{ (q_v if q_v is not none else q)|urlencode }}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 and q %}
@@ -32,6 +34,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
 <h1>{{ title }}</h1>
 <p class="muted">
   Search Trakt’s movie and show database. Add hits to Wishlist / personal lists, or mark watched — same actions as Latest.
+  By default, watched titles and titles already on Wishlist / personal lists are hidden.
   For titles already on your lists, use the search box on My / Latest / Rec pages instead.
 </p>
 
@@ -45,9 +48,27 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
       <option value="movie" {% if search_type == 'movie' %}selected{% endif %}>Movies</option>
       <option value="show" {% if search_type == 'show' %}selected{% endif %}>Shows</option>
     </select>
+    <input type="hidden" name="hide_watched" value="{{ hw }}">
+    <input type="hidden" name="hide_lists" value="{{ hl }}">
     <button class="btn btn-primary btn-small" type="submit">Search</button>
     {% if q %}
-      <a class="btn btn-small" href="{{ url_for('catalog.search', type=search_type) }}">Clear</a>
+      <a class="btn btn-small" href="{{ url_for('catalog.search', type=search_type, hide_watched=hw, hide_lists=hl) }}">Clear</a>
+    {% endif %}
+  </div>
+  <div class="pill-row">
+    {% if hide_watched %}
+      <a class="pill" href="?{{ qs(page_n=1, hw_v=0) }}">Show watched</a>
+      <span class="pill on">Not watched</span>
+    {% else %}
+      <span class="pill on">Showing watched</span>
+      <a class="pill" href="?{{ qs(page_n=1, hw_v=1) }}">Not watched</a>
+    {% endif %}
+    {% if hide_lists %}
+      <a class="pill" href="?{{ qs(page_n=1, hl_v=0) }}">In lists</a>
+      <span class="pill on">Not in lists</span>
+    {% else %}
+      <span class="pill on">Showing list titles</span>
+      <a class="pill" href="?{{ qs(page_n=1, hl_v=1) }}">Not in lists</a>
     {% endif %}
   </div>
 </form>
@@ -60,6 +81,11 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
   <p class="meta">
     Showing <strong>{{ rows|length }}</strong> of <strong>{{ total }}</strong> result{{ '' if total == 1 else 's' }}
     for “{{ q }}”
+    {% if raw_total and raw_total != total %}
+      · {{ raw_total }} before filters
+    {% endif %}
+    {% if hide_watched %} · hiding watched{% endif %}
+    {% if hide_lists %} · hiding list titles{% endif %}
     {% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}.
   </p>
   {{ pager('top') }}
@@ -167,7 +193,14 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
         </div>
       </article>
     {% else %}
-      <p class="muted">No Trakt titles matched “{{ q }}”.</p>
+      {% if raw_total %}
+        <p class="muted">
+          Trakt found {{ raw_total }} title{{ '' if raw_total == 1 else 's' }} for “{{ q }}”, but all are hidden by your filters.
+          <a href="?{{ qs(page_n=1, hw_v=0, hl_v=0) }}">Show watched and list titles</a>.
+        </p>
+      {% else %}
+        <p class="muted">No Trakt titles matched “{{ q }}”.</p>
+      {% endif %}
     {% endfor %}
   </div>
 

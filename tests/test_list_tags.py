@@ -90,7 +90,7 @@ def test_search_page_shows_personal_list_tags(app, client, user):
          patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=[
              {'id': '10', 'name': 'TV Show Favs', 'slug': 'tv-show-favs'},
          ]):
-        resp = client.get('/search?q=listed&type=show')
+        resp = client.get('/search?q=listed&type=show&hide_lists=0&hide_watched=0')
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
     assert 'Listed Show' in html

@@ -284,6 +284,11 @@ def home():
     return render_template('home.html', unread=unread)
 
 
+def _search_on_any_list(row: dict) -> bool:
+    """True when the title is on Wishlist or any personal list."""
+    return bool(row.get('on_watchlist') or row.get('list_names'))
+
+
 @catalog_bp.route('/search')
 @login_required
 def search():
@@ -291,7 +296,9 @@ def search():
     Trakt-wide title search (movies and/or shows).
 
     Results use the same decorated card fields as Latest (lists / watched / streaming).
+    Defaults hide watched and already-listed titles (Wishlist + personal lists).
     """
+    from services import view_prefs
     from services.sync_jobs import enrich_media_list_for_display, upsert_cached_media
     from services.streaming_matcher import split_providers_for_user
     from services.tmdb_client import is_configured as tmdb_is_configured
@@ -302,10 +309,17 @@ def search():
         type_raw = 'both'
     page = max(int(request.args.get('page', 1) or 1), 1)
     per_page = 20
+    hide_watched = view_prefs.resolve_bool(
+        current_user, 'search', 'hide_watched', 'hide_watched', default=True,
+    )
+    hide_lists = view_prefs.resolve_bool(
+        current_user, 'search', 'hide_lists', 'hide_lists', default=True,
+    )
 
     types: list[str] = ['movie', 'show'] if type_raw == 'both' else [type_raw]
     rows: list[dict] = []
     fetch_error = None
+    raw_total = 0
 
     if q:
         try:
@@ -318,7 +332,10 @@ def search():
 
         cached_items: list[tuple[str, CachedMedia]] = []
         try:
-            per_type_limit = per_page if type_raw != 'both' else max(per_page // 2, 10)
+            # Over-fetch when filters are on so a page still has room after hiding.
+            base_limit = per_page if type_raw != 'both' else max(per_page // 2, 10)
+            mult = 3 if (hide_watched or hide_lists) else 1
+            per_type_limit = min(base_limit * mult, 50)
             for media_type in types:
                 hits = trakt_client.search_titles(
                     current_user, media_type, q, limit=per_type_limit,
@@ -344,6 +361,12 @@ def search():
             for r in decorated:
                 r['media_type'] = media_type
             rows.extend(decorated)
+
+        raw_total = len(rows)
+        if hide_watched:
+            rows = [r for r in rows if not r.get('watched')]
+        if hide_lists:
+            rows = [r for r in rows if not _search_on_any_list(r)]
 
         # Enrich + providers for the visible slice only (after simple paging).
         total = len(rows)
@@ -398,6 +421,9 @@ def search():
         page_links=_pagination_pages(page, pages),
         per_page=per_page,
         total=total,
+        raw_total=raw_total,
+        hide_watched=hide_watched,
+        hide_lists=hide_lists,
         fetch_error=fetch_error,
         tmdb_configured=tmdb_is_configured(),
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),

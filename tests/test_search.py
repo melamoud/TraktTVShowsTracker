@@ -2,7 +2,7 @@
 
 from unittest.mock import patch
 
-from models import CachedMedia, UserMediaState, UserPreference, db
+from models import CachedMedia, UserListMembership, UserMediaState, UserPreference, db
 from tests.conftest import login_client
 
 
@@ -64,6 +64,95 @@ def test_search_page_renders_multiple_results(app, client, user):
     assert 'data-trakt-id="1400"' in html
     assert 'data-action="lists-edit"' in html
     assert 'Set lists' in html
+    assert 'Not watched' in html
+    assert 'Not in lists' in html
+
+
+def test_search_hides_watched_and_list_titles_by_default(app, client, user):
+    """Default Search filters drop watched, wishlist, and personal-list hits."""
+    with app.app_context():
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=1, watched=True,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=2, on_watchlist=True,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=3, on_watchlist=False,
+        ))
+        db.session.add(UserListMembership(
+            user_id=user, list_id='10', media_type='show', trakt_id=3,
+        ))
+        db.session.commit()
+
+    def fake_search(_user, media_type, query, *, limit=20):
+        assert media_type == 'show'
+        return [
+            {
+                'type': 'show', 'score': 100,
+                'show': {'title': 'Watched Show', 'year': 2020, 'ids': {'trakt': 1}},
+            },
+            {
+                'type': 'show', 'score': 90,
+                'show': {'title': 'Wishlist Show', 'year': 2021, 'ids': {'trakt': 2}},
+            },
+            {
+                'type': 'show', 'score': 80,
+                'show': {'title': 'Personal List Show', 'year': 2022, 'ids': {'trakt': 3}},
+            },
+            {
+                'type': 'show', 'score': 70,
+                'show': {'title': 'Fresh Show', 'year': 2023, 'ids': {'trakt': 4}},
+            },
+        ]
+
+    login_client(client, app, user)
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_titles', side_effect=fake_search), \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]), \
+         patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=[
+             {'id': '10', 'name': 'Favs', 'slug': 'favs'},
+         ]):
+        hidden = client.get('/search?q=show&type=show')
+        shown = client.get('/search?q=show&type=show&hide_watched=0&hide_lists=0')
+
+    assert hidden.status_code == 200
+    hidden_html = hidden.get_data(as_text=True)
+    assert 'data-trakt-id="4"' in hidden_html
+    assert 'Fresh Show' in hidden_html
+    assert 'data-trakt-id="1"' not in hidden_html
+    assert 'data-trakt-id="2"' not in hidden_html
+    assert 'data-trakt-id="3"' not in hidden_html
+
+    assert shown.status_code == 200
+    shown_html = shown.get_data(as_text=True)
+    assert 'data-trakt-id="1"' in shown_html
+    assert 'data-trakt-id="2"' in shown_html
+    assert 'data-trakt-id="3"' in shown_html
+    assert 'data-trakt-id="4"' in shown_html
+
+
+def test_search_remembers_filter_prefs(app, client, user):
+    """Toggling Show watched persists for the next Search visit without args."""
+    login_client(client, app, user)
+
+    def fake_search(_user, media_type, query, *, limit=20):
+        return [{
+            'type': 'movie', 'score': 1,
+            'movie': {'title': 'Solo', 'year': 2024, 'ids': {'trakt': 9}},
+        }]
+
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_titles', side_effect=fake_search), \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+        client.get('/search?q=solo&type=movie&hide_watched=0&hide_lists=1')
+        resp = client.get('/search?q=solo&type=movie')
+
+    html = resp.get_data(as_text=True)
+    assert 'Showing watched' in html
+    assert 'Not in lists' in html
 
 
 def test_search_titles_dedupes_exact_before_broad(app, user):

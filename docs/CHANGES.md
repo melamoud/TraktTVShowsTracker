@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-12 — Search: hide watched / list titles by default
+
+- Search filters: **Not watched** and **Not in lists** (Wishlist + personal lists), both on by default
+- Choices remembered like Latest / My; **Show watched** / **In lists** to include them again
+
 ## 2026-08-12 — Cast + favorite actors
 
 - Title detail shows Trakt cast (main few, expand for all) with local **☆ Favorite** per actor
