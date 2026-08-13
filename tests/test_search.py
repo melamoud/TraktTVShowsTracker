@@ -18,6 +18,8 @@ def test_search_page_prompts_without_query(app, client, user):
     assert 'class="pill on"' in html
     assert '>Movies</' in html
     assert '>Shows</' in html
+    assert 'class="active"' in html
+    assert 'aria-current="page">Search</a>' in html
 
 
 def test_search_type_pills_toggle_movies_and_shows(app, client, user):

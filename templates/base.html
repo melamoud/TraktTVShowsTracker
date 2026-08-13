@@ -8,25 +8,26 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=14">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=15">
   {% block head %}{% endblock %}
 </head>
 <body>
   {% if current_user.is_authenticated %}
-  <nav class="topnav">
-    <a class="brand" href="{{ url_for('catalog.home') }}">TraktTV <span>Shows Tracker</span></a>
-    <a href="{{ url_for('catalog.latest_movies') }}">Latest movies</a>
-    <a href="{{ url_for('catalog.latest_shows') }}">Latest shows</a>
-    <a href="{{ url_for('catalog.recommended_movies') }}">Rec movies</a>
-    <a href="{{ url_for('catalog.recommended_shows') }}">Rec shows</a>
-    <a href="{{ url_for('user.my_movies') }}">My movies</a>
-    <a href="{{ url_for('user.my_shows') }}">My shows</a>
-    <a href="{{ url_for('catalog.search') }}">Search</a>
-    <a href="{{ url_for('user.preferences') }}">Preferences</a>
-    <a href="{{ url_for('user.notifications') }}">Alerts{% if unread_notifications %}<span class="badge">{{ unread_notifications }}</span>{% endif %}</a>
-    <a href="{{ url_for('user.help_page') }}">Help</a>
+  {% set ep = request.endpoint or '' %}
+  <nav class="topnav" aria-label="Main">
+    <a class="brand{% if ep == 'catalog.home' %} active{% endif %}" href="{{ url_for('catalog.home') }}">TraktTV <span>Shows Tracker</span></a>
+    <a href="{{ url_for('catalog.latest_movies') }}" class="{% if ep == 'catalog.latest_movies' %}active{% endif %}"{% if ep == 'catalog.latest_movies' %} aria-current="page"{% endif %}>Latest movies</a>
+    <a href="{{ url_for('catalog.latest_shows') }}" class="{% if ep == 'catalog.latest_shows' %}active{% endif %}"{% if ep == 'catalog.latest_shows' %} aria-current="page"{% endif %}>Latest shows</a>
+    <a href="{{ url_for('catalog.recommended_movies') }}" class="{% if ep == 'catalog.recommended_movies' %}active{% endif %}"{% if ep == 'catalog.recommended_movies' %} aria-current="page"{% endif %}>Rec movies</a>
+    <a href="{{ url_for('catalog.recommended_shows') }}" class="{% if ep == 'catalog.recommended_shows' %}active{% endif %}"{% if ep == 'catalog.recommended_shows' %} aria-current="page"{% endif %}>Rec shows</a>
+    <a href="{{ url_for('user.my_movies') }}" class="{% if ep == 'user.my_movies' %}active{% endif %}"{% if ep == 'user.my_movies' %} aria-current="page"{% endif %}>My movies</a>
+    <a href="{{ url_for('user.my_shows') }}" class="{% if ep in ('user.my_shows', 'user.series_progress') %}active{% endif %}"{% if ep in ('user.my_shows', 'user.series_progress') %} aria-current="page"{% endif %}>My shows</a>
+    <a href="{{ url_for('catalog.search') }}" class="{% if ep == 'catalog.search' %}active{% endif %}"{% if ep == 'catalog.search' %} aria-current="page"{% endif %}>Search</a>
+    <a href="{{ url_for('user.preferences') }}" class="{% if ep in ('user.preferences', 'user.preferences_setup') %}active{% endif %}"{% if ep in ('user.preferences', 'user.preferences_setup') %} aria-current="page"{% endif %}>Preferences</a>
+    <a href="{{ url_for('user.notifications') }}" class="{% if ep == 'user.notifications' %}active{% endif %}"{% if ep == 'user.notifications' %} aria-current="page"{% endif %}>Alerts{% if unread_notifications %}<span class="badge">{{ unread_notifications }}</span>{% endif %}</a>
+    <a href="{{ url_for('user.help_page') }}" class="{% if ep == 'user.help_page' %}active{% endif %}"{% if ep == 'user.help_page' %} aria-current="page"{% endif %}>Help</a>
     {% if current_user.is_admin %}
-      <a href="{{ url_for('admin.dashboard') }}">Admin</a>
+      <a href="{{ url_for('admin.dashboard') }}" class="{% if ep.startswith('admin.') %}active{% endif %}"{% if ep.startswith('admin.') %} aria-current="page"{% endif %}>Admin</a>
     {% endif %}
     <a href="{{ url_for('auth.logout') }}">Logout ({{ current_user.username }})</a>
   </nav>

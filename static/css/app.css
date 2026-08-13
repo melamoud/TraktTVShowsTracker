@@ -41,8 +41,24 @@ a:hover { text-decoration: underline; }
   color: var(--text); letter-spacing: .02em; margin-right: auto;
 }
 .brand span { color: var(--accent); }
-.topnav a { color: var(--muted); font-weight: 600; }
-.topnav a:hover, .topnav a.active { color: var(--text); text-decoration: none; }
+.topnav a {
+  color: var(--muted);
+  font-weight: 600;
+  padding: .15rem 0;
+  border-bottom: 2px solid transparent;
+}
+.topnav a:hover { color: var(--text); text-decoration: none; }
+.topnav a.active {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom-color: var(--accent);
+}
+.topnav a.brand {
+  border-bottom-color: transparent;
+  padding-bottom: 0;
+}
+.topnav a.brand.active { color: var(--text); }
+.topnav a.brand.active span { color: var(--accent); }
 .badge {
   display: inline-block; min-width: 1.2rem; padding: 0 .35rem;
   border-radius: 999px; background: var(--accent-2); color: #1a1200;
