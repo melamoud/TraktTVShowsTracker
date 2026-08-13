@@ -316,6 +316,11 @@ def search():
     Results use the same decorated card fields as Latest (lists / watched / streaming).
     Defaults hide watched and already-listed titles (Wishlist + personal lists).
     """
+    return render_template('search.html', **_search_catalog())
+
+
+def _search_catalog() -> dict:
+    """Collect Trakt-wide search results and filter state for HTML or JSON."""
     from services import view_prefs
     from services.sync_jobs import enrich_media_list_for_display, upsert_cached_media
     from services.streaming_matcher import split_providers_for_user
@@ -429,24 +434,23 @@ def search():
         total = 0
         pages = 1
 
-    return render_template(
-        'search.html',
-        q=q,
-        search_type=type_raw,
-        rows=page_rows,
-        page=page,
-        pages=pages,
-        page_links=_pagination_pages(page, pages),
-        per_page=per_page,
-        total=total,
-        raw_total=raw_total,
-        hide_watched=hide_watched,
-        hide_lists=hide_lists,
-        fetch_error=fetch_error,
-        tmdb_configured=tmdb_is_configured(),
-        streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
-        title='Search',
-    )
+    return {
+        'q': q,
+        'search_type': type_raw,
+        'rows': page_rows,
+        'page': page,
+        'pages': pages,
+        'page_links': _pagination_pages(page, pages),
+        'per_page': per_page,
+        'total': total,
+        'raw_total': raw_total,
+        'hide_watched': hide_watched,
+        'hide_lists': hide_lists,
+        'fetch_error': fetch_error,
+        'tmdb_configured': tmdb_is_configured(),
+        'streaming_region': current_app.config.get('STREAMING_REGION', 'US'),
+        'title': 'Search',
+    }
 
 
 @catalog_bp.route('/latest/movies')

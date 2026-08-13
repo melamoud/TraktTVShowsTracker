@@ -13,6 +13,7 @@ TraktTV Shows Tracker helps you review newly listed movies and shows on Trakt, h
 - **Series progress** — mark seasons/episodes; **Rate / Review** dialog (rating + comment + optional watch); updates Trakt
 - **Title detail** — open a movie/show page for cast (favorite actors), **Write review…**, rate / favorite / lists
 - **Alerts** — automatic in-app alerts for collection titles (release date, new streaming, episodes/seasons); toggles in Preferences
+- **Android app** — My Shows / My Movies / Search / Alerts / Progress on your phone (same server + Trakt login). Latest and Recommended stay on the website for now. See [Android app](android).
 
 You must log in with TraktTV. There are no local passwords for normal users.
 

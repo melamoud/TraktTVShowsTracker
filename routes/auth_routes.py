@@ -38,6 +38,8 @@ def auth_trakt():
     if not current_app.config.get('TRAKT_CLIENT_ID'):
         flash('Missing TRAKT_CLIENT_ID. Configure .env first.', 'danger')
         return redirect(url_for('auth.login'))
+    if request.args.get('client') == 'android':
+        session['oauth_client'] = 'android'
     state = secrets.token_urlsafe(24)
     session['oauth_state'] = state
     return redirect(trakt_client.oauth_authorize_url(state))
@@ -139,6 +141,19 @@ def auth_callback():
     except Exception as exc:
         current_app.logger.warning('Initial media sync failed: %s', exc)
 
+    oauth_client = session.pop('oauth_client', None)
+    if oauth_client == 'android':
+        from datetime import timedelta
+        from models import MobileLoginToken
+        token = secrets.token_urlsafe(32)
+        db.session.add(MobileLoginToken(
+            token=token,
+            user_id=user.id,
+            expires_at=datetime.utcnow() + timedelta(minutes=5),
+        ))
+        db.session.commit()
+        return redirect(url_for('auth.mobile_done', token=token))
+
     flash(f'Welcome, {user.username}!', 'success')
     # First-run: send users without genres/keywords through the match-filter wizard.
     prefs = user.preferences
@@ -148,6 +163,13 @@ def auth_callback():
     if not user_has_match_prefs(user) and not prefs.onboarding_completed_at:
         return redirect(url_for('user.preferences_setup'))
     return redirect(url_for('catalog.home'))
+
+
+@auth_bp.route('/auth/mobile-done')
+def mobile_done():
+    """Handoff page after Android Trakt OAuth — opens the app via custom scheme."""
+    token = (request.args.get('token') or '').strip()
+    return render_template('auth_mobile_done.html', token=token)
 
 
 @auth_bp.route('/logout')

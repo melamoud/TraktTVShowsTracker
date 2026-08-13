@@ -47,6 +47,12 @@ logs/
 *.pid
 .server.pid
 
+# Android
+android/.gradle/
+android/local.properties
+android/app/build/
+android/app/src/main/assets/server_cert.pem
+
 # Test / temp
 .pytest_cache/
 .coverage

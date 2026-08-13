@@ -56,4 +56,5 @@ def get_help_toc(role: str = 'user') -> list[dict]:
         {'title': 'Series progress', 'slug': 'series_progress'},
         {'title': 'Streaming vs Found on', 'slug': 'streaming'},
         {'title': 'Alerts', 'slug': 'release_alerts'},
+        {'title': 'Android app', 'slug': 'android'},
     ]

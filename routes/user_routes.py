@@ -412,14 +412,14 @@ def preferences():
 @login_required
 def my_movies():
     """Movies on the user's Trakt watchlist and/or watched history."""
-    return _my_media('movie')
+    return render_template('my_media.html', **_my_media('movie'))
 
 
 @user_bp.route('/my/shows')
 @login_required
 def my_shows():
     """Shows on the user's Trakt watchlist and/or watched history."""
-    return _my_media('show')
+    return render_template('my_media.html', **_my_media('show'))
 
 
 def _my_filter_lists(user) -> list[dict]:
@@ -923,28 +923,27 @@ def _my_media(media_type: str):
     ]
     selected_names = [lst['name'] for lst in filter_lists if lst['id'] in selected_set]
 
-    return render_template(
-        'my_media.html',
-        media_type=media_type,
-        rows=rows,
-        filt=filt,
-        filter_lists=filter_lists,
-        filter_lists_payload=filter_lists_payload,
-        selected_lists=selected_lists,
-        selected_names=selected_names,
-        page=page,
-        pages=pages,
-        per_page=per_page,
-        total=total,
-        page_links=_pagination_pages(page, pages),
-        search_q=search_q,
-        avail=avail,
-        display_mode=display_mode,
-        calendar=calendar_ctx,
-        tmdb_configured=tmdb_ok,
-        streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
-        title='My Movies' if media_type == 'movie' else 'My Shows',
-    )
+    return {
+        'media_type': media_type,
+        'rows': rows,
+        'filt': filt,
+        'filter_lists': filter_lists,
+        'filter_lists_payload': filter_lists_payload,
+        'selected_lists': selected_lists,
+        'selected_names': selected_names,
+        'page': page,
+        'pages': pages,
+        'per_page': per_page,
+        'total': total,
+        'page_links': _pagination_pages(page, pages),
+        'search_q': search_q,
+        'avail': avail,
+        'display_mode': display_mode,
+        'calendar': calendar_ctx,
+        'tmdb_configured': tmdb_ok,
+        'streaming_region': current_app.config.get('STREAMING_REGION', 'US'),
+        'title': 'My Movies' if media_type == 'movie' else 'My Shows',
+    }
 
 
 def _progress_keys_from_trakt(progress, history, watched_entry) -> tuple[set, set]:
@@ -1067,10 +1066,12 @@ def _build_progress_context(media, trakt_id, seasons_meta, watched_keys, aired_k
     }
 
 
-@user_bp.route('/shows/<int:trakt_id>/progress')
-@login_required
-def series_progress(trakt_id):
-    """Series progress screen with dimmed watched seasons/episodes."""
+def _load_progress_data(trakt_id: int) -> dict:
+    """
+    Load series progress for the current user.
+
+    Returns ``{'ok': True, ...ctx}`` or ``{'ok': False, 'message', 'status'}``.
+    """
     from services.trakt_cache import (
         cache_http_span,
         load_progress_payload,
@@ -1113,16 +1114,11 @@ def series_progress(trakt_id):
                 current_app.logger.warning('Progress load rate-limited: %s', exc)
                 msg = 'Trakt is rate-limiting right now. Wait a few seconds and retry.'
                 status = 429
-                flash_cat = 'warning'
             else:
                 current_app.logger.exception('Progress load failed: %s', exc)
                 msg = 'Could not load show progress from Trakt right now.'
                 status = 502
-                flash_cat = 'danger'
-            if request.args.get('partial') == '1':
-                return (f'<p class="muted">{msg}</p>', status)
-            flash(msg, flash_cat)
-            return redirect(url_for('user.my_shows'))
+            return {'ok': False, 'message': msg, 'status': status}
         watched_keys, aired_keys = _progress_keys_from_trakt(
             progress, history, watched_entry,
         )
@@ -1146,6 +1142,22 @@ def series_progress(trakt_id):
     ctx = _build_progress_context(
         media, trakt_id, seasons_meta, watched_keys, aired_keys,
     )
+    return {'ok': True, **ctx}
+
+
+@user_bp.route('/shows/<int:trakt_id>/progress')
+@login_required
+def series_progress(trakt_id):
+    """Series progress screen with dimmed watched seasons/episodes."""
+    result = _load_progress_data(trakt_id)
+    if not result.get('ok'):
+        msg = result.get('message') or 'Could not load show progress.'
+        status = int(result.get('status') or 502)
+        if request.args.get('partial') == '1':
+            return (f'<p class="muted">{msg}</p>', status)
+        flash(msg, 'warning' if status == 429 else 'danger')
+        return redirect(url_for('user.my_shows'))
+    ctx = {k: v for k, v in result.items() if k != 'ok'}
     if request.args.get('partial') == '1':
         return render_template('_series_progress_body.html', **ctx)
     return render_template('series_progress.html', **ctx)
@@ -1297,10 +1309,8 @@ ALERT_TYPE_LABELS = {
 }
 
 
-@user_bp.route('/notifications')
-@login_required
-def notifications():
-    """List in-app notifications for the current user."""
+def _collect_alert_cards() -> dict:
+    """Build Alerts page/API payload for the current user."""
     from services import view_prefs
 
     hide_read = view_prefs.resolve_bool(
@@ -1350,12 +1360,18 @@ def notifications():
                 n.alert_type, (n.alert_type or '').replace('_', ' '),
             ),
         })
-    return render_template(
-        'notifications.html',
-        cards=cards,
-        unread_count=unread_count,
-        hide_read=hide_read,
-    )
+    return {
+        'cards': cards,
+        'unread_count': unread_count,
+        'hide_read': hide_read,
+    }
+
+
+@user_bp.route('/notifications')
+@login_required
+def notifications():
+    """List in-app notifications for the current user."""
+    return render_template('notifications.html', **_collect_alert_cards())
 
 
 @user_bp.route('/notifications/read-all', methods=['POST'])

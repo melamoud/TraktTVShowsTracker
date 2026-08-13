@@ -1,0 +1,29 @@
+<resources>
+    <string name="app_name">TV Tracker</string>
+    <string name="login_title">TraktTV Shows Tracker</string>
+    <string name="login_subtitle">Update progress and find what to watch</string>
+    <string name="login_with_trakt">Login with TraktTV</string>
+    <string name="login_help">Uses the same Trakt account as the website. After you authorize, this app opens again to finish login.</string>
+    <string name="logout">Log out</string>
+    <string name="my_shows">My Shows</string>
+    <string name="my_movies">My Movies</string>
+    <string name="search">Search</string>
+    <string name="alerts">Alerts</string>
+    <string name="progress">Progress</string>
+    <string name="search_hint">Search Trakt titles…</string>
+    <string name="list_search_hint">Search titles in this list…</string>
+    <string name="empty_search">Type at least 2 characters to search Trakt.</string>
+    <string name="empty_list">Nothing matches these filters.</string>
+    <string name="empty_alerts">No alerts right now.</string>
+    <string name="refresh">Refresh from Trakt</string>
+    <string name="pin">Pin</string>
+    <string name="unpin">Unpin</string>
+    <string name="set_lists">Set lists…</string>
+    <string name="mark_watched">Mark watched</string>
+    <string name="unwatch">Unwatch</string>
+    <string name="rate">Rate…</string>
+    <string name="favorite">Favorite</string>
+    <string name="unfavorite">Unfavorite</string>
+    <string name="hide_password">Hide password</string>
+    <string name="show_password">Show password</string>
+</resources>

@@ -1,0 +1,13 @@
+/.gradle/
+/build/
+/app/build/
+/local.properties
+*.iml
+.idea/
+.DS_Store
+captures/
+*.jks
+*.keystore
+keystore.properties
+/app/src/main/assets/server_cert.pem
+/app/release/

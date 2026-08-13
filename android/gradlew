@@ -1,0 +1,19 @@
+#!/bin/sh
+# Gradle start up script for POSIX generated for this project.
+APP_HOME=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+DEFAULT_JVM_OPTS='-Dfile.encoding=UTF-8 -Xmx64m -Xms64m'
+# Prefer a project JDK 17 if present; does not change the caller JAVA_HOME.
+if [ -x "/d/dev/jdk-17/bin/java" ]; then
+  JAVA_HOME="/d/dev/jdk-17"
+elif [ -x "D:/dev/jdk-17/bin/java" ]; then
+  JAVA_HOME="D:/dev/jdk-17"
+fi
+if [ -n "$JAVA_HOME" ]; then
+  JAVACMD="$JAVA_HOME/bin/java"
+else
+  JAVACMD=java
+fi
+exec "$JAVACMD" $DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS \
+  "-Dorg.gradle.appname=gradlew" \
+  -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" \
+  org.gradle.wrapper.GradleWrapperMain "$@"

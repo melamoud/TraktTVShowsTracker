@@ -21,6 +21,7 @@ Details: [docs/SETUP.md](docs/SETUP.md)
 - [Deployment](docs/DEPLOYMENT.md) (`tvtracker.melamoud.com`)
 - [Changes](docs/CHANGES.md)
 - In-app **Help** menu (`docs/help/user` and `docs/help/admin`)
+- [Android app](android/README.md) — My Shows / My Movies / Search / Alerts / Progress
 
 ## Main features
 

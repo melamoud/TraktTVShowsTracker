@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Return to TV Tracker</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #0b0d12;
+      color: #e8edf7;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+    }
+    .panel {
+      max-width: 28rem;
+      padding: 2rem;
+      text-align: center;
+    }
+    a.btn {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: .7rem 1.2rem;
+      background: #3dd6c6;
+      color: #0b0d12;
+      font-weight: 700;
+      text-decoration: none;
+      border-radius: 8px;
+    }
+    .muted { color: #9aa6bf; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    <h1>Signed in</h1>
+    {% if token %}
+    <p class="muted">Return to the TV Tracker app to finish login.</p>
+    <p><a class="btn" id="open-app" href="tvtracker://oauth?token={{ token }}">Open TV Tracker</a></p>
+    <script>
+      window.location = "tvtracker://oauth?token={{ token }}";
+    </script>
+    {% else %}
+    <p class="muted">Missing login token. Close this tab and try again from the app.</p>
+    {% endif %}
+  </div>
+</body>
+</html>

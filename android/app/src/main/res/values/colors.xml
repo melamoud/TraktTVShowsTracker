@@ -1,0 +1,13 @@
+<resources>
+    <color name="primary">#3DD6C6</color>
+    <color name="background">#0B0D12</color>
+    <color name="surface">#141821</color>
+    <color name="surface_dark">#0B0D12</color>
+    <color name="text_primary">#E8EDF7</color>
+    <color name="text_muted">#9AA6BF</color>
+    <color name="accent">#3DD6C6</color>
+    <color name="accent_2">#F0B429</color>
+    <color name="danger">#FF6B7A</color>
+    <color name="ok">#6DDF8B</color>
+    <color name="ic_launcher_background">#0B0D12</color>
+</resources>

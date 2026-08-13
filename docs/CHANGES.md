@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-13 — Android app (My / Search / Alerts / Progress)
+
+- Native Kotlin client in `android/` talks to `https://tvtracker.melamoud.com:8300` the same way AudioBooks Review does (HTTPS, bundled cert, cookie session)
+- Login is Trakt OAuth in a Custom Tab, then a one-time token (`tvtracker://oauth`) becomes a Flask session
+- `/api/v1` JSON for My movies/shows, Search, Progress, Alerts, and the existing list/watch/rate/favorite writes
+- Latest and Recommended screens are not in this build
+
 ## 2026-08-13 — Trakt call log (source + user)
 
 - Every cache object decision is logged as `Cache user_media hit user=friend calls=0 source=http GET /my/shows` (also `probe` / `fetch` with `calls=` for Trakt HTTP count)

@@ -5,6 +5,8 @@
 3. Approve access for this application
 4. You return here signed in
 
+The [Android app](android) uses the same Trakt login: tap **Login with TraktTV**, approve in the browser, then return to the app.
+
 ## Need a Trakt account?
 
 Create one at [trakt.tv](https://trakt.tv). This app cannot create Trakt accounts for you.

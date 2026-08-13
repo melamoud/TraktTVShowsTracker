@@ -20,6 +20,7 @@ Patterns intentionally mirror `D:\dev\AudioBooksReview` (config, security header
 - `routes/catalog_routes.py` — Home, latest movies/shows, detail, Trakt actions, markers
 - `routes/user_routes.py` — Preferences, my lists, series progress, notifications, user help
 - `routes/admin_routes.py` — Users, streaming defaults/approvals, admin help
+- `mobile_api.py` — `/api/v1` JSON for the Android client (CSRF-exempt; same Flask-Login session cookies)
 
 ## Data ownership
 

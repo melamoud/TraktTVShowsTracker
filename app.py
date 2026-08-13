@@ -41,6 +41,13 @@ def create_app(config_object=Config):
         """Load user for Flask-Login."""
         return db.session.get(User, int(user_id))
 
+    @login_manager.unauthorized_handler
+    def unauthorized():
+        """JSON 401 for the Android API; HTML redirect for the website."""
+        if request.path.startswith('/api/v1'):
+            return jsonify({'success': False, 'message': 'Login required'}), 401
+        return redirect(url_for('auth.login'))
+
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):
         """Friendly CSRF failure response."""
@@ -121,6 +128,11 @@ def create_app(config_object=Config):
 
     from routes import register_routes
     register_routes(app)
+
+    from mobile_api import mobile_api_bp
+    csrf.exempt(mobile_api_bp)
+    app.register_blueprint(mobile_api_bp)
+    app.logger.info('[ANDROID-API] blueprint registered prefix=/api/v1')
 
     with app.app_context():
         db.create_all()

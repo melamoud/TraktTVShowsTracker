@@ -471,6 +471,18 @@ class Notification(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
+class MobileLoginToken(db.Model):
+    """One-time token that hands a Trakt OAuth login from the browser to the Android app."""
+
+    __tablename__ = 'mobile_login_tokens'
+
+    token = db.Column(db.String(64), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    used_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
 class UserSession(db.Model):
     """Trackable login sessions for admin revoke / audit."""
 
