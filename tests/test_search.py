@@ -110,6 +110,8 @@ def test_search_page_renders_multiple_results(app, client, user):
     assert 'Set lists' in html
     assert 'Not watched' in html
     assert 'Not in lists' in html
+    assert 'trakt.tv/shows/' in html
+    assert '>Trakt</a>' in html
 
 
 def test_search_hides_watched_and_list_titles_by_default(app, client, user):

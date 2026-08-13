@@ -31,6 +31,6 @@ Open the title page for **Write review…** (posts a Trakt comment; optional spo
 - **Mark watched / Unwatch** — syncs to Trakt (asks for confirmation first)
 - **Streaming** / **Plays on your services** — TMDB availability (same as Latest); highlighted when it matches services in Preferences  
 - **Found on…** — multi-select where *you* found it (local only; see [Streaming](streaming)). Each row has **Search** to open that service for the title without saving first.
-- Open the title for full detail, IMDb, trailer
+- Open the title for full detail, IMDb, Trakt, trailer
 
 List membership ↔ watched works both ways (mark watched from a list, or put a watched title onto lists).

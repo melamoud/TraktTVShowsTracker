@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-12 — Trakt link on every title card
+
+- Latest / Recommended / Search / My cards now include a **Trakt** button (same as title detail), next to IMDb / Trailer
+
 ## 2026-08-12 — Search: hide watched / list titles by default
 
 - Search filters: **Not watched** and **Not in lists** (Wishlist + personal lists), both on by default
