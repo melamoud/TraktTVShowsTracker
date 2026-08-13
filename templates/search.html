@@ -43,11 +43,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
     <label class="sr-only" for="search-q">Search titles</label>
     <input class="search-input" id="search-q" type="search" name="q" value="{{ q }}"
            placeholder="Title (min. 2 characters)" minlength="2" autofocus>
-    <select class="search-select" name="type" aria-label="Media type">
-      <option value="both" {% if search_type == 'both' %}selected{% endif %}>Movies &amp; shows</option>
-      <option value="movie" {% if search_type == 'movie' %}selected{% endif %}>Movies</option>
-      <option value="show" {% if search_type == 'show' %}selected{% endif %}>Shows</option>
-    </select>
+    <input type="hidden" name="type" value="{{ search_type }}">
     <input type="hidden" name="hide_watched" value="{{ hw }}">
     <input type="hidden" name="hide_lists" value="{{ hl }}">
     <button class="btn btn-primary btn-small" type="submit">Search</button>
@@ -56,6 +52,18 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
     {% endif %}
   </div>
   <div class="pill-row">
+    {% set movie_on = search_type in ('movie', 'both') %}
+    {% set show_on = search_type in ('show', 'both') %}
+    {% if movie_on and show_on %}
+      <a class="pill on" href="?{{ qs(page_n=1, type_v='show') }}" title="Turn off Movies">Movies</a>
+      <a class="pill on" href="?{{ qs(page_n=1, type_v='movie') }}" title="Turn off Shows">Shows</a>
+    {% elif movie_on %}
+      <span class="pill on" aria-current="true">Movies</span>
+      <a class="pill" href="?{{ qs(page_n=1, type_v='both') }}">Shows</a>
+    {% else %}
+      <a class="pill" href="?{{ qs(page_n=1, type_v='both') }}">Movies</a>
+      <span class="pill on" aria-current="true">Shows</span>
+    {% endif %}
     {% if hide_watched %}
       <a class="pill" href="?{{ qs(page_n=1, hw_v=0) }}">Show watched</a>
       <span class="pill on">Not watched</span>

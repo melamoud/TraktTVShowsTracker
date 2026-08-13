@@ -4,6 +4,7 @@
 
 - Search filters: **Not watched** and **Not in lists** (Wishlist + personal lists), both on by default
 - Choices remembered like Latest / My; **Show watched** / **In lists** to include them again
+- **Movies** / **Shows** are toggle pills on the same filter row (both on by default) instead of a dropdown
 
 ## 2026-08-12 — Cast + favorite actors
 

@@ -5,7 +5,7 @@
 Use **Search** in the top navigation to find movies and shows in Trakt’s database (not only titles you already track).
 
 1. Type at least **2 characters**
-2. Choose **Movies**, **Shows**, or **Movies & shows**
+2. Use the **Movies** / **Shows** pills (both on by default) — tap one to search that type only; tap again via the other pill to restore both
 3. Results use the same card layout as Latest: overview, genres, streaming lines, preference tags, watchlist/watched status
 4. **Set lists…** / **Mark watched** / **Rate…** / **Favorite** work the same as elsewhere; shows also link to **Progress**
 

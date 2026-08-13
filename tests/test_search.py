@@ -14,6 +14,50 @@ def test_search_page_prompts_without_query(app, client, user):
     assert 'Type at least 2 characters' in html
     assert 'class="media-list"' not in html
     assert 'data-action="lists-edit"' not in html
+    assert 'search-select' not in html
+    assert 'class="pill on"' in html
+    assert '>Movies</' in html
+    assert '>Shows</' in html
+
+
+def test_search_type_pills_toggle_movies_and_shows(app, client, user):
+    """Movies + Shows pills sit with other filters; both on means type=both."""
+    login_client(client, app, user)
+
+    def fake_search(_user, media_type, query, *, limit=20):
+        if media_type == 'movie':
+            return [{
+                'type': 'movie', 'score': 1,
+                'movie': {'title': 'Solo Movie', 'year': 2024, 'ids': {'trakt': 11}},
+            }]
+        return [{
+            'type': 'show', 'score': 1,
+            'show': {'title': 'Solo Show', 'year': 2024, 'ids': {'trakt': 12}},
+        }]
+
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_titles', side_effect=fake_search), \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+        both = client.get('/search?q=solo&type=both&hide_watched=0&hide_lists=0')
+        movies = client.get('/search?q=solo&type=movie&hide_watched=0&hide_lists=0')
+        shows = client.get('/search?q=solo&type=show&hide_watched=0&hide_lists=0')
+
+    both_html = both.get_data(as_text=True)
+    assert 'data-trakt-id="11"' in both_html
+    assert 'data-trakt-id="12"' in both_html
+    assert 'type=show' in both_html  # Movies pill turns off → shows only
+    assert 'type=movie' in both_html  # Shows pill turns off → movies only
+
+    movies_html = movies.get_data(as_text=True)
+    assert 'data-trakt-id="11"' in movies_html
+    assert 'data-trakt-id="12"' not in movies_html
+    assert 'type=both' in movies_html  # Shows pill adds shows back
+
+    shows_html = shows.get_data(as_text=True)
+    assert 'data-trakt-id="12"' in shows_html
+    assert 'data-trakt-id="11"' not in shows_html
+    assert 'type=both' in shows_html  # Movies pill adds movies back
 
 
 def test_search_page_renders_multiple_results(app, client, user):
