@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-13 — Android cards and filters compacted
+
+- My / Search filters are dropdowns with checkmarks (one button each) instead of chip rows
+- Title cards keep **Progress** and **Watch**; pin / lists / rate / favorite live in the ⋮ menu
+
 ## 2026-08-13 — Android app (My / Search / Alerts / Progress)
 
 - Native Kotlin client in `android/` talks to `https://tvtracker.melamoud.com:8300` the same way AudioBooks Review does (HTTPS, bundled cert, cookie session)

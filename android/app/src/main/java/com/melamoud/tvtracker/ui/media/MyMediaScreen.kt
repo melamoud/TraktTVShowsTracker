@@ -12,11 +12,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -27,10 +28,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.R
+import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
+import com.melamoud.tvtracker.ui.components.FilterMenuButton
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
 import com.melamoud.tvtracker.ui.components.RateDialog
@@ -45,11 +49,23 @@ fun MyMediaScreen(
     onProgress: (Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val statusOptions = statusChoices(isShows)
+    val statusLabel = statusOptions.firstOrNull { it.first == state.filter }?.second ?: "Status"
+    val availLabel = when (state.avail) {
+        "upcoming" -> "Upcoming"
+        "theater" -> "Theater"
+        "streaming" -> "Streaming"
+        else -> "Avail"
+    }
+    val viewLabel = if (state.display == "newest_aired") "Newest" else "List"
+    val listsSelected = state.filterLists.count { it.selected }
+    val listsLabel = if (listsSelected == 0) "Lists" else "Lists ($listsSelected)"
+
     Column(Modifier.fillMaxSize()) {
         OutlinedTextField(
             value = state.query,
             onValueChange = viewModel::setQuery,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             placeholder = { Text(stringResource(R.string.list_search_hint)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
@@ -58,40 +74,59 @@ fun MyMediaScreen(
                 }
             },
             singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { viewModel.applyQuery() }),
         )
-        TextButton(onClick = viewModel::applyQuery, modifier = Modifier.padding(horizontal = 8.dp)) {
-            Text("Filter titles")
-        }
-        ChipRow {
-            statusChips(isShows).forEach { (id, label) ->
-                FilterChip(selected = state.filter == id, onClick = { viewModel.setFilter(id) }, label = { Text(label) })
+        Row(
+            Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilterMenuButton(statusLabel) { dismiss ->
+                statusOptions.forEach { (id, label) ->
+                    CheckMenuItem(label, state.filter == id) {
+                        viewModel.setFilter(id)
+                        dismiss()
+                    }
+                }
             }
-        }
-        ChipRow {
-            FilterChip(selected = state.display == "list", onClick = { viewModel.setDisplay("list") }, label = { Text("List") })
-            FilterChip(selected = state.display == "newest_aired", onClick = { viewModel.setDisplay("newest_aired") }, label = { Text("Newest aired") })
-            FilterChip(selected = state.avail == "", onClick = { viewModel.setAvail("") }, label = { Text("Any avail") })
-            FilterChip(selected = state.avail == "upcoming", onClick = { viewModel.setAvail("upcoming") }, label = { Text("Upcoming") })
-            FilterChip(selected = state.avail == "theater", onClick = { viewModel.setAvail("theater") }, label = { Text("Theater") })
-            FilterChip(selected = state.avail == "streaming", onClick = { viewModel.setAvail("streaming") }, label = { Text("Streaming") })
-        }
-        if (state.filterLists.isNotEmpty()) {
-            ChipRow {
-                state.filterLists.forEach { lst ->
-                    FilterChip(
-                        selected = lst.selected,
-                        onClick = { viewModel.toggleList(lst.id) },
-                        label = { Text(lst.name) },
-                    )
+            if (state.filterLists.isNotEmpty()) {
+                FilterMenuButton(listsLabel) { _ ->
+                    state.filterLists.forEach { lst ->
+                        CheckMenuItem(lst.name, lst.selected) { viewModel.toggleList(lst.id) }
+                    }
+                }
+            }
+            FilterMenuButton(availLabel) { dismiss ->
+                listOf("" to "Any", "upcoming" to "Upcoming", "theater" to "Theater", "streaming" to "Streaming")
+                    .forEach { (id, label) ->
+                        CheckMenuItem(label, state.avail == id) {
+                            viewModel.setAvail(id)
+                            dismiss()
+                        }
+                    }
+            }
+            FilterMenuButton(viewLabel) { dismiss ->
+                CheckMenuItem("List", state.display == "list") {
+                    viewModel.setDisplay("list")
+                    dismiss()
+                }
+                CheckMenuItem("Newest aired", state.display == "newest_aired") {
+                    viewModel.setDisplay("newest_aired")
+                    dismiss()
                 }
             }
         }
-        Text("${state.total} titles · page ${state.page}/${state.pages}", color = TextMuted, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+        Text(
+            "${state.total} titles · page ${state.page}/${state.pages}",
+            color = TextMuted,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
         when {
             state.loading && state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             state.error != null && state.items.isEmpty() -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
             state.items.isEmpty() -> Text(stringResource(R.string.empty_list), color = TextMuted, modifier = Modifier.padding(24.dp))
-            else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
                     MediaCard(
                         item = item,
@@ -143,18 +178,9 @@ fun MyMediaScreen(
     }
 }
 
-@Composable
-private fun ChipRow(content: @Composable () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) { content() }
-}
-
-private fun statusChips(isShows: Boolean): List<Pair<String, String>> {
+private fun statusChoices(isShows: Boolean): List<Pair<String, String>> {
     return if (isShows) {
-        listOf("lists" to "Both", "watched" to "Watched", "unwatched_episodes" to "Unwatched episodes")
+        listOf("lists" to "Both", "watched" to "Watched", "unwatched_episodes" to "Unwatched eps")
     } else {
         listOf("lists" to "Both", "watched" to "Watched", "unwatched" to "Unwatched")
     }

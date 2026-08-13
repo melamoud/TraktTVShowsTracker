@@ -17,7 +17,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -30,7 +29,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.R
+import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
+import com.melamoud.tvtracker.ui.components.FilterMenuButton
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
 import com.melamoud.tvtracker.ui.components.RateDialog
@@ -44,11 +45,19 @@ fun SearchScreen(
     onProgress: (Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val typeLabel = when (state.type) {
+        "movie" -> "Movies"
+        "show" -> "Shows"
+        else -> "Type"
+    }
+    val filterCount = listOf(state.hideWatched, state.hideLists).count { it }
+    val filtersLabel = if (filterCount == 0) "Filters" else "Filters ($filterCount)"
+
     Column(Modifier.fillMaxSize()) {
         OutlinedTextField(
             value = state.query,
             onValueChange = viewModel::onQuery,
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             placeholder = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             singleLine = true,
@@ -57,30 +66,39 @@ fun SearchScreen(
         )
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            FilterChip(selected = state.type == "both" || state.type == "movie", onClick = {
-                viewModel.setType(when (state.type) {
-                    "both" -> "show"
-                    "show" -> "both"
-                    else -> "both"
-                })
-            }, label = { Text("Movies") })
-            FilterChip(selected = state.type == "both" || state.type == "show", onClick = {
-                viewModel.setType(when (state.type) {
-                    "both" -> "movie"
-                    "movie" -> "both"
-                    else -> "both"
-                })
-            }, label = { Text("Shows") })
-            FilterChip(selected = state.hideWatched, onClick = { viewModel.setHideWatched(!state.hideWatched) }, label = { Text(if (state.hideWatched) "Not watched" else "Show watched") })
-            FilterChip(selected = state.hideLists, onClick = { viewModel.setHideLists(!state.hideLists) }, label = { Text(if (state.hideLists) "Not in lists" else "In lists") })
+            FilterMenuButton(typeLabel) { _ ->
+                CheckMenuItem("Movies", state.type == "both" || state.type == "movie") {
+                    viewModel.setType(
+                        when (state.type) {
+                            "both" -> "show"
+                            "show" -> "both"
+                            else -> "both"
+                        }
+                    )
+                }
+                CheckMenuItem("Shows", state.type == "both" || state.type == "show") {
+                    viewModel.setType(
+                        when (state.type) {
+                            "both" -> "movie"
+                            "movie" -> "both"
+                            else -> "both"
+                        }
+                    )
+                }
+            }
+            FilterMenuButton(filtersLabel) { _ ->
+                CheckMenuItem("Not watched", state.hideWatched) { viewModel.setHideWatched(!state.hideWatched) }
+                CheckMenuItem("Not in lists", state.hideLists) { viewModel.setHideLists(!state.hideLists) }
+            }
         }
         when {
             state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
             state.error != null && state.items.isEmpty() -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
             state.items.isEmpty() -> Text(stringResource(R.string.empty_search), color = TextMuted, modifier = Modifier.padding(24.dp))
-            else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
                     MediaCard(
                         item = item,
