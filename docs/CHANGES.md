@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-13 — Progress drawer survives Trakt rate limits
+
+- List membership sync no longer fetches seasons for every personal-list show (that loop kept calling Trakt after HTTP 429 and starved Progress)
+- Remaining batch work (list items, title backfill) stops on the first 429
+- Short burst 429s retry once; quota 429s fail fast instead of blocking the worker
+- Progress panel returns 429 with a **Retry** button instead of a 502 traceback
+
 ## 2026-08-12 — Trakt link on every title card
 
 - Latest / Recommended / Search / My cards now include a **Trakt** button (same as title detail), next to IMDb / Trailer

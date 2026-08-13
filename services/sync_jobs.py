@@ -766,18 +766,20 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
             ):
                 row.progress_percent = None
 
+    lists_ok = True
     try:
-        sync_user_list_memberships(user, media_types=types)
+        lists_ok = sync_user_list_memberships(user, media_types=types)
     except Exception as exc:
         logger.warning('List membership sync failed for user %s: %s', user.id, exc)
         all_ok = False
+        lists_ok = False
 
     user.last_sync_at = datetime.utcnow()
     db.session.commit()
 
     # Seed last-aired for newly discovered shows only (bounded). Everything
     # else is maintained by the periodic media job — no per-show sweeps here.
-    if 'show' in types:
+    if 'show' in types and lists_ok:
         try:
             from services.shows_cache import seed_new_shows_inline
             seed_new_shows_inline(user)
@@ -790,12 +792,16 @@ def sync_user_media_state(user: User, media_types: tuple[str, ...] | None = None
 def sync_user_list_memberships(
     user: User,
     media_types: tuple[str, ...] | None = None,
-) -> None:
+) -> bool:
     """
     Refresh local cache of personal-list membership for lists shown in Preferences.
 
     Hidden lists are skipped (and their cached rows cleared). Wishlist is handled
     separately via ``UserMediaState.on_watchlist``.
+
+    Returns False when Trakt rate-limits (429) so callers skip further API work.
+    Last-aired dates are *not* fetched here — ``seed_new_shows_inline`` and the
+    periodic cache job own per-show seasons calls.
     """
     types = media_types or ('movie', 'show')
     hidden = set(get_hidden_list_ids(user))
@@ -803,7 +809,7 @@ def sync_user_list_memberships(
         personal = trakt_client.get_personal_lists(user)
     except Exception as exc:
         logger.warning('Could not load personal lists for user %s: %s', user.id, exc)
-        return
+        return not trakt_client.is_rate_limited(exc)
 
     shown = [lst for lst in personal if lst['id'] not in hidden]
     shown_ids = {lst['id'] for lst in shown}
@@ -826,6 +832,11 @@ def sync_user_list_memberships(
                     'List items sync failed user=%s list=%s %s: %s',
                     user.id, lid, media_type, exc,
                 )
+                if trakt_client.is_rate_limited(exc):
+                    logger.warning(
+                        'Stopping list membership sync early (Trakt rate limit)'
+                    )
+                    return False
                 continue
             current_ids: set[int] = set()
             for entry in items:
@@ -838,12 +849,6 @@ def sync_user_list_memberships(
                 _upsert_list_membership(user.id, lid, media_type, tid)
                 _upsert_state(user.id, media_type, tid)
                 upsert_cached_media(media_type, entry)
-                # Pre-populate latest aired for personal-list shows too.
-                if media_type == 'show':
-                    try:
-                        _update_latest_aired_for_show(user.id, tid)
-                    except Exception as exc:
-                        logger.warning('Latest aired pre-pop failed for list show %s: %s', tid, exc)
 
             existing = UserListMembership.query.filter_by(
                 user_id=user.id, list_id=lid, media_type=media_type
@@ -851,6 +856,7 @@ def sync_user_list_memberships(
             for row in existing:
                 if row.trakt_id not in current_ids:
                     db.session.delete(row)
+    return True
 
 
 def _upsert_list_membership(
@@ -926,6 +932,9 @@ def ensure_media_cached(media_type: str, trakt_ids: list[int]) -> None:
                 upsert_cached_media(media_type, summary)
         except Exception as exc:
             logger.warning('ensure_media_cached failed for %s %s: %s', media_type, tid, exc)
+            if trakt_client.is_rate_limited(exc):
+                logger.warning('Stopping media cache backfill early (Trakt rate limit)')
+                break
     if missing:
         db.session.commit()
 

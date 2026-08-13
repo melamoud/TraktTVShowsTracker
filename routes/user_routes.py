@@ -941,13 +941,20 @@ def series_progress(trakt_id):
         # Same source Showly/Kodi use for per-episode plays (extended=progress).
         watched_entry = trakt_client.get_show_watched_entry(current_user, trakt_id)
     except Exception as exc:
-        current_app.logger.exception('Progress load failed: %s', exc)
+        rate_limited = trakt_client.is_rate_limited(exc)
+        if rate_limited:
+            current_app.logger.warning('Progress load rate-limited: %s', exc)
+            msg = 'Trakt is rate-limiting right now. Wait a few seconds and retry.'
+            status = 429
+            flash_cat = 'warning'
+        else:
+            current_app.logger.exception('Progress load failed: %s', exc)
+            msg = 'Could not load show progress from Trakt right now.'
+            status = 502
+            flash_cat = 'danger'
         if request.args.get('partial') == '1':
-            return (
-                '<p class="muted">Could not load show progress from Trakt right now.</p>',
-                502,
-            )
-        flash('Could not load show progress from Trakt.', 'danger')
+            return (f'<p class="muted">{msg}</p>', status)
+        flash(msg, flash_cat)
         return redirect(url_for('user.my_shows'))
 
     watched_keys = trakt_client.episode_watched_keys_from_trakt(

@@ -410,6 +410,13 @@ input[type=text], input[type=url], textarea, select {
 }
 #progress-drawer-loading,
 #progress-drawer-error { margin: .55rem 1.1rem; }
+#progress-drawer-error:not([hidden]) {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  flex-wrap: wrap;
+}
+#progress-drawer-error-text { margin: 0; }
 @media (max-width: 640px) {
   .drawer-panel { width: 100vw; }
 }

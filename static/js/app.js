@@ -798,16 +798,21 @@ function closeProgressDrawer() {
   }
 }
 
+function setProgressDrawerError(message) {
+  const errorEl = document.getElementById('progress-drawer-error');
+  const textEl = document.getElementById('progress-drawer-error-text');
+  if (!errorEl) return;
+  if (textEl) textEl.textContent = message || '';
+  else errorEl.textContent = message || '';
+  errorEl.hidden = !message;
+}
+
 async function refreshProgressDrawer() {
   const body = document.getElementById('progress-drawer-body');
   const loadingEl = document.getElementById('progress-drawer-loading');
-  const errorEl = document.getElementById('progress-drawer-error');
   if (!body || !progressDrawerTraktId) return;
   if (loadingEl) loadingEl.hidden = false;
-  if (errorEl) {
-    errorEl.hidden = true;
-    errorEl.textContent = '';
-  }
+  setProgressDrawerError('');
   try {
     const resp = await fetch(
       '/shows/' + progressDrawerTraktId + '/progress?partial=1',
@@ -820,14 +825,17 @@ async function refreshProgressDrawer() {
     );
     const html = await resp.text();
     if (!resp.ok) {
-      throw new Error(html.replace(/<[^>]+>/g, '').trim() || 'Failed to load progress');
+      const stripped = html.replace(/<[^>]+>/g, '').trim();
+      if (resp.status === 429) {
+        throw new Error(
+          stripped || 'Trakt is rate-limiting right now. Wait a few seconds and retry.'
+        );
+      }
+      throw new Error(stripped || 'Failed to load progress');
     }
     body.innerHTML = html;
   } catch (err) {
-    if (errorEl) {
-      errorEl.hidden = false;
-      errorEl.textContent = err.message || String(err);
-    }
+    setProgressDrawerError(err.message || String(err));
   } finally {
     if (loadingEl) loadingEl.hidden = true;
   }
@@ -841,17 +849,14 @@ async function openProgressDrawer(opts) {
   const titleEl = document.getElementById('progress-drawer-title');
   const body = document.getElementById('progress-drawer-body');
   const closeBtn = document.getElementById('progress-drawer-close');
-  const errorEl = document.getElementById('progress-drawer-error');
+  const retryBtn = document.getElementById('progress-drawer-retry');
   if (!drawer || !body || !traktId) return;
 
   progressDrawerTraktId = String(traktId);
   progressDrawerDirty = false;
   if (titleEl) titleEl.textContent = title || ('Show ' + traktId);
   body.innerHTML = '';
-  if (errorEl) {
-    errorEl.hidden = true;
-    errorEl.textContent = '';
-  }
+  setProgressDrawerError('');
   drawer.hidden = false;
   document.body.classList.add('modal-open');
 
@@ -867,6 +872,13 @@ async function openProgressDrawer(opts) {
       closeProgressDrawer();
     });
     closeBtn._progressBound = true;
+  }
+  if (retryBtn && !retryBtn._progressBound) {
+    retryBtn.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      refreshProgressDrawer();
+    });
+    retryBtn._progressBound = true;
   }
   if (!drawer._progressBound) {
     drawer.addEventListener('click', function (ev) {

@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=11">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=12">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -162,7 +162,10 @@
         Watched marks come from Trakt watch history. Use <strong>Rate / Review</strong> to rate, comment, and optionally watch in one step.
       </p>
       <p class="meta" id="progress-drawer-loading" hidden>Loading progress…</p>
-      <p class="meta" id="progress-drawer-error" hidden></p>
+      <div id="progress-drawer-error" hidden>
+        <p class="meta" id="progress-drawer-error-text"></p>
+        <button class="btn btn-small" type="button" id="progress-drawer-retry">Retry</button>
+      </div>
       <div id="progress-drawer-body" class="drawer-body"></div>
     </aside>
   </div>
@@ -184,7 +187,7 @@
     'search_templates': found_on_search_templates
   }|tojson }}</script>
   {% endif %}
-  <script src="{{ url_for('static', filename='js/app.js') }}?v=20"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=21"></script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

@@ -5,6 +5,7 @@ Trakt.tv API client (OAuth + catalog + sync write-backs).
 from __future__ import annotations
 
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import urlencode
@@ -17,6 +18,11 @@ from services.crypto_tokens import decrypt_token, encrypt_token
 
 logger = logging.getLogger('app')
 
+# Burst 429s often send Retry-After of 1s. Quota exhaustion is minutes — don't
+# block Flask workers or background jobs waiting that out.
+_MAX_429_RETRIES = 2
+_MAX_429_WAIT_SECONDS = 1.5
+
 
 class TraktError(Exception):
     """Raised when a Trakt API call fails."""
@@ -25,6 +31,22 @@ class TraktError(Exception):
         super().__init__(message)
         self.status_code = status_code
         self.payload = payload
+
+
+def is_rate_limited(exc: BaseException) -> bool:
+    """True when a Trakt call was rejected with HTTP 429."""
+    return getattr(exc, 'status_code', None) == 429 or '429' in str(exc)
+
+
+def _retry_after_seconds(resp) -> float:
+    """Seconds Trakt asked us to wait; default 1s when the header is missing."""
+    raw = resp.headers.get('Retry-After')
+    if raw is None or raw == '':
+        return 1.0
+    try:
+        return max(0.0, float(raw))
+    except (TypeError, ValueError):
+        return 1.0
 
 
 def _headers(access_token: str | None = None) -> dict:
@@ -124,6 +146,7 @@ def api_request(
     # Honor an explicit starting page (needed for early-exit scans).
     page = int(params.get('page') or 1)
     end_page = page + paginate_max_pages - 1
+    retries_429 = 0
 
     while page <= end_page:
         params['page'] = page
@@ -151,12 +174,28 @@ def api_request(
                 json=json_body,
                 timeout=45,
             )
+        if resp.status_code == 429:
+            wait = _retry_after_seconds(resp)
+            if retries_429 < _MAX_429_RETRIES and wait <= _MAX_429_WAIT_SECONDS:
+                retries_429 += 1
+                logger.warning(
+                    'Trakt 429 on %s; retrying in %.1fs (%s/%s)',
+                    path, wait, retries_429, _MAX_429_RETRIES,
+                )
+                time.sleep(wait)
+                continue
+            raise TraktError(
+                f'Trakt API error on {path} ({resp.status_code})',
+                resp.status_code,
+                resp.text,
+            )
         if resp.status_code >= 400:
             raise TraktError(
                 f'Trakt API error on {path} ({resp.status_code})',
                 resp.status_code,
                 resp.text,
             )
+        retries_429 = 0
         if resp.status_code == 204 or not resp.content:
             data = None
         else:

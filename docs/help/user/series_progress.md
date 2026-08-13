@@ -37,4 +37,6 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 
 My shows auto-syncs watchlist/watched when Trakt activity advances; **Refresh from Trakt** forces a full pull. Neither writes episode history.
 
+If the panel says Trakt is **rate-limiting**, wait a few seconds and click **Retry**. A sync that just ran can use up Trakt’s shared quota; the next try usually works once that settles.
+
 If Trakt’s website shows a checkmark but this page still says **Watch**, Trakt has no history for that episode on this account. Click **Watch** here once — after a successful write the button becomes **Watched**.
