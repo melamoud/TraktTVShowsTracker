@@ -74,6 +74,18 @@
     <input type="text" name="media_alerts_timezone" value="{{ status.config.media_alerts_timezone or 'America/New_York' }}" placeholder="America/New_York">
   </label>
 
+  <h2>Trakt read cache</h2>
+  <p class="muted">
+    Page loads (including browser Back) read local cache for watchlist, lists,
+    calendar, progress, and recommendations. Trakt is contacted when that
+    object’s cache is older than this TTL, after <strong>Refresh from Trakt</strong>,
+    or when an in-app write could not update the local object. Default 2 hours.
+    Changes made only on trakt.tv wait until the TTL expires.
+  </p>
+  <label>TTL (hours)
+    <input type="number" name="trakt_read_cache_hours" min="0.25" max="168" step="0.25" value="{{ status.config.trakt_read_cache_hours or 2 }}" style="width:5rem;">
+  </label>
+
   <div class="actions" style="margin-top:1rem;">
     <button class="btn btn-primary" type="submit">Save and apply</button>
   </div>

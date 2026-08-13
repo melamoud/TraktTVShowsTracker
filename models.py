@@ -32,6 +32,10 @@ class User(UserMixin, db.Model):
     last_sync_at = db.Column(db.DateTime)
     # Fingerprint of Trakt /sync/last_activities used to auto-invalidate My cache.
     trakt_activities_json = db.Column(db.Text, default='{}')
+    # Last successful My-calendar window fetch (shared by calendar views + alerts).
+    calendar_synced_at = db.Column(db.DateTime)
+    calendar_window_start = db.Column(db.Date)
+    calendar_window_end = db.Column(db.Date)
 
     preferences = db.relationship('UserPreference', backref='user', uselist=False, cascade='all, delete-orphan')
     streaming_services = db.relationship('UserStreamingService', backref='user', cascade='all, delete-orphan')
@@ -323,6 +327,8 @@ class UserMediaState(db.Model):
     next_episode_number = db.Column(db.Integer)
     next_episode_title = db.Column(db.String(400))
     progress_detail_at = db.Column(db.DateTime)
+    # JSON: watched_keys, aired_keys, seasons_meta — shared by Progress + Alerts.
+    progress_payload_json = db.Column(db.Text)
     # Latest aired episode for the "Newest aired" view (shows with future-only eps hidden).
     last_episode_aired_at = db.Column(db.DateTime)
     last_episode_label = db.Column(db.String(100))
@@ -377,6 +383,42 @@ class UserListMembership(db.Model):
     media_type = db.Column(db.String(16), nullable=False)
     trakt_id = db.Column(db.Integer, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserTraktList(db.Model):
+    """Cached Trakt personal-list metadata (id / name / slug) for one user."""
+
+    __tablename__ = 'user_trakt_lists'
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'list_id', name='uq_user_trakt_list'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    list_id = db.Column(db.String(64), nullable=False, index=True)
+    name = db.Column(db.String(200), nullable=False)
+    slug = db.Column(db.String(200), default='')
+    item_count = db.Column(db.Integer, default=0)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class UserRecommendationCache(db.Model):
+    """Cached Trakt recommendations payload for one user + type + genre tab."""
+
+    __tablename__ = 'user_recommendation_cache'
+    __table_args__ = (
+        db.UniqueConstraint(
+            'user_id', 'media_type', 'genre_slug',
+            name='uq_user_recommendation_cache',
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    media_type = db.Column(db.String(16), nullable=False)
+    genre_slug = db.Column(db.String(64), default='all', nullable=False)
+    payload_json = db.Column(db.Text, default='[]')
+    fetched_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
 class AlertEvent(db.Model):
@@ -472,4 +514,6 @@ class SchedulerConfig(db.Model):
     # IANA tz for alert clock (interval = every N hours at :00; cron = daily HH:MM).
     media_alerts_timezone = db.Column(db.String(64), default='America/New_York', nullable=False)
     alerts_startup_delay_seconds = db.Column(db.Integer, default=0, nullable=False)
+    # Page/object reads skip Trakt while the matching cache is younger than this.
+    trakt_read_cache_hours = db.Column(db.Float, default=2.0, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

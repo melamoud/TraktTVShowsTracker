@@ -928,6 +928,40 @@ body.modal-open { overflow: hidden; }
   to { opacity: 1; transform: scale(1); }
 }
 
+.trakt-log-toolbar { justify-content: flex-start; }
+.trakt-log-live {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font-weight: 600; color: var(--muted);
+}
+.trakt-log-stats {
+  display: flex; flex-wrap: wrap; gap: .4rem; margin: 0 0 1rem;
+}
+.trakt-log-chip {
+  display: inline-flex; align-items: center; gap: .3rem;
+  padding: .2rem .5rem; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--bg1);
+  font-size: .8rem; color: var(--muted);
+}
+.trakt-log-chip strong { color: var(--text); font-weight: 650; }
+.trakt-log-chip.is-err { border-color: #8a3040; color: var(--danger); }
+.trakt-log-table-wrap {
+  overflow: auto;
+  max-height: min(70vh, 44rem);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg1);
+}
+.trakt-log-table { margin: 0; font-size: .85rem; }
+.trakt-log-table th:nth-child(1),
+.trakt-log-table td:nth-child(1) { white-space: nowrap; }
+.trakt-log-table th:nth-child(3),
+.trakt-log-table td:nth-child(3) { text-align: right; }
+.trakt-log-table tr.is-hit td { color: var(--ok); }
+.trakt-log-table tr.is-probe td { color: var(--muted); }
+.trakt-log-table tr.is-fetch td:nth-child(2) { color: var(--accent-2); }
+.trakt-log-table tr.is-429 td { color: var(--accent-2); }
+.trakt-log-table tr.is-err td { color: var(--danger); }
+
 /* Make disabled buttons visually obvious so users know they already clicked. */
 .btn:disabled,
 .pill:disabled,

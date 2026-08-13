@@ -431,11 +431,13 @@ def _mark_watched_alerts_read(user: User, *, rate_limited: bool = False) -> int:
         .all()
     )
     if movie_notes:
-        try:
-            from services.sync_jobs import sync_user_media_state
-            sync_user_media_state(user, ('movie',))
-        except Exception as exc:
-            logger.warning('Movie watch-state sync before alert cleanup failed: %s', exc)
+        from services.trakt_cache import cache_is_fresh
+        if not cache_is_fresh(getattr(user, 'last_sync_at', None)):
+            try:
+                from services.sync_jobs import sync_user_media_state
+                sync_user_media_state(user, ('movie',))
+            except Exception as exc:
+                logger.warning('Movie watch-state sync before alert cleanup failed: %s', exc)
         movie_ids = {int(n.trakt_id) for n in movie_notes if n.trakt_id}
         watched_ids = {
             int(st.trakt_id)
@@ -470,22 +472,33 @@ def _mark_watched_alerts_read(user: User, *, rate_limited: bool = False) -> int:
         by_show.setdefault(int(note.trakt_id), []).append(note)
 
     for trakt_id, notes in by_show.items():
-        try:
-            progress = trakt_client.get_show_progress(user, trakt_id)
-        except Exception as exc:
-            if getattr(exc, 'status_code', None) == 429:
-                logger.warning(
-                    'Trakt throttling while clearing watched episode alerts; deferring'
-                )
-                break
-            logger.warning(
-                'Could not load progress for show %s while clearing alerts: %s',
-                trakt_id, exc,
-            )
-            continue
-        watched_keys = trakt_client.episode_watched_keys_from_trakt(
-            history=None, watched_entry=None, progress=progress or {},
+        from services.trakt_cache import (
+            load_progress_payload,
+            progress_cache_is_fresh,
+            watched_keys_from_payload,
         )
+        watched_keys: set[tuple[int, int]] = set()
+        if progress_cache_is_fresh(user.id, trakt_id):
+            watched_keys = watched_keys_from_payload(
+                load_progress_payload(user.id, trakt_id)
+            )
+        else:
+            try:
+                progress = trakt_client.get_show_progress(user, trakt_id)
+            except Exception as exc:
+                if getattr(exc, 'status_code', None) == 429:
+                    logger.warning(
+                        'Trakt throttling while clearing watched episode alerts; deferring'
+                    )
+                    break
+                logger.warning(
+                    'Could not load progress for show %s while clearing alerts: %s',
+                    trakt_id, exc,
+                )
+                continue
+            watched_keys = trakt_client.episode_watched_keys_from_trakt(
+                history=None, watched_entry=None, progress=progress or {},
+            )
         for note in notes:
             payload = _notification_payload_key(note)
             if not payload:

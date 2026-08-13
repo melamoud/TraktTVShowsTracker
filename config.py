@@ -109,3 +109,4 @@ class Config:
     ALERTS_INTERVAL_HOURS = float(os.environ.get('ALERTS_INTERVAL_HOURS', '4'))
     ALERTS_TIMEZONE = os.environ.get('ALERTS_TIMEZONE', 'America/New_York')
     ALERTS_STARTUP_DELAY_SECONDS = int(os.environ.get('ALERTS_STARTUP_DELAY_SECONDS', '0'))
+    TRAKT_READ_CACHE_HOURS = float(os.environ.get('TRAKT_READ_CACHE_HOURS', '2'))

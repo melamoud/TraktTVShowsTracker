@@ -27,4 +27,4 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **Rate…** / **Favorite** — same Trakt rating and favorites as on trakt.tv  
 - **Hide recommendation** — Trakt “Not interested”; drops it from future picks  
 
-See also Help → Recommended movies for the shared workflow.
+See also Help → Recommended movies for the shared workflow (the list is cached for the admin Trakt read-cache TTL; watched/list tags come from the same local title state as My / Latest).

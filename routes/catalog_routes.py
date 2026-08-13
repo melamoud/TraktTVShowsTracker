@@ -34,6 +34,24 @@ from services.sync_jobs import (
 catalog_bp = Blueprint('catalog', __name__)
 
 
+def _personal_lists(user) -> list[dict]:
+    """Personal lists from SQLite when the membership TTL is fresh."""
+    from services.trakt_cache import (
+        cached_personal_lists,
+        cache_is_fresh,
+        replace_cached_personal_lists,
+    )
+    if cache_is_fresh(getattr(user, 'last_sync_at', None)):
+        return cached_personal_lists(user)
+    lists = trakt_client.get_personal_lists(user)
+    replace_cached_personal_lists(user.id, lists)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return lists
+
+
 def _api_fail(log_msg: str, exc: Exception, *, user_message: str = 'Something went wrong. Please try again.', status: int = 400):
     """Log full exception server-side; return a short safe message to the client."""
     current_app.logger.exception('%s: %s', log_msg, exc)
@@ -165,7 +183,7 @@ def _list_names_map(media_type: str, trakt_ids: list[int]) -> dict[int, list[str
     list_names = {}
     if list_ids:
         try:
-            for lst in trakt_client.get_personal_lists(current_user):
+            for lst in _personal_lists(current_user):
                 if str(lst.get('id')) in list_ids:
                     list_names[str(lst.get('id'))] = lst.get('name') or 'List'
         except Exception as exc:
@@ -509,18 +527,41 @@ def _recommendations_page(media_type: str):
     fetch_limit = 100
     items: list[CachedMedia] = []
     fetch_error = None
+    force_recs = request.args.get('refresh') == '1'
     try:
-        payload = trakt_client.get_recommendations(
-            current_user,
-            media_type,
-            limit=fetch_limit,
-            genres=genre_filter,
-            ignore_watched=hide_watched,
-            ignore_collected=True,
-            # Prefer server-side ignore when hiding wishlist; still filter locally
-            # in case Trakt returns a watchlisted title.
-            ignore_watchlisted=hide_wishlist,
+        from services.trakt_cache import (
+            cache_http_span,
+            load_recommendations_cache,
+            log_cache_event,
+            recs_genre_key,
+            save_recommendations_cache,
         )
+        payload = None
+        if not force_recs:
+            payload = load_recommendations_cache(
+                current_user.id, media_type, genre_filter,
+            )
+        recs_item = f'{media_type}:{recs_genre_key(genre_filter)}'
+        if payload is None:
+            span = cache_http_span()
+            payload = trakt_client.get_recommendations(
+                current_user,
+                media_type,
+                limit=fetch_limit,
+                genres=genre_filter,
+                ignore_watched=hide_watched,
+                ignore_collected=True,
+                ignore_watchlisted=hide_wishlist,
+            )
+            save_recommendations_cache(
+                current_user.id, media_type, genre_filter, payload or [],
+            )
+            log_cache_event(
+                'recs', 'fetch', user=current_user, item=recs_item,
+                reason='force' if force_recs else 'stale', calls=span(),
+            )
+        else:
+            log_cache_event('recs', 'hit', user=current_user, item=recs_item, calls=0)
         for entry in payload or []:
             row = upsert_cached_media(media_type, entry)
             if row:
@@ -1151,7 +1192,7 @@ def api_lists_membership(media_type, trakt_id):
     title = media.title if media else f'{media_type} {trakt_id}'
 
     try:
-        personal = trakt_client.get_personal_lists(current_user)
+        personal = _personal_lists(current_user)
     except Exception as exc:
         return _api_fail(
             'Failed loading Trakt lists',
@@ -1334,6 +1375,13 @@ def api_watched(media_type, trakt_id):
             # when a new season aired before Progress refreshed.
             if media_type == 'movie':
                 st.progress_percent = 100.0
+            else:
+                from services.trakt_cache import patch_show_watched
+                patch_show_watched(current_user.id, trakt_id, watched=True)
+        else:
+            if media_type == 'show':
+                from services.trakt_cache import patch_show_watched
+                patch_show_watched(current_user.id, trakt_id, watched=False)
         db.session.commit()
         if watched:
             try:
@@ -1486,6 +1534,12 @@ def api_hide_recommendation(media_type, trakt_id):
         return jsonify({'success': False, 'message': 'Invalid media type'}), 400
     try:
         trakt_client.hide_recommendation(current_user, media_type, trakt_id)
+        try:
+            from services.trakt_cache import drop_recommendation_from_cache
+            drop_recommendation_from_cache(current_user.id, media_type, trakt_id)
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
         return jsonify({'success': True, 'hidden': True, 'trakt_id': int(trakt_id)})
     except Exception as exc:
         return _api_fail(

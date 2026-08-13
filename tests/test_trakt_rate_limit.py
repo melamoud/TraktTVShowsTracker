@@ -130,3 +130,52 @@ def test_series_progress_partial_429(app, client, user):
     html = resp.get_data(as_text=True)
     assert 'rate-limiting' in html.lower()
     assert 'retry' in html.lower()
+
+
+def test_api_request_does_not_info_log_successful_calls(app, user, caplog):
+    """Successful Trakt HTTP is counted, not INFO-logged (cache events cover scale)."""
+    import logging
+
+    from services.trakt_client import trakt_call_source, trakt_http_count
+
+    ok = _resp(200, payload={'ok': True})
+    user_obj = db.session.get(User, user)
+    before = trakt_http_count()
+    caplog.set_level(logging.INFO, logger='app')
+    with patch('services.trakt_client.ensure_access_token', return_value='tok'), patch(
+        'services.trakt_client.requests.request', return_value=ok
+    ):
+        with trakt_call_source('scheduler media_alerts'):
+            api_request('GET', '/sync/last_activities', user=user_obj)
+    assert 'Trakt GET /sync/last_activities' not in caplog.text
+    assert trakt_http_count() == before + 1
+
+
+def test_api_request_warns_on_429(app, caplog):
+    """HTTP errors still log so 429s show in the cache viewer."""
+    import logging
+
+    from services.trakt_client import trakt_call_source
+
+    limited = _resp(429, retry_after=120)
+    caplog.set_level(logging.WARNING, logger='app')
+    with patch('services.trakt_client.requests.request', return_value=limited), patch(
+        'services.trakt_client.time.sleep'
+    ):
+        with trakt_call_source('scheduler catalog_sync'):
+            with pytest.raises(TraktError):
+                api_request('GET', '/shows/1')
+    assert 'Trakt GET /shows/1' in caplog.text
+    assert 'status=429' in caplog.text
+    assert 'source=scheduler catalog_sync' in caplog.text
+
+
+def test_http_request_inferred_as_trakt_source(app):
+    """Without an explicit tag, the Flask method + path is the source."""
+    from services.trakt_client import current_trakt_source, trakt_call_source
+
+    with app.test_request_context('/my/movies?refresh=1'):
+        assert current_trakt_source() == 'http GET /my/movies?refresh=1'
+        with trakt_call_source('scheduler catalog_sync'):
+            assert current_trakt_source() == 'scheduler catalog_sync'
+        assert current_trakt_source() == 'http GET /my/movies?refresh=1'

@@ -86,6 +86,24 @@ from services.user_media_sync import ensure_user_media_fresh
 user_bp = Blueprint('user', __name__)
 
 
+def _personal_lists(user) -> list[dict]:
+    """Personal lists from SQLite when the membership TTL is fresh."""
+    from services.trakt_cache import (
+        cached_personal_lists,
+        cache_is_fresh,
+        replace_cached_personal_lists,
+    )
+    if cache_is_fresh(getattr(user, 'last_sync_at', None)):
+        return cached_personal_lists(user)
+    lists = trakt_client.get_personal_lists(user)
+    replace_cached_personal_lists(user.id, lists)
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+    return lists
+
+
 def _ensure_prefs() -> UserPreference:
     """Return the current user's preference row, creating it if needed."""
     prefs = current_user.preferences
@@ -353,7 +371,7 @@ def preferences():
     trakt_lists = []
     trakt_lists_error = None
     try:
-        trakt_lists = trakt_client.get_personal_lists(current_user)
+        trakt_lists = _personal_lists(current_user)
     except Exception as exc:
         current_app.logger.warning('Could not load Trakt lists for preferences: %s', exc)
         trakt_lists_error = str(exc)
@@ -409,7 +427,7 @@ def _my_filter_lists(user) -> list[dict]:
     hidden = set(get_hidden_list_ids(user))
     out = [{'id': WATCHLIST_LIST_ID, 'name': 'Wishlist', 'kind': 'watchlist'}]
     try:
-        for lst in trakt_client.get_personal_lists(user):
+        for lst in _personal_lists(user):
             if lst['id'] in hidden:
                 continue
             out.append({
@@ -929,43 +947,15 @@ def _my_media(media_type: str):
     )
 
 
-@user_bp.route('/shows/<int:trakt_id>/progress')
-@login_required
-def series_progress(trakt_id):
-    """Series progress screen with dimmed watched seasons/episodes."""
-    media = CachedMedia.query.filter_by(media_type='show', trakt_id=trakt_id).first()
-    try:
-        progress = trakt_client.get_show_progress(current_user, trakt_id)
-        seasons_meta = trakt_client.get_show_seasons(trakt_id)
-        history = trakt_client.get_show_watch_history(current_user, trakt_id)
-        # Same source Showly/Kodi use for per-episode plays (extended=progress).
-        watched_entry = trakt_client.get_show_watched_entry(current_user, trakt_id)
-    except Exception as exc:
-        rate_limited = trakt_client.is_rate_limited(exc)
-        if rate_limited:
-            current_app.logger.warning('Progress load rate-limited: %s', exc)
-            msg = 'Trakt is rate-limiting right now. Wait a few seconds and retry.'
-            status = 429
-            flash_cat = 'warning'
-        else:
-            current_app.logger.exception('Progress load failed: %s', exc)
-            msg = 'Could not load show progress from Trakt right now.'
-            status = 502
-            flash_cat = 'danger'
-        if request.args.get('partial') == '1':
-            return (f'<p class="muted">{msg}</p>', status)
-        flash(msg, flash_cat)
-        return redirect(url_for('user.my_shows'))
-
+def _progress_keys_from_trakt(progress, history, watched_entry) -> tuple[set, set]:
+    """Watched + aired episode keys from live Trakt payloads."""
     watched_keys = trakt_client.episode_watched_keys_from_trakt(
         history=history,
         watched_entry=watched_entry,
         progress=progress,
     )
-
-    # Which episodes Trakt considers aired (for counts / next-up only).
     aired_keys: set[tuple[int, int]] = set()
-    for season in progress.get('seasons') or []:
+    for season in (progress or {}).get('seasons') or []:
         s_no = season.get('number')
         if s_no is None:
             continue
@@ -973,10 +963,11 @@ def series_progress(trakt_id):
             e_no = ep.get('number')
             if e_no is not None:
                 aired_keys.add((int(s_no), int(e_no)))
+    return watched_keys, aired_keys
 
-    # Full season lists from metadata so unaired/future eps still appear.
-    # Season 0 (specials) is kept, but must not steal next-up / default-open /
-    # header counts — that made shows like True Blood look like "0 watched".
+
+def _build_progress_context(media, trakt_id, seasons_meta, watched_keys, aired_keys) -> dict:
+    """Build the Progress template context from cached or live Trakt objects."""
     season_views = []
     next_regular = None
     next_special = None
@@ -1037,7 +1028,6 @@ def series_progress(trakt_id):
             })
         if not episodes:
             continue
-        # Header totals = regular seasons only (matches Trakt season progress).
         if not is_specials:
             total_aired += aired_count
             total_completed += completed
@@ -1052,9 +1042,7 @@ def series_progress(trakt_id):
             'default_open': False,
         })
 
-    # Regular seasons first, specials last.
     season_views.sort(key=lambda s: (s['is_specials'], s['number']))
-
     for season in season_views:
         if season['is_specials']:
             continue
@@ -1068,23 +1056,7 @@ def series_progress(trakt_id):
                 break
 
     next_episode = next_regular or next_special
-
-    # Persist episode summary for My Shows cards / Unwatched filter.
-    try:
-        from services.sync_jobs import apply_show_episode_progress
-        apply_show_episode_progress(
-            current_user.id,
-            trakt_id,
-            aired=total_aired,
-            completed=total_completed,
-            next_episode=next_episode,
-        )
-        db.session.commit()
-    except Exception as exc:
-        current_app.logger.warning('Could not cache show progress %%: %s', exc)
-        db.session.rollback()
-
-    ctx = {
+    return {
         'media': media,
         'trakt_id': trakt_id,
         'seasons': season_views,
@@ -1093,7 +1065,87 @@ def series_progress(trakt_id):
         'progress_completed': total_completed,
         'title': media.title if media else f'Show {trakt_id}',
     }
-    # Drawer / AJAX: return body-only fragment (no full page chrome).
+
+
+@user_bp.route('/shows/<int:trakt_id>/progress')
+@login_required
+def series_progress(trakt_id):
+    """Series progress screen with dimmed watched seasons/episodes."""
+    from services.trakt_cache import (
+        cache_http_span,
+        load_progress_payload,
+        log_cache_event,
+        progress_cache_is_fresh,
+        save_progress_payload,
+        _keys_to_tuples,
+    )
+
+    media = CachedMedia.query.filter_by(media_type='show', trakt_id=trakt_id).first()
+    force = request.args.get('refresh') == '1'
+    seasons_meta = None
+    watched_keys: set[tuple[int, int]] = set()
+    aired_keys: set[tuple[int, int]] = set()
+
+    if not force and progress_cache_is_fresh(current_user.id, trakt_id):
+        payload = load_progress_payload(current_user.id, trakt_id)
+        if payload and payload.get('seasons_meta'):
+            seasons_meta = payload.get('seasons_meta') or []
+            watched_keys = _keys_to_tuples(payload.get('watched_keys'))
+            aired_keys = _keys_to_tuples(payload.get('aired_keys'))
+            log_cache_event(
+                'progress', 'hit', user=current_user, item=str(trakt_id), calls=0,
+            )
+
+    if seasons_meta is None:
+        span = cache_http_span()
+        try:
+            progress = trakt_client.get_show_progress(current_user, trakt_id)
+            seasons_meta = trakt_client.get_show_seasons(trakt_id)
+            history = trakt_client.get_show_watch_history(current_user, trakt_id)
+            watched_entry = trakt_client.get_show_watched_entry(current_user, trakt_id)
+        except Exception as exc:
+            rate_limited = trakt_client.is_rate_limited(exc)
+            log_cache_event(
+                'progress', 'error', user=current_user, item=str(trakt_id),
+                reason='429' if rate_limited else 'fetch', calls=span(),
+            )
+            if rate_limited:
+                current_app.logger.warning('Progress load rate-limited: %s', exc)
+                msg = 'Trakt is rate-limiting right now. Wait a few seconds and retry.'
+                status = 429
+                flash_cat = 'warning'
+            else:
+                current_app.logger.exception('Progress load failed: %s', exc)
+                msg = 'Could not load show progress from Trakt right now.'
+                status = 502
+                flash_cat = 'danger'
+            if request.args.get('partial') == '1':
+                return (f'<p class="muted">{msg}</p>', status)
+            flash(msg, flash_cat)
+            return redirect(url_for('user.my_shows'))
+        watched_keys, aired_keys = _progress_keys_from_trakt(
+            progress, history, watched_entry,
+        )
+        try:
+            save_progress_payload(
+                current_user.id,
+                trakt_id,
+                watched_keys=watched_keys,
+                aired_keys=aired_keys,
+                seasons_meta=seasons_meta or [],
+            )
+            db.session.commit()
+        except Exception as exc:
+            current_app.logger.warning('Could not cache show progress %%: %s', exc)
+            db.session.rollback()
+        log_cache_event(
+            'progress', 'fetch', user=current_user, item=str(trakt_id),
+            reason='force' if force else 'stale', calls=span(),
+        )
+
+    ctx = _build_progress_context(
+        media, trakt_id, seasons_meta, watched_keys, aired_keys,
+    )
     if request.args.get('partial') == '1':
         return render_template('_series_progress_body.html', **ctx)
     return render_template('series_progress.html', **ctx)
@@ -1153,6 +1205,21 @@ def api_episode_watched():
                 current_app.logger.warning(
                     'Could not mark episode alerts read after watch: %s', exc,
                 )
+        try:
+            show_id = int(payload.get('show_trakt_id') or 0)
+            season = payload.get('season')
+            episode = payload.get('episode')
+            if show_id and season is not None and episode is not None:
+                from services.trakt_cache import patch_episode_watched
+                patch_episode_watched(
+                    current_user.id, show_id, int(season), int(episode),
+                    watched=watched,
+                )
+                db.session.commit()
+        except Exception as exc:
+            current_app.logger.warning(
+                'Could not patch progress cache after episode watch: %s', exc,
+            )
         return jsonify({'success': True, 'watched': watched})
     except Exception as exc:
         current_app.logger.exception('Episode watched action failed: %s', exc)
@@ -1176,6 +1243,16 @@ def api_season_watched(trakt_id, season_number):
             current_app.logger.warning(
                 'Could not mark season alerts read after watch: %s', exc,
             )
+        try:
+            from services.trakt_cache import patch_season_watched
+            patch_season_watched(
+                current_user.id, trakt_id, season_number, watched=True,
+            )
+            db.session.commit()
+        except Exception as exc:
+            current_app.logger.warning(
+                'Could not patch progress cache after season watch: %s', exc,
+            )
         return jsonify({'success': True, 'added': added, 'season': season_number})
     except Exception as exc:
         current_app.logger.exception('Season watched failed: %s', exc)
@@ -1192,6 +1269,16 @@ def api_season_unwatched(trakt_id, season_number):
     try:
         result = trakt_client.mark_season_unwatched(current_user, trakt_id, season_number)
         deleted = int(((result.get('deleted') or {}).get('episodes')) or 0)
+        try:
+            from services.trakt_cache import patch_season_watched
+            patch_season_watched(
+                current_user.id, trakt_id, season_number, watched=False,
+            )
+            db.session.commit()
+        except Exception as exc:
+            current_app.logger.warning(
+                'Could not patch progress cache after season unwatch: %s', exc,
+            )
         return jsonify({'success': True, 'deleted': deleted, 'season': season_number})
     except Exception as exc:
         current_app.logger.exception('Season unwatched failed: %s', exc)

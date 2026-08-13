@@ -6,7 +6,7 @@ from datetime import datetime
 from functools import wraps
 
 from flask import (
-    Blueprint, abort, current_app, flash, redirect, render_template,
+    Blueprint, abort, current_app, flash, jsonify, redirect, render_template,
     request, url_for,
 )
 from flask_login import current_user, login_required
@@ -19,6 +19,7 @@ from models import (
 from services.sync_jobs import (
     MIN_ALERTS_INTERVAL_HOURS,
     MIN_CATALOG_SYNC_MINUTES,
+    MIN_TRAKT_READ_CACHE_HOURS,
     apply_scheduler_config,
     get_or_create_scheduler_config,
     get_scheduler_status,
@@ -70,7 +71,9 @@ def run_release_check():
         next_url = url_for('admin.dashboard')
 
     try:
-        notified = run_media_alerts(current_app._get_current_object())
+        from services.trakt_client import trakt_call_source
+        with trakt_call_source('admin run-release-check'):
+            notified = run_media_alerts(current_app._get_current_object())
         flash(f'Alert check finished. Notifications created: {notified}.', 'success')
     except Exception as exc:
         current_app.logger.exception('Manual alert check failed: %s', exc)
@@ -282,6 +285,18 @@ def scheduler_config():
         except Exception:
             errors.append('Alerts timezone must be a valid IANA name (e.g. America/New_York).')
 
+        try:
+            row.trakt_read_cache_hours = float(request.form.get('trakt_read_cache_hours', 2))
+        except (TypeError, ValueError):
+            errors.append('Trakt read cache TTL must be a number of hours.')
+        else:
+            if row.trakt_read_cache_hours < MIN_TRAKT_READ_CACHE_HOURS:
+                errors.append(
+                    f'Trakt read cache TTL must be at least {MIN_TRAKT_READ_CACHE_HOURS} hours.'
+                )
+            elif row.trakt_read_cache_hours > 168:
+                errors.append('Trakt read cache TTL must be at most 168 hours (1 week).')
+
         if errors:
             for msg in errors:
                 flash(msg, 'danger')
@@ -295,6 +310,27 @@ def scheduler_config():
 
     status = get_scheduler_status(app)
     return render_template('admin/scheduler.html', status=status)
+
+
+@admin_bp.route('/trakt-log')
+@admin_required
+def trakt_log():
+    """Live tail of Trakt HTTP calls from the rotating app log."""
+    return render_template('admin/trakt_log.html')
+
+
+@admin_bp.route('/trakt-log.json')
+@admin_required
+def trakt_log_json():
+    """Newest Trakt call lines for the admin live viewer."""
+    from services.trakt_log import read_trakt_log
+
+    payload = read_trakt_log(
+        current_app.config.get('LOG_FILE') or '',
+        limit=request.args.get('limit', 200),
+        query=request.args.get('q') or '',
+    )
+    return jsonify(payload)
 
 
 @admin_bp.route('/help/')

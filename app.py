@@ -221,12 +221,28 @@ def _ensure_schema(app):
                 app.logger.info('Added notifications columns')
         if 'users' in tables:
             user_cols = {c['name'] for c in insp.get_columns('users')}
+            u_user_alters = []
             if 'trakt_activities_json' not in user_cols:
+                u_user_alters.append(
+                    "ALTER TABLE users ADD COLUMN trakt_activities_json TEXT DEFAULT '{}'"
+                )
+            if 'calendar_synced_at' not in user_cols:
+                u_user_alters.append(
+                    'ALTER TABLE users ADD COLUMN calendar_synced_at DATETIME'
+                )
+            if 'calendar_window_start' not in user_cols:
+                u_user_alters.append(
+                    'ALTER TABLE users ADD COLUMN calendar_window_start DATE'
+                )
+            if 'calendar_window_end' not in user_cols:
+                u_user_alters.append(
+                    'ALTER TABLE users ADD COLUMN calendar_window_end DATE'
+                )
+            if u_user_alters:
                 with db.engine.begin() as conn:
-                    conn.execute(text(
-                        "ALTER TABLE users ADD COLUMN trakt_activities_json TEXT DEFAULT '{}'"
-                    ))
-                app.logger.info('Added users.trakt_activities_json column')
+                    for stmt in u_user_alters:
+                        conn.execute(text(stmt))
+                app.logger.info('Added users calendar / activities cache columns')
         if 'user_media_state' in tables:
             ucols = {c['name'] for c in insp.get_columns('user_media_state')}
             u_alters = []
@@ -257,6 +273,8 @@ def _ensure_schema(app):
                  'ALTER TABLE user_media_state ADD COLUMN last_episode_label VARCHAR(100)'),
                 ('last_aired_checked_at',
                  'ALTER TABLE user_media_state ADD COLUMN last_aired_checked_at DATETIME'),
+                ('progress_payload_json',
+                 'ALTER TABLE user_media_state ADD COLUMN progress_payload_json TEXT'),
             ):
                 if col not in ucols:
                     u_alters.append(ddl)
@@ -276,13 +294,22 @@ def _ensure_schema(app):
                 app.logger.info('Added user_streaming_services.custom_search_template')
         if 'scheduler_config' in tables:
             scols = {c['name'] for c in insp.get_columns('scheduler_config')}
+            sc_alters = []
             if 'media_alerts_timezone' not in scols:
+                sc_alters.append(
+                    "ALTER TABLE scheduler_config ADD COLUMN media_alerts_timezone "
+                    "VARCHAR(64) DEFAULT 'America/New_York' NOT NULL"
+                )
+            if 'trakt_read_cache_hours' not in scols:
+                sc_alters.append(
+                    'ALTER TABLE scheduler_config ADD COLUMN trakt_read_cache_hours '
+                    'FLOAT DEFAULT 2.0 NOT NULL'
+                )
+            if sc_alters:
                 with db.engine.begin() as conn:
-                    conn.execute(text(
-                        "ALTER TABLE scheduler_config ADD COLUMN media_alerts_timezone "
-                        "VARCHAR(64) DEFAULT 'America/New_York' NOT NULL"
-                    ))
-                app.logger.info('Added scheduler_config.media_alerts_timezone')
+                    for stmt in sc_alters:
+                        conn.execute(text(stmt))
+                app.logger.info('Added scheduler_config cache / timezone columns')
     except Exception as exc:
         app.logger.warning('Schema ensure failed: %s', exc)
 

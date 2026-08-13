@@ -6,8 +6,10 @@ from __future__ import annotations
 
 import logging
 import time
+from contextlib import contextmanager
+from contextvars import ContextVar
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Iterator
 from urllib.parse import urlencode
 
 import requests
@@ -17,6 +19,71 @@ from models import User, db
 from services.crypto_tokens import decrypt_token, encrypt_token
 
 logger = logging.getLogger('app')
+
+# Why this process is talking to Trakt (scheduler vs HTTP vs queued job).
+_trakt_source: ContextVar[str | None] = ContextVar('trakt_source', default=None)
+_trakt_http_count: ContextVar[int] = ContextVar('trakt_http_count', default=0)
+
+
+@contextmanager
+def trakt_call_source(source: str) -> Iterator[None]:
+    """Tag subsequent Trakt HTTP calls with a trigger (scheduler, admin, …)."""
+    token = _trakt_source.set(str(source).strip() or 'background')
+    try:
+        yield
+    finally:
+        _trakt_source.reset(token)
+
+
+def current_trakt_source() -> str:
+    """Return the explicit source, else the current Flask request, else background."""
+    tagged = _trakt_source.get()
+    if tagged:
+        return tagged
+    try:
+        from flask import has_request_context, request
+        if has_request_context() and request:
+            path = request.path or ''
+            qs = (request.query_string or b'').decode('utf-8', errors='replace')
+            if qs:
+                path = f'{path}?{qs}'
+            return f'http {request.method} {path}'
+    except Exception:
+        pass
+    return 'background'
+
+
+def trakt_http_count() -> int:
+    """HTTP attempts to Trakt in this thread since process start (for cache spans)."""
+    return _trakt_http_count.get()
+
+
+def log_trakt_call(
+    method: str,
+    path: str,
+    *,
+    user: User | None = None,
+    status: int | None = None,
+    page: int | None = None,
+) -> None:
+    """Count every Trakt HTTP attempt; log only errors (429 / 4xx / 5xx)."""
+    _trakt_http_count.set(_trakt_http_count.get() + 1)
+    try:
+        code = int(status) if status is not None else 0
+    except (TypeError, ValueError):
+        code = 0
+    if code < 400:
+        return
+    who = getattr(user, 'username', None) or '-'
+    bits = [
+        f'Trakt {method.upper()} {path}',
+        f'status={code}',
+        f'user={who}',
+        f'source={current_trakt_source()}',
+    ]
+    if page is not None:
+        bits.insert(1, f'page={page}')
+    logger.warning(' '.join(bits))
 
 # Burst 429s often send Retry-After of 1s. Quota exhaustion is minutes — don't
 # block Flask workers or background jobs waiting that out.
@@ -83,6 +150,7 @@ def exchange_code_for_tokens(code: str) -> dict:
         'grant_type': 'authorization_code',
     }
     resp = requests.post(url, json=payload, timeout=30)
+    log_trakt_call('POST', '/oauth/token', status=resp.status_code)
     if resp.status_code >= 400:
         raise TraktError('Token exchange failed', resp.status_code, resp.text)
     return resp.json()
@@ -99,6 +167,7 @@ def refresh_tokens(refresh_token: str) -> dict:
         'grant_type': 'refresh_token',
     }
     resp = requests.post(url, json=payload, timeout=30)
+    log_trakt_call('POST', '/oauth/token', status=resp.status_code)
     if resp.status_code >= 400:
         raise TraktError('Token refresh failed', resp.status_code, resp.text)
     return resp.json()
@@ -158,6 +227,7 @@ def api_request(
             json=json_body,
             timeout=45,
         )
+        log_trakt_call(method, path, user=user, status=resp.status_code, page=page)
         if resp.status_code == 401 and user:
             # Force refresh once
             refresh = decrypt_token(user.refresh_token_enc)
@@ -174,6 +244,7 @@ def api_request(
                 json=json_body,
                 timeout=45,
             )
+            log_trakt_call(method, path, user=user, status=resp.status_code, page=page)
         if resp.status_code == 429:
             wait = _retry_after_seconds(resp)
             if retries_429 < _MAX_429_RETRIES and wait <= _MAX_429_WAIT_SECONDS:
@@ -221,6 +292,7 @@ def get_user_settings(access_token: str) -> dict:
     """Fetch the authenticated Trakt user profile/settings."""
     url = f"{current_app.config['TRAKT_API_BASE']}/users/settings"
     resp = requests.get(url, headers=_headers(access_token), timeout=30)
+    log_trakt_call('GET', '/users/settings', status=resp.status_code)
     if resp.status_code >= 400:
         raise TraktError('Failed to load user settings', resp.status_code, resp.text)
     return resp.json()
@@ -261,6 +333,7 @@ def probe_updates_pagination(
         params=params,
         timeout=45,
     )
+    log_trakt_call('GET', path, status=resp.status_code, page=1)
     if resp.status_code >= 400:
         raise TraktError(
             f'Trakt API error on {path} ({resp.status_code})',
@@ -312,6 +385,7 @@ def fetch_updates_pages(
                 params=params,
                 timeout=45,
             )
+            log_trakt_call('GET', path, status=r.status_code, page=page)
             if r.status_code >= 400:
                 raise TraktError(
                     f'Trakt API error on {path} ({r.status_code})',
@@ -457,6 +531,9 @@ def get_show_watched_entry(user: User, trakt_id: int) -> dict | None:
             params={'extended': 'progress', 'limit': 100, 'page': page},
             timeout=45,
         )
+        log_trakt_call(
+            'GET', '/sync/watched/shows', user=user, status=resp.status_code, page=page,
+        )
         if resp.status_code == 401:
             refresh = decrypt_token(user.refresh_token_enc)
             if not refresh:
@@ -469,6 +546,10 @@ def get_show_watched_entry(user: User, trakt_id: int) -> dict | None:
                 headers=headers,
                 params={'extended': 'progress', 'limit': 100, 'page': page},
                 timeout=45,
+            )
+            log_trakt_call(
+                'GET', '/sync/watched/shows', user=user,
+                status=resp.status_code, page=page,
             )
         if resp.status_code >= 400:
             raise TraktError(
@@ -961,6 +1042,7 @@ def get_list_items(user: User, list_id: str, media_type: str) -> list:
             params={'limit': 100, 'page': page},
             timeout=45,
         )
+        log_trakt_call('GET', path, user=user, status=resp.status_code, page=page)
         if resp.status_code == 401:
             refresh = decrypt_token(user.refresh_token_enc)
             if not refresh:
@@ -974,6 +1056,7 @@ def get_list_items(user: User, list_id: str, media_type: str) -> list:
                 params={'limit': 100, 'page': page},
                 timeout=45,
             )
+            log_trakt_call('GET', path, user=user, status=resp.status_code, page=page)
         if resp.status_code >= 400:
             raise TraktError(
                 f'Trakt API error on {path} ({resp.status_code})',

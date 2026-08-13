@@ -2,7 +2,7 @@
 
 Movies on your Trakt **Wishlist** and **personal lists** (the ones you show in Preferences), with local metadata (poster, description, genres). Watch history alone does **not** put a title here.
 
-Opening this page uses a local cache that **auto-invalidates** when Trakt reports newer watchlist / watched / list activity. In-app rate / watch / list actions only mark those activity slices fresh, so adds you made on Trakt.tv still sync on the next visit. **Refresh from Trakt** forces a full re-pull. Sorted by in-progress first, then most recently watched; not-started titles last.
+Opening this page uses a local cache. Trakt is contacted at most every **N hours** (admin **Trakt read cache** TTL, default 2) per object, after **Refresh from Trakt**, or when an in-app write could not be applied locally. Watch / rate / list actions in this app update the same local rows that Latest, Recs, and Alerts read — they do not re-pull the title from Trakt. Adds you made only on trakt.tv appear after the TTL expires or a manual refresh. Sorted by in-progress first, then most recently watched; not-started titles last.
 
 ## Filters
 

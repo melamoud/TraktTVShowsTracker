@@ -172,7 +172,9 @@ def enrich_media_list_for_display(
             or not media.poster_url
             or not is_local_poster_url(media.poster_url)
         )
-        if needs and fetches >= max_fetches:
+        if not needs:
+            continue
+        if fetches >= max_fetches:
             # Best-effort: migrate CDN URL already on the row into local cache.
             if media.poster_url and not is_local_poster_url(media.poster_url):
                 try:
@@ -180,8 +182,7 @@ def enrich_media_list_for_display(
                 except Exception:
                     pass
             continue
-        if needs:
-            fetches += 1
+        fetches += 1
         ok = enrich_media_details_for_display(media)
         if not ok:
             logger.warning('Stopping list enrich early (Trakt rate limit)')
@@ -368,10 +369,11 @@ def catalog_has_more_older(media_type: str) -> bool:
 
 def _should_refresh_newest(media_type: str) -> bool:
     """Throttle newest-page refreshes so Latest clicks do not hammer Trakt."""
+    from services.trakt_cache import get_trakt_read_cache_ttl
     row = _get_feed_sync(media_type)
     if not row or not row.updated_at:
         return True
-    return (datetime.utcnow() - row.updated_at) >= NEWEST_REFRESH_MIN_INTERVAL
+    return (datetime.utcnow() - row.updated_at) >= get_trakt_read_cache_ttl()
 
 
 def reconcile_feed_cursor(media_type: str, days_back: int = UPDATES_WINDOW_DAYS) -> CatalogFeedSync | None:
@@ -575,7 +577,13 @@ def ensure_catalog_through_marker(
         return refresh_catalog_newest(media_type, days_back=days_back, pages=1)
 
     if _should_refresh_newest(media_type):
-        return refresh_catalog_newest(media_type, days_back=days_back, pages=1)
+        from services.trakt_cache import cache_http_span, log_cache_event
+        span = cache_http_span()
+        added = refresh_catalog_newest(media_type, days_back=days_back, pages=1)
+        log_cache_event('latest', 'fetch', item=media_type, reason='ttl', calls=span())
+        return added
+    from services.trakt_cache import log_cache_event
+    log_cache_event('latest', 'hit', item=media_type, calls=0)
     return 0
 
 
@@ -814,6 +822,9 @@ def sync_user_list_memberships(
     shown = [lst for lst in personal if lst['id'] not in hidden]
     shown_ids = {lst['id'] for lst in shown}
 
+    from services.trakt_cache import replace_cached_personal_lists
+    replace_cached_personal_lists(user.id, personal)
+
     # Drop cache for lists no longer shown / deleted on Trakt.
     stale = UserListMembership.query.filter(
         UserListMembership.user_id == user.id,
@@ -1030,21 +1041,23 @@ def refresh_show_progress_for_ids(
     trakt_ids: list[int],
     *,
     force: bool = False,
-    max_age_hours: int = 12,
+    max_age_hours: float | None = None,
     max_workers: int = 6,
 ) -> int:
     """
     Fetch Trakt progress for the given show ids (typically one My Shows page).
 
-    Skips rows with fresh ``progress_detail_at`` unless ``force``. Does not run
-    on full Refresh — only for the visible page — so Refresh stays fast.
-    Returns how many shows were updated.
+    Skips rows with fresh ``progress_detail_at`` unless ``force``. Age uses the
+    admin Trakt read-cache TTL when ``max_age_hours`` is omitted.
     """
     ids = [int(t) for t in trakt_ids if t]
     if not ids:
         return 0
 
-    cutoff = datetime.utcnow() - timedelta(hours=max(1, int(max_age_hours)))
+    if max_age_hours is None:
+        from services.trakt_cache import get_trakt_read_cache_hours
+        max_age_hours = get_trakt_read_cache_hours()
+    cutoff = datetime.utcnow() - timedelta(hours=max(0.25, float(max_age_hours)))
     rows = {
         r.trakt_id: r
         for r in UserMediaState.query.filter(
@@ -1216,22 +1229,28 @@ def sync_providers_for_media(media: CachedMedia) -> list[str]:
 def check_release_watches(app: Flask) -> int:
     """Backward-compatible entry point — runs auto media alerts."""
     from services.alerts import run_media_alerts
-    return run_media_alerts(app)
+    from services.trakt_client import trakt_call_source
+
+    with trakt_call_source('scheduler media_alerts'):
+        return run_media_alerts(app)
 
 
 def run_catalog_sync_job(app: Flask) -> None:
     """Scheduled job: refresh newest catalog activity and enrich details."""
+    from services.trakt_client import trakt_call_source
+
     with app.app_context():
-        try:
-            for media_type in ('movie', 'show'):
-                if feed_count(media_type) == 0:
-                    sync_catalog(media_type)
-                else:
-                    refresh_catalog_newest(media_type, pages=2)
-            enrich_media_details('movie')
-            enrich_media_details('show')
-        except Exception as exc:
-            logger.exception('Catalog sync job failed: %s', exc)
+        with trakt_call_source('scheduler catalog_sync'):
+            try:
+                for media_type in ('movie', 'show'):
+                    if feed_count(media_type) == 0:
+                        sync_catalog(media_type)
+                    else:
+                        refresh_catalog_newest(media_type, pages=2)
+                enrich_media_details('movie')
+                enrich_media_details('show')
+            except Exception as exc:
+                logger.exception('Catalog sync job failed: %s', exc)
 
 
 SCHEDULER_MODES = ('interval', 'cron')
@@ -1249,12 +1268,14 @@ DEFAULT_SCHEDULER_CONFIG = {
     'media_alerts_cron_time': '08:00',
     'media_alerts_timezone': 'America/New_York',
     'alerts_startup_delay_seconds': 0,
+    'trakt_read_cache_hours': 2.0,
 }
 
 
 # Minimum allowed intervals to prevent accidental self-DDoS.
 MIN_CATALOG_SYNC_MINUTES = 5
 MIN_ALERTS_INTERVAL_HOURS = 1.0
+MIN_TRAKT_READ_CACHE_HOURS = 0.25
 
 
 def _env_scheduler_defaults(app: Flask) -> dict:
@@ -1275,6 +1296,9 @@ def _env_scheduler_defaults(app: Flask) -> dict:
         'alerts_startup_delay_seconds': int(
             app.config.get('ALERTS_STARTUP_DELAY_SECONDS', 0)
         ),
+        'trakt_read_cache_hours': float(
+            app.config.get('TRAKT_READ_CACHE_HOURS', 2)
+        ),
     }
 
 
@@ -1285,6 +1309,9 @@ def get_or_create_scheduler_config(app: Flask | None = None) -> SchedulerConfig:
         # Fill columns added after the row was first created.
         if not getattr(row, 'media_alerts_timezone', None):
             row.media_alerts_timezone = 'America/New_York'
+            db.session.commit()
+        if getattr(row, 'trakt_read_cache_hours', None) is None:
+            row.trakt_read_cache_hours = 2.0
             db.session.commit()
         return row
     values = DEFAULT_SCHEDULER_CONFIG.copy()

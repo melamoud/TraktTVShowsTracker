@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% block title %}Trakt cache log — Admin{% endblock %}
+{% block content %}
+<p><a href="{{ url_for('admin.dashboard') }}">← Admin</a></p>
+<h1>Trakt cache log</h1>
+<p class="muted">
+  One line per cache object (watchlist/lists, calendar, progress, recs, latest):
+  <strong>hit</strong> (served locally), <strong>probe</strong> (cheap last_activities, no full sync),
+  or <strong>fetch</strong> (Trakt HTTP, <code>calls=</code> how many).
+  HTTP 429s also appear here. Live refresh does not call Trakt.
+</p>
+
+<div class="toolbar trakt-log-toolbar">
+  <div class="search-fields">
+    <label class="sr-only" for="trakt-log-filter">Filter</label>
+    <input class="search-input" id="trakt-log-filter" type="search"
+           placeholder="Filter object, user, source…" autocomplete="off">
+    <label class="sr-only" for="trakt-log-limit">Lines</label>
+    <select class="search-select" id="trakt-log-limit">
+      <option value="50">50 lines</option>
+      <option value="200" selected>200 lines</option>
+      <option value="500">500 lines</option>
+    </select>
+    <label class="trakt-log-live">
+      <input type="checkbox" id="trakt-log-live" checked> Live
+    </label>
+    <button class="btn btn-small" type="button" id="trakt-log-refresh">Refresh</button>
+    <span class="meta" id="trakt-log-status">Loading…</span>
+  </div>
+</div>
+
+<div class="trakt-log-stats" id="trakt-log-stats"></div>
+
+<div class="trakt-log-table-wrap">
+  <table class="data trakt-log-table">
+    <thead>
+      <tr>
+        <th>Time</th>
+        <th>Result</th>
+        <th>Object</th>
+        <th>Calls</th>
+        <th>User</th>
+        <th>Source</th>
+      </tr>
+    </thead>
+    <tbody id="trakt-log-body">
+      <tr><td colspan="6" class="muted">Loading…</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const body = document.getElementById('trakt-log-body');
+  const stats = document.getElementById('trakt-log-stats');
+  const filter = document.getElementById('trakt-log-filter');
+  const limit = document.getElementById('trakt-log-limit');
+  const live = document.getElementById('trakt-log-live');
+  const statusEl = document.getElementById('trakt-log-status');
+  const refreshBtn = document.getElementById('trakt-log-refresh');
+  const endpoint = {{ url_for('admin.trakt_log_json')|tojson }};
+  let timer = null;
+  let inFlight = false;
+  let debounce = null;
+
+  function rowClass(result) {
+    if (result === 'hit') return 'is-hit';
+    if (result === 'probe') return 'is-probe';
+    if (result === 'fetch' || result === 'patch') return 'is-fetch';
+    if (result === 'error' || result === 'invalidate') return 'is-err';
+    return '';
+  }
+
+  function chipList(pairs) {
+    if (!pairs || !pairs.length) return '';
+    return pairs.map(function (pair) {
+      return '<span class="trakt-log-chip"><strong>' + escapeHtml(String(pair[0])) + '</strong> ' + pair[1] + '</span>';
+    }).join('');
+  }
+
+  function escapeHtml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function detail(entry) {
+    const bits = [];
+    if (entry.item) bits.push(entry.item);
+    if (entry.reason) bits.push(entry.reason);
+    if (entry.source) bits.push(entry.source);
+    return bits.join(' · ');
+  }
+
+  function render(data) {
+    const lines = data.lines || [];
+    if (!data.exists) {
+      body.innerHTML = '<tr><td colspan="6" class="muted">Log file not found.</td></tr>';
+    } else if (!lines.length) {
+      body.innerHTML = '<tr><td colspan="6" class="muted">No cache events in the current log yet. Browse the app or wait for a scheduler job.</td></tr>';
+    } else {
+      const rows = document.createDocumentFragment();
+      lines.forEach(function (entry) {
+        const tr = document.createElement('tr');
+        const cls = rowClass(entry.result);
+        if (cls) tr.className = cls;
+        const cells = [
+          entry.ts || '',
+          entry.result || '',
+          entry.object || '',
+          String(entry.calls || 0),
+          entry.user || '',
+          detail(entry)
+        ];
+        cells.forEach(function (text) {
+          const td = document.createElement('td');
+          td.textContent = text;
+          tr.appendChild(td);
+        });
+        rows.appendChild(tr);
+      });
+      body.replaceChildren(rows);
+    }
+    const s = data.stats || {};
+    const bits = [];
+    bits.push('<span class="trakt-log-chip">' + (s.hit_pct || 0) + '% hit</span>');
+    bits.push('<span class="trakt-log-chip"><strong>hits</strong> ' + (s.hits || 0) + '</span>');
+    bits.push('<span class="trakt-log-chip"><strong>probes</strong> ' + (s.probes || 0) + '</span>');
+    bits.push('<span class="trakt-log-chip"><strong>fetches</strong> ' + (s.fetches || 0) + '</span>');
+    bits.push('<span class="trakt-log-chip"><strong>calls</strong> ' + (s.calls || 0) + '</span>');
+    if (s.errors) bits.push('<span class="trakt-log-chip is-err">' + s.errors + ' errors</span>');
+    bits.push(chipList(s.by_object));
+    bits.push(chipList(s.by_user));
+    stats.innerHTML = bits.join('');
+    statusEl.textContent = (data.log_file || 'log') + ' · updated';
+  }
+
+  async function load() {
+    if (inFlight) return;
+    inFlight = true;
+    const params = new URLSearchParams({
+      limit: limit.value,
+      q: filter.value.trim()
+    });
+    try {
+      const resp = await fetch(endpoint + '?' + params.toString(), {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      render(await resp.json());
+    } catch (err) {
+      statusEl.textContent = 'Could not load log';
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  function arm() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+    if (live.checked) timer = setInterval(load, 3000);
+  }
+
+  filter.addEventListener('input', function () {
+    if (debounce) clearTimeout(debounce);
+    debounce = setTimeout(load, 250);
+  });
+  limit.addEventListener('change', load);
+  live.addEventListener('change', arm);
+  refreshBtn.addEventListener('click', load);
+  load();
+  arm();
+})();
+</script>
+{% endblock %}

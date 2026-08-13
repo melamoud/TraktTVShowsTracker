@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 from models import db
 from services import trakt_client
 from services.sync_jobs import sync_user_media_state
+from services.trakt_cache import bump_user_sync_stamp, cache_http_span, cache_is_fresh, log_cache_event
 
 logger = logging.getLogger('app')
 
@@ -122,6 +123,7 @@ def ensure_user_media_fresh(
     mark the cache “fresh” and hide remote wishlist/list adds.
     """
     types = media_types or ('movie', 'show')
+    span = cache_http_span()
 
     def _persist(fp: dict) -> None:
         if not fp:
@@ -134,6 +136,10 @@ def ensure_user_media_fresh(
         except Exception as exc:
             logger.warning('Could not store activities after sync: %s', exc)
             db.session.rollback()
+
+    if not force and cache_is_fresh(getattr(user, 'last_sync_at', None)):
+        log_cache_event('user_media', 'hit', user=user, calls=0)
+        return False
 
     if force:
         ok = sync_user_media_state(user, media_types=types)
@@ -148,9 +154,11 @@ def ensure_user_media_fresh(
                 'Forced media sync incomplete for user %s; leaving activities fingerprint unchanged',
                 user.id,
             )
+        log_cache_event('user_media', 'fetch', user=user, reason='force', calls=span())
         return True
 
     need_sync = False
+    reason = 'fingerprint'
     fingerprint: dict = {}
     try:
         activities = get_last_activities(user)
@@ -158,15 +166,25 @@ def ensure_user_media_fresh(
         stored = _stored_fingerprint(user)
         if not user.last_sync_at:
             need_sync = True
+            reason = 'empty'
         elif any(fingerprint.get(k) != stored.get(k) for k in fingerprint):
             need_sync = True
+            reason = 'fingerprint'
     except Exception as exc:
         logger.warning('last_activities check failed for user %s: %s', user.id, exc)
         # Fallback: periodic sync if activities probe fails.
         if not user.last_sync_at or user.last_sync_at < datetime.utcnow() - _FALLBACK_MAX_AGE:
             need_sync = True
+            reason = 'fallback'
 
     if not need_sync:
+        bump_user_sync_stamp(user)
+        try:
+            db.session.commit()
+        except Exception as exc:
+            logger.warning('Could not extend TTL after unchanged probe: %s', exc)
+            db.session.rollback()
+        log_cache_event('user_media', 'probe', user=user, reason='unchanged', calls=span())
         return False
 
     ok = sync_user_media_state(user, media_types=types)
@@ -177,6 +195,7 @@ def ensure_user_media_fresh(
             'Media sync incomplete for user %s; not advancing activities fingerprint',
             user.id,
         )
+    log_cache_event('user_media', 'fetch', user=user, reason=reason, calls=span())
     return True
 
 
@@ -188,29 +207,14 @@ def note_user_media_write(
 ) -> None:
     """
     After a local write that already updated the DB cache (watchlist / lists /
-    watched / ratings / favorites), refresh only the fingerprint keys for those
-    aspects so the next page load does not immediately re-pull that slice.
+    watched / ratings / favorites), extend the membership TTL so the next page
+    load does not probe Trakt. Fingerprint keys stay as they were; the next
+    TTL expiry uses last_activities to pick up remote-only changes.
 
-    Important: do **not** copy unrelated Trakt activity timestamps. Doing so
-    would mark remote watchlist/list adds as “already synced” without importing
-    them (e.g. rating something in-app after adding a show on Trakt.tv).
+    ``aspects`` / ``media_types`` are accepted for call-site compatibility.
     """
-    types = media_types or ('movie', 'show')
-    # Default: assume watchlist-shaped writes when callers omit aspects (legacy).
-    write_aspects = aspects or (_ASPECT_WATCHLIST,)
-    keys = fingerprint_keys_for_aspects(write_aspects, types)
-    if not keys:
-        return
     try:
-        activities = get_last_activities(user)
-        fp = activity_fingerprint(activities, types)
-        if not fp:
-            return
-        merged = dict(_stored_fingerprint(user))
-        for key in keys:
-            if key in fp:
-                merged[key] = fp[key]
-        _save_fingerprint(user, merged)
+        bump_user_sync_stamp(user)
         db.session.commit()
     except Exception as exc:
         logger.warning('Could not note media write for user %s: %s', user.id, exc)

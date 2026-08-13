@@ -19,6 +19,13 @@
       or daily time-of-day, enable/disable jobs, and run them manually.
     </div>
   </a>
+  <a class="media-row" href="{{ url_for('admin.trakt_log') }}">
+    <h2 class="media-title">Trakt cache log</h2>
+    <div class="meta">
+      Hit / probe / fetch per cache object, with how many Trakt HTTP calls a miss used.
+      Live tail for cache scale and 429s.
+    </div>
+  </a>
   <article class="media-row">
     <h2 class="media-title">Media alerts</h2>
     <div class="meta">

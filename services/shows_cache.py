@@ -186,13 +186,16 @@ def _user_media_cycle_job(app: Flask, user_id: int) -> None:
     from services.alerts import _run_alerts_for_user
 
     with app.app_context():
+        from services.trakt_client import trakt_call_source
+
         user = db.session.get(User, user_id)
         if user is None or not user.is_active_account:
             return
         try:
-            _created, rate_limited = _run_alerts_for_user(user)
-            refresh_shows_cache_for_user(user, skip_per_show=rate_limited)
-            db.session.commit()
+            with trakt_call_source('queued user_media_cycle'):
+                _created, rate_limited = _run_alerts_for_user(user)
+                refresh_shows_cache_for_user(user, skip_per_show=rate_limited)
+                db.session.commit()
         except Exception as exc:
             logger.warning('Queued media cycle failed for user %s: %s', user_id, exc)
             db.session.rollback()

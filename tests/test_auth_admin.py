@@ -43,3 +43,41 @@ def test_admin_dashboard_ok(app, client, admin_user):
     resp = client.get('/admin/')
     assert resp.status_code == 200
     assert b'Admin' in resp.data
+
+
+def test_trakt_log_forbidden_for_normal_user(app, client, user):
+    """Non-admin cannot open the Trakt call log."""
+    login_client(client, app, user)
+    assert client.get('/admin/trakt-log').status_code == 403
+    assert client.get('/admin/trakt-log.json').status_code == 403
+
+
+def test_trakt_log_json_returns_parsed_calls(app, client, admin_user, tmp_path):
+    """Admin JSON viewer tails Trakt lines and honors a substring filter."""
+    log = tmp_path / 'app.log'
+    log.write_text(
+        '\n'.join([
+            '2026-08-13 12:00:01,001 - app - INFO - Seeded 11 default streaming services',
+            '2026-08-13 12:00:02,002 - app - INFO - Cache user_media hit user=friend calls=0 source=http GET /my/shows',
+            '2026-08-13 12:00:03,003 - app - WARNING - Trakt GET /movies/updates/2026-08-01 page=1 status=429 user=- source=scheduler catalog_sync',
+            '2026-08-13 12:00:04,004 - app - INFO - Cache user_media fetch user=friend reason=force calls=8 source=http GET /my/shows?refresh=1',
+        ]) + '\n',
+        encoding='utf-8',
+    )
+    app.config['LOG_FILE'] = str(log)
+    login_client(client, app, admin_user)
+
+    page = client.get('/admin/trakt-log')
+    assert page.status_code == 200
+    assert b'Trakt cache log' in page.data
+
+    all_rows = client.get('/admin/trakt-log.json').get_json()
+    assert all_rows['shown'] == 3
+    assert all_rows['lines'][0]['result'] == 'hit'
+    assert all_rows['lines'][1]['result'] == 'error'
+    assert all_rows['stats']['hits'] == 1
+    assert all_rows['stats']['fetches'] == 1
+
+    filtered = client.get('/admin/trakt-log.json?q=scheduler').get_json()
+    assert filtered['shown'] == 1
+    assert filtered['lines'][0]['source'] == 'scheduler catalog_sync'

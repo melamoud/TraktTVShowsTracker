@@ -12,6 +12,12 @@ from datetime import date, datetime, timedelta
 from models import UserCalendarEvent, db
 from services import trakt_client
 from services.sync_jobs import upsert_cached_media
+from services.trakt_cache import (
+    calendar_window_covers,
+    cache_http_span,
+    log_cache_event,
+    note_calendar_window,
+)
 
 logger = logging.getLogger('app')
 
@@ -80,20 +86,23 @@ def ensure_user_calendar_fresh(
     start: date,
     days: int,
     *,
-    max_age_hours: int = 6,
+    max_age_hours: int | None = None,
     media_types: tuple[str, ...] = ('movie', 'show'),
     raise_on_rate_limit: bool = False,
 ) -> bool:
     """
     Cache /calendars/my for [start, start+days) into UserCalendarEvent.
 
-    Returns True when a fetch ran. Existing rows in the window are replaced only
-    when the fetch succeeds, so a Trakt error never blanks the calendar.
-    ``media_types`` limits which feeds are fetched/replaced (alerts only need
-    shows). With ``raise_on_rate_limit``, a 429 propagates so callers can back
-    off instead of hammering Trakt with fallback calls.
+    Returns True when a fetch ran. Skips Trakt when a still-fresh fetch already
+    covers this window (shared by My calendar views and the alerts job).
+    ``max_age_hours`` is accepted for callers; the admin Trakt read-cache TTL
+    is the source of truth.
     """
     end = start + timedelta(days=days - 1)
+    if calendar_window_covers(user, start, end):
+        log_cache_event('calendar', 'hit', user=user, calls=0)
+        return False
+    span = cache_http_span()
     try:
         if days <= _CAL_CHUNK_DAYS:
             chunks = [(start, days)]
@@ -117,6 +126,7 @@ def ensure_user_calendar_fresh(
                     entries.append((media_type, entry))
     except Exception as exc:
         logger.warning('Calendar sync failed for user %s: %s', user.id, exc)
+        log_cache_event('calendar', 'error', user=user, reason='fetch', calls=span())
         if raise_on_rate_limit and getattr(exc, 'status_code', None) == 429:
             raise
         return False
@@ -172,7 +182,9 @@ def ensure_user_calendar_fresh(
             ))
         upsert_cached_media(media_type, entry)
 
+    note_calendar_window(user, start, end)
     db.session.commit()
+    log_cache_event('calendar', 'fetch', user=user, reason='stale', calls=span())
     return True
 
 

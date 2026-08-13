@@ -1,5 +1,18 @@
 # Changes log
 
+## 2026-08-13 — Trakt call log (source + user)
+
+- Every cache object decision is logged as `Cache user_media hit user=friend calls=0 source=http GET /my/shows` (also `probe` / `fetch` with `calls=` for Trakt HTTP count)
+- HTTP 429 / 4xx are still logged as warnings; successful per-request Trakt calls are not
+- Admins can watch this live from **Admin → Trakt cache log**
+
+## 2026-08-13 — Cache-first Trakt reads
+
+- Page loads (including browser Back) read local SQLite for watchlist, lists, calendar, progress, and recommendations
+- Trakt is contacted when that **object** is older than the admin TTL (default 2 hours, **Admin → Scheduler**), after **Refresh from Trakt**, or when an in-app write could not update the local object
+- Progress / My / Alerts share one show-progress cache — marking an episode watched updates card counts and alert cleanup without a follow-up Trakt GET
+- In-app writes no longer probe `/sync/last_activities`; changes made only on trakt.tv appear at the next TTL expiry or manual refresh
+
 ## 2026-08-13 — Alerts auto-read when you watch
 
 - On each alert refresh, unread **movie release/streaming** alerts mark read if the movie is watched

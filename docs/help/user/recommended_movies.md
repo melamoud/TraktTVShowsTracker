@@ -20,7 +20,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **Search titles in this list…** — filter the current recommendation results by title/year (not remembered)
 - **Upcoming / Theater window / Streaming** — same availability chips/filters as My / Latest
 
-The recommendation list itself is fetched live from Trakt each visit. Wishlist/watched tags used for hide filters also auto-refresh when Trakt activity timestamps advance.
+The recommendation list is cached locally for the admin **Trakt read cache** TTL (default 2 hours). Wishlist/watched **tags** always come from the same local title state as My / Latest, so a watch on another screen shows up here immediately.
 
 ## Highlights
 

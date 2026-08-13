@@ -16,7 +16,7 @@ Filter choices (status, Lists…, titles per page) are remembered for your accou
 
 **Upcoming / Theater window / Streaming** chips sit under the poster; the same names are filter pills (Theater = ±30 days, Upcoming = >30 days out).
 
-Opening the page uses a local cache, but it **auto-invalidates**: a cheap Trakt `/sync/last_activities` check runs on each visit, and watchlist / watched / lists re-sync when those timestamps advanced (e.g. you added a show on Trakt.tv). In-app rate / watch / list actions only mark *those* activity slices fresh, so a Trakt.tv watchlist add is not skipped. **Refresh from Trakt** forces a full re-pull of membership **and** queues a background pass over episode/progress data (results appear within a minute). Sync is **read-only** — it never writes episode history.
+Opening the page uses a local cache shared with Progress, Latest tags, and Alerts. Trakt is contacted at most every **N hours** (admin **Trakt read cache** TTL, default 2) for list membership, calendar, and per-show progress — or after **Refresh from Trakt**. In-app watch / rate / list actions update those same objects immediately. Adds you made only on trakt.tv wait for the TTL or a manual refresh. **Refresh from Trakt** forces a full re-pull of membership **and** queues a background pass over episode/progress data (results appear within a minute). Sync is **read-only** — it never writes episode history.
 
 **Pin** keeps a show at the top of My shows (local only — for “watching now” / “soon”). Newest pin wins among pinned titles. **Unpin** returns it to normal sort.
 
