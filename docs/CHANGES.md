@@ -3,6 +3,7 @@
 ## 2026-08-13 — Trakt call log (source + user)
 
 - Every cache object decision is logged as `Cache user_media hit user=friend calls=0 source=http GET /my/shows` (also `probe` / `fetch` with `calls=` for Trakt HTTP count)
+- Scheduler catalog sync, alerts, and progress jobs log the same way (`reason=scheduler` / `alerts` / `job`) so page-load hits are not mistaken for “Trakt was never called”
 - HTTP 429 / 4xx are still logged as warnings; successful per-request Trakt calls are not
 - Admins can watch this live from **Admin → Trakt cache log**
 

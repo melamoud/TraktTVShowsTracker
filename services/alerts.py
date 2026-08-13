@@ -431,11 +431,15 @@ def _mark_watched_alerts_read(user: User, *, rate_limited: bool = False) -> int:
         .all()
     )
     if movie_notes:
-        from services.trakt_cache import cache_is_fresh
+        from services.trakt_cache import cache_http_span, cache_is_fresh, log_cache_event
         if not cache_is_fresh(getattr(user, 'last_sync_at', None)):
             try:
                 from services.sync_jobs import sync_user_media_state
+                span = cache_http_span()
                 sync_user_media_state(user, ('movie',))
+                log_cache_event(
+                    'user_media', 'fetch', user=user, reason='alerts', calls=span(),
+                )
             except Exception as exc:
                 logger.warning('Movie watch-state sync before alert cleanup failed: %s', exc)
         movie_ids = {int(n.trakt_id) for n in movie_notes if n.trakt_id}

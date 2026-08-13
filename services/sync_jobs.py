@@ -1076,6 +1076,7 @@ def refresh_show_progress_for_ids(
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from flask import current_app
+    from services.trakt_cache import log_cache_event
 
     app = current_app._get_current_object()
     user_id = user.id
@@ -1114,6 +1115,10 @@ def refresh_show_progress_for_ids(
             updated += 1
     if updated:
         db.session.commit()
+    log_cache_event(
+        'progress', 'fetch', user=user, item=f'{updated}/{len(need)}',
+        reason='job', calls=len(need),
+    )
     return updated
 
 
@@ -1242,11 +1247,17 @@ def run_catalog_sync_job(app: Flask) -> None:
     with app.app_context():
         with trakt_call_source('scheduler catalog_sync'):
             try:
+                from services.trakt_cache import cache_http_span, log_cache_event
                 for media_type in ('movie', 'show'):
+                    span = cache_http_span()
                     if feed_count(media_type) == 0:
                         sync_catalog(media_type)
                     else:
                         refresh_catalog_newest(media_type, pages=2)
+                    log_cache_event(
+                        'latest', 'fetch', item=media_type, reason='scheduler',
+                        calls=span(),
+                    )
                 enrich_media_details('movie')
                 enrich_media_details('show')
             except Exception as exc:

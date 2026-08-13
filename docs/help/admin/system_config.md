@@ -14,7 +14,7 @@ Admins can change the schedule from **Admin → Scheduler** without restarting t
 
 Jobs can also be enabled or disabled individually. The page shows the next scheduled run time. **Run alert check now** is available from Admin, Scheduler, and (for admins) the Alerts page. There is no automatic run a few minutes after restart — the next clock slot (or a manual run) is used.
 
-Each cache object decision is written to `logs/app.log` as `Cache user_media hit|probe|fetch user=… calls=… source=…`. Watch it live from **Admin → Trakt cache log**. Successful Trakt HTTP calls are not logged (too noisy); 429s still appear as warnings.
+Each cache object decision is written to `logs/app.log` as `Cache user_media hit|probe|fetch user=… calls=… source=…`. Watch it live from **Admin → Trakt cache log**. Catalog sync and media-alerts jobs appear there too (`reason=scheduler` / `alerts` / `job`); they refresh the same objects the pages read, so a page load soon after a job is a `hit`. Successful per-request Trakt HTTP calls are not logged (too noisy); 429s still appear as warnings.
 
 ## Trakt read cache
 
