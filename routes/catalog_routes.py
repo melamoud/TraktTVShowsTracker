@@ -1335,6 +1335,17 @@ def api_watched(media_type, trakt_id):
             if media_type == 'movie':
                 st.progress_percent = 100.0
         db.session.commit()
+        if watched:
+            try:
+                from services import alerts as alerts_svc
+                if media_type == 'movie':
+                    alerts_svc.mark_movie_alerts_read(current_user, trakt_id)
+                elif media_type == 'show':
+                    alerts_svc.mark_show_alerts_read(current_user, trakt_id)
+            except Exception as exc:
+                current_app.logger.warning(
+                    'Could not mark alerts read after watched: %s', exc,
+                )
         try:
             from services.user_media_sync import note_user_media_write
             note_user_media_write(

@@ -423,6 +423,8 @@ class Notification(db.Model):
     link = db.Column(db.String(500))
     media_type = db.Column(db.String(16))  # movie|show when title-linked
     trakt_id = db.Column(db.Integer)
+    # Same key as AlertEvent (ep:2:5, season:2, release:YYYY-MM-DD, …) for cleanup.
+    payload_key = db.Column(db.String(200))
     is_read = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 

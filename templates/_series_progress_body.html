@@ -31,6 +31,8 @@
             data-action="episode-watched"
             data-media-type="show"
             data-trakt-id="{{ trakt_id }}"
+            data-season="{{ next_episode.get('season') }}"
+            data-episode="{{ next_episode.get('number') }}"
             data-ids='{{ next_episode.get("ids", {}) | tojson }}'>
       Watch
     </button>
@@ -84,6 +86,9 @@
                       data-action="episode-rate-review"
                       data-media-type="episode"
                       data-trakt-id="{{ ep.trakt_id }}"
+                      data-show-trakt-id="{{ trakt_id }}"
+                      data-season="{{ season.number }}"
+                      data-episode="{{ ep.number }}"
                       data-ids='{{ ep.ids | tojson }}'
                       data-watched="{{ '1' if ep.watched else '0' }}"
                       data-title="E{{ ep.number }}{% if ep.title %} — {{ ep.title|e }}{% endif %}">Rate / Review</button>
@@ -93,6 +98,8 @@
                       data-action="episode-unwatched"
                       data-media-type="show"
                       data-trakt-id="{{ trakt_id }}"
+                      data-season="{{ season.number }}"
+                      data-episode="{{ ep.number }}"
                       data-ids='{{ ep.ids | tojson }}'
                       title="Click to unwatch">Watched</button>
             {% else %}
@@ -100,6 +107,8 @@
                       data-action="episode-watched"
                       data-media-type="show"
                       data-trakt-id="{{ trakt_id }}"
+                      data-season="{{ season.number }}"
+                      data-episode="{{ ep.number }}"
                       data-ids='{{ ep.ids | tojson }}'>Watch</button>
             {% endif %}
           </div>

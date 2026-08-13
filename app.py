@@ -209,6 +209,8 @@ def _ensure_schema(app):
                  'ALTER TABLE notifications ADD COLUMN media_type VARCHAR(16)'),
                 ('trakt_id',
                  'ALTER TABLE notifications ADD COLUMN trakt_id INTEGER'),
+                ('payload_key',
+                 'ALTER TABLE notifications ADD COLUMN payload_key VARCHAR(200)'),
             ):
                 if col not in ncols:
                     n_alters.append(ddl)

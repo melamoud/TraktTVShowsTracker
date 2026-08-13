@@ -1026,7 +1026,14 @@ document.addEventListener('click', async function (ev) {
         jobs.push(apiPost('/api/comment/episode/' + id, body));
       }
       if (draft.markWatched) {
-        jobs.push(apiPost('/api/episode/watched', { ids: ids, action: 'add' }));
+        const showId = btn.getAttribute('data-show-trakt-id') || '';
+        const season = btn.getAttribute('data-season');
+        const episode = btn.getAttribute('data-episode');
+        const watchBody = { ids: ids, action: 'add' };
+        if (showId) watchBody.show_trakt_id = Number(showId);
+        if (season != null && season !== '') watchBody.season = Number(season);
+        if (episode != null && episode !== '') watchBody.episode = Number(episode);
+        jobs.push(apiPost('/api/episode/watched', watchBody));
       }
       await Promise.all(jobs);
       await afterProgressMutation();
@@ -1296,10 +1303,17 @@ document.addEventListener('click', async function (ev) {
       requestReload();
     } else if (action === 'episode-watched' || action === 'episode-unwatched') {
       const ids = JSON.parse(btn.getAttribute('data-ids') || '{}');
-      await apiPost('/api/episode/watched', {
+      const body = {
         ids: ids,
         action: action === 'episode-unwatched' ? 'remove' : 'add',
-      });
+      };
+      const showId = btn.getAttribute('data-trakt-id');
+      const season = btn.getAttribute('data-season');
+      const episode = btn.getAttribute('data-episode');
+      if (showId) body.show_trakt_id = Number(showId);
+      if (season != null && season !== '') body.season = Number(season);
+      if (episode != null && episode !== '') body.episode = Number(episode);
+      await apiPost('/api/episode/watched', body);
       await afterProgressMutation();
     } else if (action === 'season-watched') {
       const season = btn.getAttribute('data-season');

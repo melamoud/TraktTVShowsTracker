@@ -9,11 +9,14 @@ Alert types:
   new_user_login   — admin: first login of a new local user
 
 Dedup / baselines live in AlertEvent so jobs never re-fire the same event.
+Unread release/episode alerts are marked read on the next refresh once the
+movie or episode is watched on Trakt.
 """
 
 from __future__ import annotations
 
 import logging
+import re
 from datetime import date, datetime, timedelta
 from typing import Iterable
 
@@ -44,6 +47,9 @@ ALERT_NEW_USER_LOGIN = 'new_user_login'
 
 STREAMING_OFFER_TYPES = ('flatrate', 'ads', 'free')
 RELEASE_GRACE_DAYS = 3
+
+_EP_PAYLOAD_RE = re.compile(r'\bS(\d{1,2})E(\d{1,3})\b', re.IGNORECASE)
+_SEASON_PAYLOAD_RE = re.compile(r'Full season\s+(\d+)', re.IGNORECASE)
 
 
 def alert_pref_enabled(user: User, alert_type: str) -> bool:
@@ -157,8 +163,351 @@ def _notify(
         link=link,
         media_type=media_type or None,
         trakt_id=int(trakt_id) if trakt_id else None,
+        payload_key=payload_key,
     ))
     return True
+
+
+def _notification_payload_key(note: Notification) -> str | None:
+    """Prefer stored payload_key; infer from message for older rows."""
+    if note.payload_key:
+        return str(note.payload_key)
+    msg = note.message or ''
+    if note.alert_type == ALERT_EPISODE_AIRED:
+        m = _EP_PAYLOAD_RE.search(msg)
+        if m:
+            return f'ep:{int(m.group(1))}:{int(m.group(2))}'
+    if note.alert_type == ALERT_SEASON_AIRED:
+        m = _SEASON_PAYLOAD_RE.search(msg)
+        if m:
+            return f'season:{int(m.group(1))}'
+    return None
+
+
+def _season_drop_watched(
+    user_id: int,
+    trakt_id: int,
+    season: int,
+    watched_keys: set[tuple[int, int]],
+) -> bool:
+    """True when every episode recorded for this season drop is watched."""
+    season = int(season)
+    rows = AlertEvent.query.filter_by(
+        user_id=user_id,
+        alert_type=ALERT_EPISODE_AIRED,
+        media_type='show',
+        trakt_id=int(trakt_id),
+    ).filter(AlertEvent.payload_key.like(f'ep:{season}:%')).all()
+    needed: list[tuple[int, int]] = []
+    for row in rows:
+        parts = (row.payload_key or '').split(':')
+        if len(parts) != 3:
+            continue
+        try:
+            needed.append((int(parts[1]), int(parts[2])))
+        except (TypeError, ValueError):
+            continue
+    if not needed:
+        return any(s == season for s, _e in watched_keys)
+    return all(key in watched_keys for key in needed)
+
+
+def mark_episode_alerts_read(
+    user: User,
+    show_trakt_id: int,
+    season: int,
+    episode: int,
+) -> int:
+    """
+    Mark unread episode alert(s) read after the user watches that episode here.
+
+    Also clears a season-drop alert when every episode in that drop is now read
+    (or is this episode).
+    """
+    show_trakt_id = int(show_trakt_id)
+    season = int(season)
+    episode = int(episode)
+    payload = f'ep:{season}:{episode}'
+    marked = 0
+    notes = (
+        Notification.query
+        .filter(
+            Notification.user_id == user.id,
+            Notification.is_read.is_(False),
+            Notification.media_type == 'show',
+            Notification.trakt_id == show_trakt_id,
+            Notification.alert_type == ALERT_EPISODE_AIRED,
+        )
+        .all()
+    )
+    for note in notes:
+        if _notification_payload_key(note) == payload:
+            note.is_read = True
+            marked += 1
+
+    season_notes = (
+        Notification.query
+        .filter(
+            Notification.user_id == user.id,
+            Notification.is_read.is_(False),
+            Notification.media_type == 'show',
+            Notification.trakt_id == show_trakt_id,
+            Notification.alert_type == ALERT_SEASON_AIRED,
+        )
+        .all()
+    )
+    for note in season_notes:
+        key = _notification_payload_key(note)
+        if key != f'season:{season}':
+            continue
+        # Season drop is cleared when no unread ep alerts remain for its episodes.
+        if _season_drop_episodes_cleared(
+            user.id, show_trakt_id, season, just_watched=(season, episode),
+        ):
+            note.is_read = True
+            marked += 1
+
+    if marked:
+        try:
+            db.session.commit()
+        except Exception as exc:
+            logger.warning('Could not commit episode alert mark-read: %s', exc)
+            db.session.rollback()
+            return 0
+    return marked
+
+
+def mark_season_alerts_read(user: User, show_trakt_id: int, season: int) -> int:
+    """Mark unread episode + season alerts for one season after Mark season watched."""
+    show_trakt_id = int(show_trakt_id)
+    season = int(season)
+    prefix = f'ep:{season}:'
+    marked = 0
+    notes = (
+        Notification.query
+        .filter(
+            Notification.user_id == user.id,
+            Notification.is_read.is_(False),
+            Notification.media_type == 'show',
+            Notification.trakt_id == show_trakt_id,
+            Notification.alert_type.in_((ALERT_EPISODE_AIRED, ALERT_SEASON_AIRED)),
+        )
+        .all()
+    )
+    for note in notes:
+        key = _notification_payload_key(note)
+        if not key:
+            continue
+        if note.alert_type == ALERT_EPISODE_AIRED and key.startswith(prefix):
+            note.is_read = True
+            marked += 1
+        elif note.alert_type == ALERT_SEASON_AIRED and key == f'season:{season}':
+            note.is_read = True
+            marked += 1
+    if marked:
+        try:
+            db.session.commit()
+        except Exception as exc:
+            logger.warning('Could not commit season alert mark-read: %s', exc)
+            db.session.rollback()
+            return 0
+    return marked
+
+
+def mark_show_alerts_read(user: User, show_trakt_id: int) -> int:
+    """Mark all unread episode/season alerts for a show (Mark series watched)."""
+    show_trakt_id = int(show_trakt_id)
+    notes = (
+        Notification.query
+        .filter(
+            Notification.user_id == user.id,
+            Notification.is_read.is_(False),
+            Notification.media_type == 'show',
+            Notification.trakt_id == show_trakt_id,
+            Notification.alert_type.in_((ALERT_EPISODE_AIRED, ALERT_SEASON_AIRED)),
+        )
+        .all()
+    )
+    if not notes:
+        return 0
+    for note in notes:
+        note.is_read = True
+    try:
+        db.session.commit()
+    except Exception as exc:
+        logger.warning('Could not commit show alert mark-read: %s', exc)
+        db.session.rollback()
+        return 0
+    return len(notes)
+
+
+def mark_movie_alerts_read(user: User, movie_trakt_id: int) -> int:
+    """Mark unread movie release/streaming alerts after Mark watched."""
+    movie_trakt_id = int(movie_trakt_id)
+    notes = (
+        Notification.query
+        .filter(
+            Notification.user_id == user.id,
+            Notification.is_read.is_(False),
+            Notification.media_type == 'movie',
+            Notification.trakt_id == movie_trakt_id,
+            Notification.alert_type.in_((ALERT_RELEASE_DAY, ALERT_NEW_STREAMING)),
+        )
+        .all()
+    )
+    if not notes:
+        return 0
+    for note in notes:
+        note.is_read = True
+    try:
+        db.session.commit()
+    except Exception as exc:
+        logger.warning('Could not commit movie alert mark-read: %s', exc)
+        db.session.rollback()
+        return 0
+    return len(notes)
+
+
+def _season_drop_episodes_cleared(
+    user_id: int,
+    trakt_id: int,
+    season: int,
+    *,
+    just_watched: tuple[int, int] | None = None,
+) -> bool:
+    """True when no unread episode alerts remain for the season-drop episodes."""
+    season = int(season)
+    rows = AlertEvent.query.filter_by(
+        user_id=user_id,
+        alert_type=ALERT_EPISODE_AIRED,
+        media_type='show',
+        trakt_id=int(trakt_id),
+    ).filter(AlertEvent.payload_key.like(f'ep:{season}:%')).all()
+    needed: list[str] = []
+    for row in rows:
+        pk = row.payload_key or ''
+        if pk.startswith(f'ep:{season}:'):
+            needed.append(pk)
+    if not needed:
+        return True
+    just_payload = None
+    if just_watched:
+        just_payload = f'ep:{int(just_watched[0])}:{int(just_watched[1])}'
+    unread = {
+        _notification_payload_key(n)
+        for n in Notification.query.filter(
+            Notification.user_id == user_id,
+            Notification.is_read.is_(False),
+            Notification.media_type == 'show',
+            Notification.trakt_id == int(trakt_id),
+            Notification.alert_type == ALERT_EPISODE_AIRED,
+        ).all()
+    }
+    unread.discard(None)
+    for payload in needed:
+        if payload == just_payload:
+            continue
+        if payload in unread:
+            return False
+    return True
+
+
+def _mark_watched_alerts_read(user: User, *, rate_limited: bool = False) -> int:
+    """
+    Mark unread release/episode alerts as read when the movie/episode is watched.
+
+    Runs on each alert refresh so watching on Trakt clears the inbox next pass.
+    """
+    marked = 0
+    movie_notes = (
+        Notification.query
+        .filter(
+            Notification.user_id == user.id,
+            Notification.is_read.is_(False),
+            Notification.media_type == 'movie',
+            Notification.alert_type.in_((ALERT_RELEASE_DAY, ALERT_NEW_STREAMING)),
+            Notification.trakt_id.isnot(None),
+        )
+        .all()
+    )
+    if movie_notes:
+        try:
+            from services.sync_jobs import sync_user_media_state
+            sync_user_media_state(user, ('movie',))
+        except Exception as exc:
+            logger.warning('Movie watch-state sync before alert cleanup failed: %s', exc)
+        movie_ids = {int(n.trakt_id) for n in movie_notes if n.trakt_id}
+        watched_ids = {
+            int(st.trakt_id)
+            for st in UserMediaState.query.filter(
+                UserMediaState.user_id == user.id,
+                UserMediaState.media_type == 'movie',
+                UserMediaState.trakt_id.in_(movie_ids or [-1]),
+                UserMediaState.watched.is_(True),
+            ).all()
+        }
+        for note in movie_notes:
+            if note.trakt_id and int(note.trakt_id) in watched_ids:
+                note.is_read = True
+                marked += 1
+
+    show_notes = (
+        Notification.query
+        .filter(
+            Notification.user_id == user.id,
+            Notification.is_read.is_(False),
+            Notification.media_type == 'show',
+            Notification.alert_type.in_((ALERT_EPISODE_AIRED, ALERT_SEASON_AIRED)),
+            Notification.trakt_id.isnot(None),
+        )
+        .all()
+    )
+    if not show_notes or rate_limited:
+        return marked
+
+    by_show: dict[int, list[Notification]] = {}
+    for note in show_notes:
+        by_show.setdefault(int(note.trakt_id), []).append(note)
+
+    for trakt_id, notes in by_show.items():
+        try:
+            progress = trakt_client.get_show_progress(user, trakt_id)
+        except Exception as exc:
+            if getattr(exc, 'status_code', None) == 429:
+                logger.warning(
+                    'Trakt throttling while clearing watched episode alerts; deferring'
+                )
+                break
+            logger.warning(
+                'Could not load progress for show %s while clearing alerts: %s',
+                trakt_id, exc,
+            )
+            continue
+        watched_keys = trakt_client.episode_watched_keys_from_trakt(
+            history=None, watched_entry=None, progress=progress or {},
+        )
+        for note in notes:
+            payload = _notification_payload_key(note)
+            if not payload:
+                continue
+            if note.alert_type == ALERT_EPISODE_AIRED and payload.startswith('ep:'):
+                try:
+                    _prefix, s_raw, e_raw = payload.split(':', 2)
+                    key = (int(s_raw), int(e_raw))
+                except (TypeError, ValueError):
+                    continue
+                if key in watched_keys:
+                    note.is_read = True
+                    marked += 1
+            elif note.alert_type == ALERT_SEASON_AIRED and payload.startswith('season:'):
+                try:
+                    s_num = int(payload.split(':', 1)[1])
+                except (TypeError, ValueError):
+                    continue
+                if _season_drop_watched(user.id, trakt_id, s_num, watched_keys):
+                    note.is_read = True
+                    marked += 1
+    return marked
 
 
 def _streaming_provider_names(media: CachedMedia) -> list[str]:
@@ -619,4 +968,13 @@ def _run_alerts_for_user(user: User) -> tuple[int, bool]:
                 logger.warning(
                     'Trakt is throttling; remaining episode scans deferred to next run'
                 )
+    try:
+        cleared = _mark_watched_alerts_read(user, rate_limited=rate_limited)
+        if cleared:
+            logger.info(
+                'Marked %s watched movie/episode alert(s) read for user %s',
+                cleared, user.id,
+            )
+    except Exception as exc:
+        logger.warning('Watch-based alert cleanup failed for user %s: %s', user.id, exc)
     return created, rate_limited

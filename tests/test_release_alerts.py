@@ -69,6 +69,143 @@ def test_release_day_skips_watched_movie(app, user):
         assert Notification.query.filter_by(user_id=user).count() == 0
 
 
+def test_alert_refresh_marks_watched_movie_release_read(app, user):
+    """Unread movie release alert clears on next run after the movie is watched."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=9103, title='Watch Me',
+            released_at=date.today(),
+        ))
+        _watchlist(user, 'movie', 9103, watched=False)
+        db.session.commit()
+
+        with patch('services.alerts.ensure_user_calendar_fresh'), \
+             patch('services.sync_jobs.sync_user_media_state', return_value=True):
+            assert run_media_alerts(app) >= 1
+        note = Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_RELEASE_DAY, trakt_id=9103,
+        ).one()
+        assert note.is_read is False
+        assert note.payload_key and note.payload_key.startswith('release:')
+
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='movie', trakt_id=9103,
+        ).one()
+        st.watched = True
+        db.session.commit()
+
+        with patch('services.alerts.ensure_user_calendar_fresh'), \
+             patch('services.sync_jobs.sync_user_media_state', return_value=True):
+            assert run_media_alerts(app) == 0
+        assert db.session.get(Notification, note.id).is_read is True
+
+
+def test_alert_refresh_marks_watched_episode_read(app, user):
+    """Unread episode alert clears on next run after that episode is watched."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=9301, title='Weekly Show',
+        ))
+        _watchlist(user, 'show', 9301)
+        db.session.add(Notification(
+            user_id=user,
+            alert_type=ALERT_EPISODE_AIRED,
+            title='New episode: Weekly Show',
+            message='S02E04 — Cliff · aired 2026-08-12',
+            media_type='show',
+            trakt_id=9301,
+            payload_key='ep:2:4',
+            is_read=False,
+        ))
+        db.session.add(Notification(
+            user_id=user,
+            alert_type=ALERT_EPISODE_AIRED,
+            title='New episode: Weekly Show',
+            message='S02E05 — Still Open · aired 2026-08-13',
+            media_type='show',
+            trakt_id=9301,
+            payload_key='ep:2:5',
+            is_read=False,
+        ))
+        db.session.commit()
+
+        progress = {
+            'seasons': [{
+                'number': 2,
+                'episodes': [
+                    {'number': 4, 'completed': True, 'last_watched_at': '2026-08-13T01:00:00.000Z'},
+                    {'number': 5, 'completed': False},
+                ],
+            }],
+        }
+        with patch('services.alerts.ensure_user_calendar_fresh'), \
+             patch('services.alerts.trakt_client.get_show_progress', return_value=progress), \
+             patch('services.alerts.collection_trakt_ids', return_value=set()):
+            run_media_alerts(app)
+
+        notes = {
+            n.payload_key: n
+            for n in Notification.query.filter_by(user_id=user, trakt_id=9301).all()
+        }
+        assert notes['ep:2:4'].is_read is True
+        assert notes['ep:2:5'].is_read is False
+
+
+def test_progress_watch_marks_episode_alert_read_immediately(app, client, user):
+    """Progress Watch button clears the matching episode alert without a refresh."""
+    from services.alerts import mark_episode_alerts_read
+
+    with app.app_context():
+        db.session.add(Notification(
+            user_id=user,
+            alert_type=ALERT_EPISODE_AIRED,
+            title='New episode: Show',
+            message='S01E02 — Two · aired 2026-08-12',
+            media_type='show',
+            trakt_id=4401,
+            payload_key='ep:1:2',
+            is_read=False,
+        ))
+        db.session.add(Notification(
+            user_id=user,
+            alert_type=ALERT_EPISODE_AIRED,
+            title='New episode: Show',
+            message='S01E03 — Three · aired 2026-08-13',
+            media_type='show',
+            trakt_id=4401,
+            payload_key='ep:1:3',
+            is_read=False,
+        ))
+        db.session.commit()
+
+        assert mark_episode_alerts_read(db.session.get(User, user), 4401, 1, 2) == 1
+        notes = {
+            n.payload_key: n.is_read
+            for n in Notification.query.filter_by(user_id=user, trakt_id=4401).all()
+        }
+        assert notes['ep:1:2'] is True
+        assert notes['ep:1:3'] is False
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.trakt_client.mark_episode_watched', return_value={'added': {'episodes': 1}}):
+        resp = client.post(
+            '/api/episode/watched',
+            json={
+                'ids': {'trakt': 99},
+                'action': 'add',
+                'show_trakt_id': 4401,
+                'season': 1,
+                'episode': 3,
+            },
+        )
+    assert resp.status_code == 200
+    with app.app_context():
+        note = Notification.query.filter_by(
+            user_id=user, trakt_id=4401, payload_key='ep:1:3',
+        ).one()
+        assert note.is_read is True
+
+
 def test_new_streaming_baselines_then_alerts_delta(app, user):
     with app.app_context():
         media = CachedMedia(
@@ -292,6 +429,7 @@ def test_calendar_event_alerts_without_per_show_fetch(app, user):
 
         with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
              patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.alerts.trakt_client.get_show_progress', return_value={}), \
              patch('services.alerts.trakt_client.get_show_seasons') as get_seasons:
             created = run_media_alerts(app)
 

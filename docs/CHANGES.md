@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-13 — Alerts auto-read when you watch
+
+- On each alert refresh, unread **movie release/streaming** alerts mark read if the movie is watched
+- Unread **episode** alerts mark read when that episode is watched on Trakt; **season** alerts when every episode in the drop is watched
+- Clicking **Watch** (Progress), **Mark season watched**, or **Mark watched** in the app also marks matching alerts read immediately
+
 ## 2026-08-13 — Progress drawer survives Trakt rate limits
 
 - List membership sync no longer fetches seasons for every personal-list show (that loop kept calling Trakt after HTTP 429 and starved Progress)

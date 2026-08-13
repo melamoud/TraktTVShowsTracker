@@ -28,6 +28,8 @@ Each alert is a card: poster, title (links to the title page), a colored **type 
 - Episode alerts show **S#E# — episode title · aired date**, and where it streams as tags — **teal** = on one of your services, gray = elsewhere (kept current at view time).
 - Episode/season alerts have a **Progress** button that opens the progress **side panel** in place — mark episodes watched without leaving Alerts. **Details** goes to the full title page.
 - **Mark read/unread** dims or brightens the card; the nav badge counts unread.
+- On the next **alert refresh**, movie release/streaming alerts auto-mark read when the movie is watched on Trakt, and episode/season alerts auto-mark read when that episode (or every episode in the season drop) is watched on Trakt.
+- **Immediately** when you click **Watch** / **Mark season watched** / **Mark watched** in this app (Progress or title cards), matching alerts for that episode/season/movie are marked read without waiting for the next refresh.
 - **Hide read** (default on) — only unread alerts; toggle **Show read** to browse older ones. Choice is remembered.
 
 ## Turning types off

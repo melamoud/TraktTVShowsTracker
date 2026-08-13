@@ -1140,6 +1140,19 @@ def api_episode_watched():
         else:
             trakt_client.mark_episode_watched(current_user, ids)
             watched = True
+            try:
+                show_id = int(payload.get('show_trakt_id') or 0)
+                season = payload.get('season')
+                episode = payload.get('episode')
+                if show_id and season is not None and episode is not None:
+                    from services.alerts import mark_episode_alerts_read
+                    mark_episode_alerts_read(
+                        current_user, show_id, int(season), int(episode),
+                    )
+            except Exception as exc:
+                current_app.logger.warning(
+                    'Could not mark episode alerts read after watch: %s', exc,
+                )
         return jsonify({'success': True, 'watched': watched})
     except Exception as exc:
         current_app.logger.exception('Episode watched action failed: %s', exc)
@@ -1156,6 +1169,13 @@ def api_season_watched(trakt_id, season_number):
     try:
         result = trakt_client.mark_season_watched(current_user, trakt_id, season_number)
         added = int(((result.get('added') or {}).get('episodes')) or 0)
+        try:
+            from services.alerts import mark_season_alerts_read
+            mark_season_alerts_read(current_user, trakt_id, season_number)
+        except Exception as exc:
+            current_app.logger.warning(
+                'Could not mark season alerts read after watch: %s', exc,
+            )
         return jsonify({'success': True, 'added': added, 'season': season_number})
     except Exception as exc:
         current_app.logger.exception('Season watched failed: %s', exc)
