@@ -17,6 +17,8 @@ Login diagnostics: Android logcat tags `TVTrackerAuth` and `TVTrackerHttp`; serv
 
 Latest and Recommended screens are not in this build.
 
+<img src="../docs/screenshots/android-my-shows.jpg" alt="Android My Shows" width="360">
+
 ## Open in Android Studio
 
 1. Install [Android Studio](https://developer.android.com/studio) (it includes JDK 17).

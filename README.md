@@ -35,6 +35,38 @@ Details: [docs/SETUP.md](docs/SETUP.md)
 - In-app release alerts when a title appears on streaming
 - Admin: users, services, manual release check, help
 
+## Screenshots
+
+### My Shows (web)
+
+Lists from Trakt (Wishlist + personal lists), unwatched-episode filter, newest-aired sort, streaming highlights, pin / lists / rate / watch.
+
+![My Shows](docs/screenshots/web-my-shows.jpg)
+
+### Series progress (web)
+
+Per-season episode list with next-up, watch / unwatch, and Rate / Review — writes back to Trakt.
+
+![My Shows progress](docs/screenshots/web-my-shows-progress.jpg)
+
+### Recommended movies (web)
+
+Personalized Trakt picks, genre tabs, preference-match tags, and “plays on your services.”
+
+![Recommended Movies](docs/screenshots/web-recommended-movies.jpg)
+
+### Alerts (web)
+
+Release / new-episode / streaming alerts for titles in your lists. Unread badge, mark read, jump to Progress.
+
+![Alerts](docs/screenshots/web-alerts.jpg)
+
+### My Shows (Android)
+
+Same server and Trakt login on the phone: My Shows / My Movies / Search / Alerts, with Progress and Watch on each card.
+
+<img src="docs/screenshots/android-my-shows.jpg" alt="Android My Shows" width="360">
+
 ## Tests
 
 ```bat

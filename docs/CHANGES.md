@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-14 — GitHub screenshots
+
+- README (and Android README) show My Shows, Progress, Recommended Movies, Alerts, and the Android My Shows screen
+
 ## 2026-08-14 — Non-commercial license
 
 - Repository is licensed under PolyForm Noncommercial 1.0.0 (copyright Nir Melamoud). Commercial use needs written permission.
