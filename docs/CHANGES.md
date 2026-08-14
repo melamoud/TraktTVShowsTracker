@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-14 — Non-commercial license
+
+- Repository is licensed under PolyForm Noncommercial 1.0.0 (copyright Nir Melamoud). Commercial use needs written permission.
+
 ## 2026-08-14 — Android launcher icon
 
 - Home-screen icon is the TV + radar mark instead of the placeholder T

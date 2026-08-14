@@ -2,6 +2,8 @@
 
 Web app to discover newly listed movies/shows on Trakt, match them to your streaming preferences, sync watchlist/watched/progress with TraktTV, and keep local extras (found-on services, review markers, release alerts).
 
+**Copyright (c) 2026 Nir Melamoud.** Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE). You may use, modify, and share this project for personal, educational, and other non-commercial purposes. **Commercial use requires written permission** from the copyright holder — [request a license via GitHub](https://github.com/melamoud).
+
 Built with **Python Flask + SQLite**, following the same operational patterns as AudioBooksReview (HTTPS runner, CSRF, help docs, admin/user route split).
 
 ## Quick start
@@ -39,10 +41,13 @@ Details: [docs/SETUP.md](docs/SETUP.md)
 .venv\Scripts\pytest.exe -q
 ```
 
-## Git remote
+## License
 
-Local git is initialized in this folder. Mirror AudioBooksReview by creating a GitHub repo under `melamoud` (install [GitHub CLI](https://cli.github.com/) then):
+Copyright (c) 2026 Nir Melamoud. All rights reserved.
 
-```bat
-gh repo create melamoud/TraktTVShowsTracker --private --source=. --remote=origin --push
-```
+This repository is **not** MIT/Apache/GPL open source. It uses the [PolyForm Noncommercial License 1.0.0](LICENSE):
+
+- Allowed without asking: personal hobby use, private study, and use by schools, charities, and similar non-commercial organizations
+- **Not allowed without consent:** selling the software, using it in a paid product or service, or any other commercial purpose
+
+To use this project commercially, contact [github.com/melamoud](https://github.com/melamoud) and wait for a written license.

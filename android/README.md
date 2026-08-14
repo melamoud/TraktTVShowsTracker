@@ -45,3 +45,7 @@ The APK is `android/app/build/outputs/apk/debug/TVTracker-v1.0.0-debug.apk`.
 1. Send the APK (Drive, chat, USB).
 2. On the phone: open the file → **Install**. Allow **Install unknown apps** for the app you used to open the APK.
 3. Tap **Login with TraktTV**, authorize in the browser, and return to the app.
+
+## License
+
+Copyright (c) 2026 Nir Melamoud. Same terms as the rest of this repository: [PolyForm Noncommercial License 1.0.0](../LICENSE). Commercial use requires written permission.
