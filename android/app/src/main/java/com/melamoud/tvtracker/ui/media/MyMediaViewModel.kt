@@ -38,14 +38,13 @@ data class ListsDialogState(
 class MyMediaViewModel(
     private val kind: String,
     private val repo: CatalogRepository,
+    private val onUnread: (Int) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(MyMediaUiState())
     val state: StateFlow<MyMediaUiState> = _state.asStateFlow()
     private val mediaType = if (kind == "shows") "show" else "movie"
 
-    init { reload() }
-
-    fun reload(refresh: Boolean = false, lists: List<String>? = null) {
+    fun reload(lists: List<String>? = null) {
         viewModelScope.launch {
             val s = _state.value
             _state.value = s.copy(loading = true, error = null)
@@ -56,7 +55,7 @@ class MyMediaViewModel(
                 query = s.query,
                 display = s.display,
                 page = s.page,
-                refresh = refresh,
+                refresh = false,
                 lists = lists,
             )
             _state.value = result.fold(
@@ -105,6 +104,7 @@ class MyMediaViewModel(
         _state.value = _state.value.copy(watchConfirm = null)
         viewModelScope.launch {
             repo.watched(mediaType, item.traktId, !item.watched)
+            onUnread(repo.unreadAlerts())
             reload()
         }
     }
@@ -148,9 +148,11 @@ class MyMediaViewModel(
     }
 
     companion object {
-        fun factory(kind: String, repo: CatalogRepository) = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T = MyMediaViewModel(kind, repo) as T
-        }
+        fun factory(kind: String, repo: CatalogRepository, onUnread: (Int) -> Unit) =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    MyMediaViewModel(kind, repo, onUnread) as T
+            }
     }
 }

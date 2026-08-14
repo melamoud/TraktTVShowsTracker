@@ -1,5 +1,18 @@
 # Changes log
 
+## 2026-08-14 — Android launcher icon
+
+- Home-screen icon is the TV + radar mark instead of the placeholder T
+
+## 2026-08-14 — Android: Alerts update after Progress; pull-to-refresh
+
+- Marking an episode or season watched on Progress reloads Alerts (and the unread badge) as soon as you go back — the list no longer stays stale until you kill the app
+- Every screen can pull down to refresh, or tap the refresh icon. That reloads from the TV Tracker server, not a full Trakt pull
+
+## 2026-08-14 — Found on on alert cards
+
+- Alerts (website and Android) show **Found on** from the title, plus labeled Streaming / Plays on your services — same as My / title pages
+
 ## 2026-08-13 — Android cards and filters compacted
 
 - My / Search filters are dropdowns with checkmarks (one button each) instead of chip rows

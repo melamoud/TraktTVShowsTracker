@@ -187,6 +187,7 @@ data class AlertItemDto(
     @SerializedName("media_title") val mediaTitle: String? = null,
     @SerializedName("my_providers") val myProviders: List<String> = emptyList(),
     @SerializedName("other_providers") val otherProviders: List<String> = emptyList(),
+    @SerializedName("found_on") val foundOn: List<String> = emptyList(),
 )
 
 data class AlertsResponse(

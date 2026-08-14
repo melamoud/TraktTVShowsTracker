@@ -61,12 +61,30 @@
         </h2>
         <div class="meta">{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
         <p class="alert-message">{{ n.message }}</p>
-        {% if card.my_providers or card.other_providers %}
-          <div class="tags">
-            {% for p in card.my_providers %}<span class="tag found">{{ p }}</span>{% endfor %}
-            {% for p in card.other_providers %}<span class="tag">{{ p }}</span>{% endfor %}
+        {% if card.my_providers %}
+          <div class="streaming-line mine">
+            <span class="streaming-label mine">Plays on your services:</span>
+            {% set labels = card.my_providers %}
+            {% set title = m.title if m else n.title %}
+            {% set year = m.year if m else none %}
+            {% set tag_class = 'stream mine' %}
+            {% include '_service_link_tags.html' %}
           </div>
         {% endif %}
+        {% if card.other_providers %}
+          <div class="streaming-line meta">
+            <span class="streaming-label">{% if card.my_providers %}Also streaming:{% else %}Streaming:{% endif %}</span>
+            {% set labels = card.other_providers %}
+            {% set title = m.title if m else n.title %}
+            {% set year = m.year if m else none %}
+            {% set tag_class = 'stream' %}
+            {% include '_service_link_tags.html' %}
+          </div>
+        {% endif %}
+        {% set found_on = card.found_on %}
+        {% set title = m.title if m else n.title %}
+        {% set year = m.year if m else none %}
+        {% include '_found_on_tags.html' %}
         <div class="actions">
           {% if n.media_type == 'show' and n.trakt_id and n.alert_type in ('episode_aired', 'season_aired') %}
             <button class="btn btn-primary btn-small" type="button"

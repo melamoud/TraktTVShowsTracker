@@ -13,6 +13,9 @@ import com.melamoud.tvtracker.data.api.buildSslConfig
 import com.melamoud.tvtracker.data.auth.SessionStore
 import com.melamoud.tvtracker.data.repo.AuthRepository
 import com.melamoud.tvtracker.data.repo.CatalogRepository
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
@@ -63,4 +66,11 @@ class AppContainer(context: Context) {
 
     val authRepository = AuthRepository(api, sessionStore, cookieJar)
     val catalogRepository = CatalogRepository(api)
+
+    private val _unreadAlerts = MutableStateFlow(0)
+    val unreadAlerts: StateFlow<Int> = _unreadAlerts.asStateFlow()
+
+    fun setUnreadAlerts(count: Int) {
+        _unreadAlerts.value = count.coerceAtLeast(0)
+    }
 }

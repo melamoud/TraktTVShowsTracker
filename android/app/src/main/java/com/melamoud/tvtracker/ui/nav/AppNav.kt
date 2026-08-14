@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -53,11 +54,10 @@ fun AppNav(
     container: AppContainer,
     loggedIn: Boolean,
     username: String?,
-    unreadAlerts: Int,
     onOpenLoginUrl: (String) -> Unit,
     onOauthToken: String?,
     onOauthConsumed: () -> Unit,
-    onLoggedIn: (String) -> Unit,
+    onLoggedIn: (String, Int) -> Unit,
     onLogout: () -> Unit,
 ) {
     if (!loggedIn) {
@@ -80,6 +80,8 @@ fun AppNav(
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
     val showChrome = currentRoute?.startsWith("progress/") != true
+    val unreadAlerts by container.unreadAlerts.collectAsStateWithLifecycle()
+    val onUnread = container::setUnreadAlerts
 
     Scaffold(
         topBar = {
@@ -153,19 +155,27 @@ fun AppNav(
             modifier = Modifier.padding(padding),
         ) {
             composable("shows") {
-                val vm: MyMediaViewModel = viewModel(factory = MyMediaViewModel.factory("shows", container.catalogRepository))
+                val vm: MyMediaViewModel = viewModel(
+                    factory = MyMediaViewModel.factory("shows", container.catalogRepository, onUnread),
+                )
                 MyMediaScreen(vm, container.baseUrl, isShows = true) { navController.navigate("progress/$it") }
             }
             composable("movies") {
-                val vm: MyMediaViewModel = viewModel(factory = MyMediaViewModel.factory("movies", container.catalogRepository))
+                val vm: MyMediaViewModel = viewModel(
+                    factory = MyMediaViewModel.factory("movies", container.catalogRepository, onUnread),
+                )
                 MyMediaScreen(vm, container.baseUrl, isShows = false) {}
             }
             composable("search") {
-                val vm: SearchViewModel = viewModel(factory = SearchViewModel.factory(container.catalogRepository))
+                val vm: SearchViewModel = viewModel(
+                    factory = SearchViewModel.factory(container.catalogRepository, onUnread),
+                )
                 SearchScreen(vm, container.baseUrl) { navController.navigate("progress/$it") }
             }
             composable("alerts") {
-                val vm: AlertsViewModel = viewModel(factory = AlertsViewModel.factory(container.catalogRepository))
+                val vm: AlertsViewModel = viewModel(
+                    factory = AlertsViewModel.factory(container.catalogRepository, onUnread),
+                )
                 AlertsScreen(vm, container.baseUrl) { navController.navigate("progress/$it") }
             }
             composable(
@@ -173,7 +183,9 @@ fun AppNav(
                 arguments = listOf(navArgument("traktId") { type = NavType.IntType }),
             ) { entry ->
                 val traktId = entry.arguments?.getInt("traktId") ?: return@composable
-                val vm: ProgressViewModel = viewModel(factory = ProgressViewModel.factory(traktId, container.catalogRepository))
+                val vm: ProgressViewModel = viewModel(
+                    factory = ProgressViewModel.factory(traktId, container.catalogRepository, onUnread),
+                )
                 ProgressScreen(vm, onBack = { navController.popBackStack() })
             }
         }

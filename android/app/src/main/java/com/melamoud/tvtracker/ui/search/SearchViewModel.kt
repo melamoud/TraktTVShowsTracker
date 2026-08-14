@@ -29,11 +29,16 @@ data class SearchUiState(
 
 class SearchViewModel(
     private val repo: CatalogRepository,
+    private val onUnread: (Int) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
 
     fun onQuery(value: String) { _state.value = _state.value.copy(query = value) }
+
+    fun reloadFromServer() {
+        if (_state.value.query.trim().length >= 2) search()
+    }
 
     fun search() {
         val q = _state.value.query.trim()
@@ -95,6 +100,7 @@ class SearchViewModel(
         _state.value = _state.value.copy(watchConfirm = null)
         viewModelScope.launch {
             repo.watched(item.mediaType ?: "movie", item.traktId, !item.watched)
+            onUnread(repo.unreadAlerts())
             search()
         }
     }
@@ -125,9 +131,9 @@ class SearchViewModel(
     }
 
     companion object {
-        fun factory(repo: CatalogRepository) = object : ViewModelProvider.Factory {
+        fun factory(repo: CatalogRepository, onUnread: (Int) -> Unit) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T = SearchViewModel(repo) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = SearchViewModel(repo, onUnread) as T
         }
     }
 }

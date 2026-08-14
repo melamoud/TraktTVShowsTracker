@@ -38,6 +38,8 @@ import com.melamoud.tvtracker.ui.components.FilterMenuButton
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
 import com.melamoud.tvtracker.ui.components.RateDialog
+import com.melamoud.tvtracker.ui.components.ReloadOnResume
+import com.melamoud.tvtracker.ui.components.ServerRefreshBox
 import com.melamoud.tvtracker.ui.theme.Danger
 import com.melamoud.tvtracker.ui.theme.TextMuted
 
@@ -60,6 +62,7 @@ fun MyMediaScreen(
     val viewLabel = if (state.display == "newest_aired") "Newest" else "List"
     val listsSelected = state.filterLists.count { it.selected }
     val listsLabel = if (listsSelected == 0) "Lists" else "Lists ($listsSelected)"
+    ReloadOnResume(viewModel::reload)
 
     Column(Modifier.fillMaxSize()) {
         OutlinedTextField(
@@ -69,7 +72,7 @@ fun MyMediaScreen(
             placeholder = { Text(stringResource(R.string.list_search_hint)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
-                IconButton(onClick = { viewModel.reload(refresh = true) }) {
+                IconButton(onClick = viewModel::reload) {
                     Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                 }
             },
@@ -122,29 +125,35 @@ fun MyMediaScreen(
             color = TextMuted,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
-        when {
-            state.loading && state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            state.error != null && state.items.isEmpty() -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
-            state.items.isEmpty() -> Text(stringResource(R.string.empty_list), color = TextMuted, modifier = Modifier.padding(24.dp))
-            else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
-                    MediaCard(
-                        item = item,
-                        baseUrl = baseUrl,
-                        showProgress = isShows,
-                        onPin = { viewModel.pin(item) },
-                        onLists = { viewModel.openLists(item) },
-                        onWatched = { viewModel.confirmWatch(item) },
-                        onRate = { viewModel.openRate(item) },
-                        onFavorite = { viewModel.favorite(item) },
-                        onProgress = if (isShows) ({ onProgress(item.traktId) }) else null,
-                    )
-                }
-                if (state.pages > 1) {
-                    item {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                            TextButton(onClick = { viewModel.setPage(state.page - 1) }, enabled = state.page > 1) { Text("Previous") }
-                            TextButton(onClick = { viewModel.setPage(state.page + 1) }, enabled = state.page < state.pages) { Text("Next") }
+        ServerRefreshBox(
+            isRefreshing = state.loading && state.items.isNotEmpty(),
+            onRefresh = viewModel::reload,
+            modifier = Modifier.weight(1f),
+        ) {
+            when {
+                state.loading && state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                state.error != null && state.items.isEmpty() -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
+                state.items.isEmpty() -> Text(stringResource(R.string.empty_list), color = TextMuted, modifier = Modifier.padding(24.dp))
+                else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
+                        MediaCard(
+                            item = item,
+                            baseUrl = baseUrl,
+                            showProgress = isShows,
+                            onPin = { viewModel.pin(item) },
+                            onLists = { viewModel.openLists(item) },
+                            onWatched = { viewModel.confirmWatch(item) },
+                            onRate = { viewModel.openRate(item) },
+                            onFavorite = { viewModel.favorite(item) },
+                            onProgress = if (isShows) ({ onProgress(item.traktId) }) else null,
+                        )
+                    }
+                    if (state.pages > 1) {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                TextButton(onClick = { viewModel.setPage(state.page - 1) }, enabled = state.page > 1) { Text("Previous") }
+                                TextButton(onClick = { viewModel.setPage(state.page + 1) }, enabled = state.page < state.pages) { Text("Next") }
+                            }
                         }
                     }
                 }

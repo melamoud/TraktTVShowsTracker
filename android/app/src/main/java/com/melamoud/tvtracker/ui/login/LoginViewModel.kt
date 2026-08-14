@@ -15,6 +15,7 @@ data class LoginUiState(
     val authorizeUrl: String? = null,
     val loggedIn: Boolean = false,
     val username: String? = null,
+    val unreadAlerts: Int = 0,
 )
 
 class LoginViewModel(
@@ -43,7 +44,14 @@ class LoginViewModel(
             _state.value = _state.value.copy(loading = true, error = null)
             val result = auth.completeLogin(token)
             _state.value = result.fold(
-                onSuccess = { _state.value.copy(loading = false, loggedIn = true, username = it.username) },
+                onSuccess = {
+                    _state.value.copy(
+                        loading = false,
+                        loggedIn = true,
+                        username = it.username,
+                        unreadAlerts = it.unreadAlerts,
+                    )
+                },
                 onFailure = { _state.value.copy(loading = false, error = it.message) },
             )
         }

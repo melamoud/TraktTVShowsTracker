@@ -1335,6 +1335,13 @@ def _collect_alert_cards() -> dict:
         media_map = {(m.media_type, m.trakt_id): m for m in found}
 
     from services.streaming_matcher import split_providers_for_user
+    found_map: dict[tuple, list[str]] = {}
+    if pairs:
+        for fo in MediaFoundOn.query.filter(
+            MediaFoundOn.user_id == current_user.id,
+            db.tuple_(MediaFoundOn.media_type, MediaFoundOn.trakt_id).in_(pairs),
+        ).all():
+            found_map.setdefault((fo.media_type, int(fo.trakt_id)), []).append(fo.service_label)
     cards = []
     for n in rows:
         media = (
@@ -1351,11 +1358,15 @@ def _collect_alert_cards() -> dict:
             my_providers, other_providers = split_providers_for_user(
                 sorted(set(names)), current_user,
             )
+        found_on = []
+        if n.media_type and n.trakt_id:
+            found_on = found_map.get((n.media_type, int(n.trakt_id)), [])
         cards.append({
             'n': n,
             'media': media,
             'my_providers': my_providers,
             'other_providers': other_providers,
+            'found_on': found_on,
             'type_label': ALERT_TYPE_LABELS.get(
                 n.alert_type, (n.alert_type or '').replace('_', ' '),
             ),

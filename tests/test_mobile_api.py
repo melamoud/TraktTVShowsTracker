@@ -2,7 +2,7 @@
 
 from datetime import datetime, timedelta
 
-from models import MobileLoginToken, Notification, User, db
+from models import CachedMedia, MediaFoundOn, MobileLoginToken, Notification, User, db
 from tests.conftest import login_client
 
 
@@ -67,6 +67,30 @@ def test_my_movies_and_alerts_json(app, client, user):
     alerts = client.get('/api/v1/alerts')
     assert alerts.status_code == 200
     assert alerts.get_json()['success'] is True
+
+
+def test_alerts_json_includes_found_on(app, client, user):
+    login_client(client, app, user)
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=42, title='The Bear', year=2022,
+        ))
+        db.session.add(Notification(
+            user_id=user,
+            alert_type='episode_aired',
+            title='The Bear',
+            message='S03E01 — Next',
+            media_type='show',
+            trakt_id=42,
+        ))
+        db.session.add(MediaFoundOn(
+            user_id=user, media_type='show', trakt_id=42, service_label='Hulu',
+        ))
+        db.session.commit()
+    data = client.get('/api/v1/alerts').get_json()
+    assert data['success'] is True
+    item = next(row for row in data['items'] if row['trakt_id'] == 42)
+    assert item['found_on'] == ['Hulu']
 
 
 def test_alerts_mark_read(app, client, user):

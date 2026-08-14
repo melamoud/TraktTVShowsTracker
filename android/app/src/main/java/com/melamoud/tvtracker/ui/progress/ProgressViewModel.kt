@@ -21,16 +21,15 @@ data class ProgressUiState(
 class ProgressViewModel(
     private val traktId: Int,
     private val repo: CatalogRepository,
+    private val onUnread: (Int) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProgressUiState())
     val state: StateFlow<ProgressUiState> = _state.asStateFlow()
 
-    init { reload() }
-
-    fun reload(refresh: Boolean = false) {
+    fun reload() {
         viewModelScope.launch {
             _state.value = _state.value.copy(loading = true, error = null)
-            val result = repo.progress(traktId, refresh)
+            val result = repo.progress(traktId, refresh = false)
             _state.value = result.fold(
                 onSuccess = { _state.value.copy(loading = false, data = it) },
                 onFailure = { _state.value.copy(loading = false, error = it.message) },
@@ -48,6 +47,7 @@ class ProgressViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = true)
             repo.episodeWatched(ids, traktId, season, ep.number, !ep.watched)
+            onUnread(repo.unreadAlerts())
             _state.value = _state.value.copy(busy = false)
             reload()
         }
@@ -57,15 +57,18 @@ class ProgressViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = true)
             repo.seasonWatched(traktId, season, watched)
+            onUnread(repo.unreadAlerts())
             _state.value = _state.value.copy(busy = false)
             reload()
         }
     }
 
     companion object {
-        fun factory(traktId: Int, repo: CatalogRepository) = object : ViewModelProvider.Factory {
-            @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T = ProgressViewModel(traktId, repo) as T
-        }
+        fun factory(traktId: Int, repo: CatalogRepository, onUnread: (Int) -> Unit) =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                    ProgressViewModel(traktId, repo, onUnread) as T
+            }
     }
 }

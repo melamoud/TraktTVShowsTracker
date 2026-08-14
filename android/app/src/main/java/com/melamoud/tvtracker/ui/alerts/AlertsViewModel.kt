@@ -20,11 +20,10 @@ data class AlertsUiState(
 
 class AlertsViewModel(
     private val repo: CatalogRepository,
+    private val onUnread: (Int) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AlertsUiState())
     val state: StateFlow<AlertsUiState> = _state.asStateFlow()
-
-    init { reload() }
 
     fun reload() {
         viewModelScope.launch {
@@ -33,6 +32,7 @@ class AlertsViewModel(
             val result = repo.alerts(s.hideRead)
             _state.value = result.fold(
                 onSuccess = {
+                    onUnread(it.unreadCount)
                     s.copy(loading = false, items = it.items, unreadCount = it.unreadCount, hideRead = it.hideRead)
                 },
                 onFailure = { s.copy(loading = false, error = it.message) },
@@ -60,9 +60,9 @@ class AlertsViewModel(
     }
 
     companion object {
-        fun factory(repo: CatalogRepository) = object : ViewModelProvider.Factory {
+        fun factory(repo: CatalogRepository, onUnread: (Int) -> Unit) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
-            override fun <T : ViewModel> create(modelClass: Class<T>): T = AlertsViewModel(repo) as T
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = AlertsViewModel(repo, onUnread) as T
         }
     }
 }

@@ -8,7 +8,6 @@ import androidx.activity.compose.setContent
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -33,14 +32,13 @@ class MainActivity : ComponentActivity() {
                 var checking by remember { mutableStateOf(true) }
                 var loggedIn by remember { mutableStateOf(false) }
                 var username by remember { mutableStateOf<String?>(null) }
-                var unread by remember { mutableIntStateOf(0) }
                 val oauthToken by oauthTokenState
 
                 LaunchedEffect(Unit) {
                     val user = container.authRepository.restoreSession()
                     loggedIn = user != null
                     username = user?.username
-                    unread = user?.unreadAlerts ?: 0
+                    container.setUnreadAlerts(user?.unreadAlerts ?: 0)
                     checking = false
                 }
 
@@ -49,20 +47,20 @@ class MainActivity : ComponentActivity() {
                         container = container,
                         loggedIn = loggedIn,
                         username = username,
-                        unreadAlerts = unread,
                         onOpenLoginUrl = ::openCustomTab,
                         onOauthToken = oauthToken,
                         onOauthConsumed = { oauthTokenState.value = null },
-                        onLoggedIn = { name ->
+                        onLoggedIn = { name, unreadCount ->
                             loggedIn = true
                             username = name
+                            container.setUnreadAlerts(unreadCount)
                         },
                         onLogout = {
                             scope.launch {
                                 container.authRepository.logout()
                                 loggedIn = false
                                 username = null
-                                unread = 0
+                                container.setUnreadAlerts(0)
                             }
                         },
                     )

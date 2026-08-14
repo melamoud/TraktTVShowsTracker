@@ -57,6 +57,9 @@ class CatalogRepository(private val api: TvTrackerApi) {
         runCatching { api.progress(traktId, if (refresh) 1 else null) }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
+    suspend fun unreadAlerts(): Int =
+        runCatching { api.me().user?.unreadAlerts ?: 0 }.getOrDefault(0)
+
     suspend fun alerts(hideRead: Boolean): Result<AlertsResponse> =
         runCatching { api.alerts(if (hideRead) 1 else 0) }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }

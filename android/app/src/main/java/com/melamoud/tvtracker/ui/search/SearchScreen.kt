@@ -15,9 +15,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,6 +37,8 @@ import com.melamoud.tvtracker.ui.components.FilterMenuButton
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
 import com.melamoud.tvtracker.ui.components.RateDialog
+import com.melamoud.tvtracker.ui.components.ReloadOnResume
+import com.melamoud.tvtracker.ui.components.ServerRefreshBox
 import com.melamoud.tvtracker.ui.theme.Danger
 import com.melamoud.tvtracker.ui.theme.TextMuted
 
@@ -52,6 +56,7 @@ fun SearchScreen(
     }
     val filterCount = listOf(state.hideWatched, state.hideLists).count { it }
     val filtersLabel = if (filterCount == 0) "Filters" else "Filters ($filterCount)"
+    ReloadOnResume(viewModel::reloadFromServer)
 
     Column(Modifier.fillMaxSize()) {
         OutlinedTextField(
@@ -60,6 +65,11 @@ fun SearchScreen(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
             placeholder = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            trailingIcon = {
+                IconButton(onClick = viewModel::reloadFromServer) {
+                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                }
+            },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { viewModel.search() }),
@@ -94,23 +104,29 @@ fun SearchScreen(
                 CheckMenuItem("Not in lists", state.hideLists) { viewModel.setHideLists(!state.hideLists) }
             }
         }
-        when {
-            state.loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-            state.error != null && state.items.isEmpty() -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
-            state.items.isEmpty() -> Text(stringResource(R.string.empty_search), color = TextMuted, modifier = Modifier.padding(24.dp))
-            else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
-                    MediaCard(
-                        item = item,
-                        baseUrl = baseUrl,
-                        showProgress = item.mediaType == "show",
-                        onPin = { viewModel.pin(item) },
-                        onLists = { viewModel.openLists(item) },
-                        onWatched = { viewModel.confirmWatch(item) },
-                        onRate = { viewModel.openRate(item) },
-                        onFavorite = { viewModel.favorite(item) },
-                        onProgress = if (item.mediaType == "show") ({ onProgress(item.traktId) }) else null,
-                    )
+        ServerRefreshBox(
+            isRefreshing = state.loading && state.items.isNotEmpty(),
+            onRefresh = viewModel::reloadFromServer,
+            modifier = Modifier.weight(1f),
+        ) {
+            when {
+                state.loading && state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                state.error != null && state.items.isEmpty() -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
+                state.items.isEmpty() -> Text(stringResource(R.string.empty_search), color = TextMuted, modifier = Modifier.padding(24.dp))
+                else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
+                        MediaCard(
+                            item = item,
+                            baseUrl = baseUrl,
+                            showProgress = item.mediaType == "show",
+                            onPin = { viewModel.pin(item) },
+                            onLists = { viewModel.openLists(item) },
+                            onWatched = { viewModel.confirmWatch(item) },
+                            onRate = { viewModel.openRate(item) },
+                            onFavorite = { viewModel.favorite(item) },
+                            onProgress = if (item.mediaType == "show") ({ onProgress(item.traktId) }) else null,
+                        )
+                    }
                 }
             }
         }

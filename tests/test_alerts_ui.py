@@ -4,7 +4,7 @@ from datetime import date, datetime
 from unittest.mock import patch
 
 from models import (
-    CachedMedia, MediaProviderAvailability, Notification, UserMediaState, db,
+    CachedMedia, MediaFoundOn, MediaProviderAvailability, Notification, UserMediaState, db,
 )
 from services.alerts import ALERT_EPISODE_AIRED, run_media_alerts
 from tests.conftest import login_client
@@ -55,6 +55,9 @@ def test_notifications_page_renders_episode_card(app, client, user):
             cached_media_id=media.id, provider_name='Apple TV+',
             offer_type='flatrate',
         ))
+        db.session.add(MediaFoundOn(
+            user_id=user, media_type='show', trakt_id=7701, service_label='toFlx',
+        ))
         db.session.commit()
 
     login_client(client, app, user)
@@ -62,6 +65,8 @@ def test_notifications_page_renders_episode_card(app, client, user):
     assert 'Silo' in html
     assert 'S03E01' in html and 'Into the Fire' in html
     assert 'Apple TV+' in html                       # streaming tag
+    assert 'Streaming:' in html
+    assert 'Found on:' in html and 'toFlx' in html
     assert 'data-action="progress-open"' in html     # drawer, not page nav
     assert 'data-trakt-id="7701"' in html
     assert '/catalog/show/7701' in html              # details link

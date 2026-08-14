@@ -152,4 +152,5 @@ def serialize_alert_card(card: dict) -> dict:
         'media_title': media.title if media else None,
         'my_providers': card.get('my_providers') or [],
         'other_providers': card.get('other_providers') or [],
+        'found_on': card.get('found_on') or [],
     }
