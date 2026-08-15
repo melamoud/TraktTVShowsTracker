@@ -694,17 +694,10 @@ def _my_media(media_type: str):
     if newest_aired:
         from sqlalchemy import func as sa_func
         today = date.today()
-        today_end = datetime.combine(today, datetime.max.time())
         if media_type == 'show':
             q = q.filter(
                 UserMediaState.last_episode_aired_at.isnot(None),
                 sa_func.date(UserMediaState.last_episode_aired_at) <= today,
-            )
-            # Hide shows that are fully caught up: nothing left to watch.
-            q = q.filter(
-                UserMediaState.episodes_aired.isnot(None),
-                UserMediaState.episodes_completed.isnot(None),
-                UserMediaState.episodes_aired > UserMediaState.episodes_completed,
             )
         else:  # movie
             if not needs_media_join:
@@ -719,8 +712,6 @@ def _my_media(media_type: str):
                 CachedMedia.released_at.isnot(None),
                 CachedMedia.released_at <= today,
             )
-        # Avoid unused variable lint warning.
-        _ = today_end
 
     total = q.count()
     per_page = _per_page(f'my_{media_type}')
@@ -733,12 +724,11 @@ def _my_media(media_type: str):
         page = pages
 
     if newest_aired:
-        # Pinned first (newest pin first), then latest aired / release date desc.
+        # Pins as a group on top; within pins (and the rest) newest aired / release first.
         if media_type == 'show':
             states = (
                 q.order_by(
                     UserMediaState.pinned.desc(),
-                    UserMediaState.pinned_at.desc(),
                     UserMediaState.last_episode_aired_at.desc(),
                     UserMediaState.id.desc(),
                 )
@@ -750,7 +740,6 @@ def _my_media(media_type: str):
             states = (
                 q.order_by(
                     UserMediaState.pinned.desc(),
-                    UserMediaState.pinned_at.desc(),
                     CachedMedia.released_at.desc(),
                     UserMediaState.id.desc(),
                 )

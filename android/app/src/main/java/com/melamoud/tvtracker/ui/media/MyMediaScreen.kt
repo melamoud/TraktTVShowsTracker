@@ -60,6 +60,7 @@ fun MyMediaScreen(
         else -> "Avail"
     }
     val viewLabel = if (state.display == "newest_aired") "Newest" else "List"
+    val displayMode = state.display.ifBlank { "list" }
     val listsSelected = state.filterLists.count { it.selected }
     val listsLabel = if (listsSelected == 0) "Lists" else "Lists ($listsSelected)"
     ReloadOnResume(viewModel::reload)
@@ -110,11 +111,11 @@ fun MyMediaScreen(
                     }
             }
             FilterMenuButton(viewLabel) { dismiss ->
-                CheckMenuItem("List", state.display == "list") {
+                CheckMenuItem("List", displayMode == "list") {
                     viewModel.setDisplay("list")
                     dismiss()
                 }
-                CheckMenuItem("Newest aired", state.display == "newest_aired") {
+                CheckMenuItem("Newest aired", displayMode == "newest_aired") {
                     viewModel.setDisplay("newest_aired")
                     dismiss()
                 }
@@ -140,6 +141,7 @@ fun MyMediaScreen(
                             item = item,
                             baseUrl = baseUrl,
                             showProgress = isShows,
+                            showNewestAired = displayMode == "newest_aired",
                             onPin = { viewModel.pin(item) },
                             onLists = { viewModel.openLists(item) },
                             onWatched = { viewModel.confirmWatch(item) },

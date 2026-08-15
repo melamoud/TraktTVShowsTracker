@@ -9,7 +9,7 @@ Pages render from cache only. This module runs inside the periodic media job
 2. per-show seasons fetch for shows with no calendar coverage (list-only) or
    never seeded — sequential, spaced, aborted on the first HTTP 429.
 3. progress refresh for shows not known finished (feeds x/y + the
-   newest-aired "hide caught-up" filter).
+   newest-aired sort).
 
 A manual page Refresh queues a one-off background cycle for that user instead
 of blocking the request.

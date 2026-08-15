@@ -47,6 +47,7 @@ fun MediaCard(
     item: MediaItemDto,
     baseUrl: String,
     showProgress: Boolean,
+    showNewestAired: Boolean = false,
     onPin: () -> Unit,
     onLists: () -> Unit,
     onWatched: () -> Unit,
@@ -112,6 +113,12 @@ fun MediaCard(
                         Text(progressBits.joinToString(" · "), color = Ok, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                if (showNewestAired) {
+                    val newestLine = newestAiredLine(item)
+                    if (newestLine != null) {
+                        Text(newestLine, color = AccentGold, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
                 if (!item.overview.isNullOrBlank()) {
                     Text(
                         item.overview,
@@ -173,5 +180,15 @@ fun MediaCard(
                 }
             }
         }
+    }
+}
+
+private fun newestAiredLine(item: MediaItemDto): String? {
+    val day = { raw: String? -> raw?.take(10)?.takeIf { it.length == 10 } }
+    return if (item.mediaType == "movie") {
+        day(item.avail?.releasedAt)?.let { "Released: $it" }
+    } else {
+        val aired = day(item.lastEpisodeAiredAt) ?: return null
+        listOfNotNull("Latest aired: $aired", item.lastEpisodeLabel).joinToString(" · ")
     }
 }

@@ -1,5 +1,15 @@
 # Changes log
 
+## 2026-08-15 — Newest aired: among pins, still newest episode/release first
+
+- Pin only lifts titles above unpinned ones. Two pinned shows (or movies) now sort by last aired / release date, not by who was pinned last
+
+## 2026-08-15 — Newest aired sort matches pin + latest episode/release
+
+- **Newest aired** is newest-first (shows: last episode air date; movies: release date) with pins still on top — same on the website and Android
+- Caught-up shows stay in that view; they used to disappear, which made the sort look broken
+- Switching List ↔ Newest aired reloads from the server; the Android app no longer sends `display=list` on first load (that overwrote the saved view and could race the tap)
+
 ## 2026-08-14 — GitHub screenshots
 
 - README (and Android README) show My Shows, Progress, Recommended Movies, Alerts, and the Android My Shows screen

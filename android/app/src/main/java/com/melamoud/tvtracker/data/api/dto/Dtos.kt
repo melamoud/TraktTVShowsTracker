@@ -70,6 +70,8 @@ data class MediaItemDto(
     @SerializedName("next_episode_season") val nextEpisodeSeason: Int? = null,
     @SerializedName("next_episode_number") val nextEpisodeNumber: Int? = null,
     @SerializedName("next_episode_title") val nextEpisodeTitle: String? = null,
+    @SerializedName("last_episode_aired_at") val lastEpisodeAiredAt: String? = null,
+    @SerializedName("last_episode_label") val lastEpisodeLabel: String? = null,
     @SerializedName("next_ep") val nextEp: NextEpDto? = null,
     @SerializedName("my_providers") val myProviders: List<String> = emptyList(),
     @SerializedName("other_providers") val otherProviders: List<String> = emptyList(),

@@ -66,6 +66,10 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
         'next_episode_season': st.next_episode_season if st is not None else None,
         'next_episode_number': st.next_episode_number if st is not None else None,
         'next_episode_title': st.next_episode_title if st is not None else None,
+        'last_episode_aired_at': (
+            _iso(st.last_episode_aired_at) if st is not None else None
+        ),
+        'last_episode_label': st.last_episode_label if st is not None else None,
         'next_ep': next_payload,
         'my_providers': row.get('my_providers') or [],
         'other_providers': row.get('other_providers') or [],

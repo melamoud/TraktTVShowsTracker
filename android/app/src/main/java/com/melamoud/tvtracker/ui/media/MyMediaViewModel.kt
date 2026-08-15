@@ -18,7 +18,7 @@ data class MyMediaUiState(
     val items: List<MediaItemDto> = emptyList(),
     val filter: String = "lists",
     val avail: String = "",
-    val display: String = "list",
+    val display: String = "",
     val query: String = "",
     val page: Int = 1,
     val pages: Int = 1,
@@ -43,8 +43,10 @@ class MyMediaViewModel(
     private val _state = MutableStateFlow(MyMediaUiState())
     val state: StateFlow<MyMediaUiState> = _state.asStateFlow()
     private val mediaType = if (kind == "shows") "show" else "movie"
+    private var loadSeq = 0
 
     fun reload(lists: List<String>? = null) {
+        val seq = ++loadSeq
         viewModelScope.launch {
             val s = _state.value
             _state.value = s.copy(loading = true, error = null)
@@ -53,26 +55,28 @@ class MyMediaViewModel(
                 filter = s.filter,
                 avail = s.avail.ifBlank { null },
                 query = s.query,
-                display = s.display,
+                display = s.display.takeIf { it.isNotBlank() },
                 page = s.page,
                 refresh = false,
                 lists = lists,
             )
+            if (seq != loadSeq) return@launch
             _state.value = result.fold(
                 onSuccess = {
-                    s.copy(
+                    _state.value.copy(
                         loading = false,
+                        error = null,
                         items = it.items,
-                        filter = it.filter ?: s.filter,
+                        filter = it.filter ?: _state.value.filter,
                         avail = it.avail.orEmpty(),
-                        display = it.display ?: s.display,
+                        display = it.display ?: _state.value.display,
                         page = it.page,
                         pages = it.pages,
                         total = it.total,
                         filterLists = it.filterLists,
                     )
                 },
-                onFailure = { s.copy(loading = false, error = it.message) },
+                onFailure = { _state.value.copy(loading = false, error = it.message) },
             )
         }
     }

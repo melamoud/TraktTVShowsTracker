@@ -11,7 +11,7 @@ Opening this page uses a local cache. Trakt is contacted at most every **N hours
 - **Both** — every title on the selected lists (watched and not)  
 - **Unwatched** — among those lists, titles that are not watched yet
 - **Search titles in this list…** — filters the full filtered set by title/year (backfills missing local titles first; not remembered; see [Search](search) for Trakt-wide search)
-- **View: List / Newest aired / Weekly / Daily / Monthly** — switch to a **Newest aired** sort (movies sorted by release date, future releases hidden) or a Trakt-style **calendar** of upcoming releases limited to your current **Lists…** selection and status filter; click an entry to open the title. Mode is remembered.
+- **View: List / Newest aired / Weekly / Daily / Monthly** — switch to a **Newest aired** sort (movies sorted by release date, newest released first, future releases hidden; pins stay on top) or a Trakt-style **calendar** of upcoming releases limited to your current **Lists…** selection and status filter; click an entry to open the title. Mode is remembered.
 - **Upcoming / Theater window / Streaming** — release & streaming availability (chips under the poster). Theater = public release within ±30 days; Upcoming = more than 30 days out; Streaming = TMDB lists a subscription/free vendor
 
 ## Paging
@@ -22,7 +22,7 @@ Filter choices and page size are remembered for your account when you leave and 
 
 ## Actions
 
-- **Pin / Unpin** — keep a title at the top of My movies (local only; for “watching now” / “soon”)
+- **Pin / Unpin** — keep a title in the pinned group at the top (local only). In **Newest aired**, pins still sort by release date among themselves
 - **Set lists…** — set Wishlist + Trakt personal list membership (checkboxes = actual membership; **Apply my defaults** / **Remove from all lists**)
 - **Rate…** — set or clear a 1–10 Trakt rating (same as trakt.tv)
 

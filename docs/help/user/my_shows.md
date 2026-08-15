@@ -10,7 +10,7 @@ Each show card shows **x / y episodes watched** and **Next: SxEy — title · ai
 
 Filter choices (status, Lists…, titles per page) are remembered for your account. Leaving My shows and coming back via the menu restores the same settings.
 
-**View: List / Newest aired / Weekly / Daily / Monthly** — switch between the normal title rows, a **Newest aired** sort (shows sorted by the air date of their latest episode, movies by release date — future titles hidden), and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** limited to your current **Lists…** selection and status filter; click an entry to open the title. View modes are remembered. **Newest aired** is a pure cache view: the background job keeps last-aired dates fresh (33 days back / 33 ahead via My calendar for watchlisted shows, plus per-show checks for list-only titles), so the page loads instantly even on big collections.
+**View: List / Newest aired / Weekly / Daily / Monthly** — switch between the normal title rows, a **Newest aired** sort (shows sorted by the air date of their latest episode — including shows you’re caught up on — movies by release date; future titles hidden), and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** limited to your current **Lists…** selection and status filter; click an entry to open the title. View modes are remembered. **Newest aired** is a pure cache view: the background job keeps last-aired dates fresh (33 days back / 33 ahead via My calendar for watchlisted shows, plus per-show checks for list-only titles), so the page loads instantly even on big collections. Pins stay on top.
 
 **Search titles in this list…** filters by title/year across the full filtered set (query is not remembered). Missing local titles are backfilled from Trakt before the filter runs. For titles not on your lists yet, use nav **Search**.
 
@@ -18,7 +18,7 @@ Filter choices (status, Lists…, titles per page) are remembered for your accou
 
 Opening the page uses a local cache shared with Progress, Latest tags, and Alerts. Trakt is contacted at most every **N hours** (admin **Trakt read cache** TTL, default 2) for list membership, calendar, and per-show progress — or after **Refresh from Trakt**. In-app watch / rate / list actions update those same objects immediately. Adds you made only on trakt.tv wait for the TTL or a manual refresh. **Refresh from Trakt** forces a full re-pull of membership **and** queues a background pass over episode/progress data (results appear within a minute). Sync is **read-only** — it never writes episode history.
 
-**Pin** keeps a show at the top of My shows (local only — for “watching now” / “soon”). Newest pin wins among pinned titles. **Unpin** returns it to normal sort.
+**Pin** keeps a show in the pinned group at the top (local only — for “watching now” / “soon”). In **List**, the newest pin wins among pins. In **Newest aired**, pins stay above unpinned titles, but among pins the latest episode date still wins. **Unpin** returns it to normal sort.
 
 **Rate…** (1–10) and **Favorite / Unfavorite** sync to Trakt the same way as on trakt.tv.
 
