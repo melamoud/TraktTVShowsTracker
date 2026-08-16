@@ -4,9 +4,14 @@ import com.melamoud.tvtracker.data.api.dto.ActionRequest
 import com.melamoud.tvtracker.data.api.dto.AlertsResponse
 import com.melamoud.tvtracker.data.api.dto.AuthCompleteRequest
 import com.melamoud.tvtracker.data.api.dto.AuthStartResponse
+import com.melamoud.tvtracker.data.api.dto.CommentResponse
+import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteResponse
+import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
+import com.melamoud.tvtracker.data.api.dto.FoundOnResponse
 import com.melamoud.tvtracker.data.api.dto.ListsResponse
 import com.melamoud.tvtracker.data.api.dto.MeResponse
+import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
 import com.melamoud.tvtracker.data.api.dto.PinResponse
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
@@ -57,6 +62,8 @@ interface TvTrackerApi {
         @Query("year") year: String? = null,
         @Query("genre") genre: List<String>? = null,
         @Query("genres_set") genresSet: Int? = null,
+        @Query("actor") actor: Int? = null,
+        @Query("actor_q") actorQ: String? = null,
     ): SearchResponse
 
     @GET("/api/v1/shows/{traktId}/progress")
@@ -134,4 +141,36 @@ interface TvTrackerApi {
         @Path("traktId") traktId: Int,
         @Path("season") season: Int,
     ): WatchedResponse
+
+    @GET("/api/v1/catalog/{mediaType}/{traktId}")
+    suspend fun catalogDetail(
+        @Path("mediaType") mediaType: String,
+        @Path("traktId") traktId: Int,
+    ): MediaDetailResponse
+
+    @POST("/api/v1/found-on/{mediaType}/{traktId}")
+    suspend fun foundOn(
+        @Path("mediaType") mediaType: String,
+        @Path("traktId") traktId: Int,
+        @Body body: ActionRequest,
+    ): FoundOnResponse
+
+    @POST("/api/v1/favorite-actor/{personId}")
+    suspend fun favoriteActor(
+        @Path("personId") personId: Int,
+        @Body body: ActionRequest,
+    ): FavoriteActorResponse
+
+    @GET("/api/v1/feedback/{mediaType}/{traktId}")
+    suspend fun feedback(
+        @Path("mediaType") mediaType: String,
+        @Path("traktId") traktId: Int,
+    ): FeedbackResponse
+
+    @POST("/api/v1/comment/{mediaType}/{traktId}")
+    suspend fun comment(
+        @Path("mediaType") mediaType: String,
+        @Path("traktId") traktId: Int,
+        @Body body: ActionRequest,
+    ): CommentResponse
 }

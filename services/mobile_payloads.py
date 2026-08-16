@@ -139,6 +139,71 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
     }
 
 
+def serialize_cast_member(actor: dict) -> dict:
+    """JSON for one Cast row on a title page."""
+    return {
+        'trakt_id': actor.get('trakt_id'),
+        'name': actor.get('name') or '',
+        'characters': actor.get('characters') or [],
+        'episode_count': actor.get('episode_count'),
+        'favorited': bool(actor.get('favorited')),
+        'headshot_url': actor.get('headshot_url'),
+    }
+
+
+def found_on_service_choices(user) -> list[str]:
+    """User services first, then remaining catalog names (same as the website picker)."""
+    from sqlalchemy.orm import joinedload
+
+    from models import StreamingService, UserStreamingService
+
+    owned = (
+        UserStreamingService.query
+        .options(joinedload(UserStreamingService.service))
+        .filter_by(user_id=user.id)
+        .order_by(UserStreamingService.id)
+        .all()
+    )
+    names = [row.display_name for row in owned if row.display_name]
+    seen = {n.lower() for n in names}
+    out = list(names)
+    for svc in StreamingService.query.order_by(StreamingService.name).all():
+        if svc.name and svc.name.lower() not in seen:
+            out.append(svc.name)
+            seen.add(svc.name.lower())
+    return out
+
+
+def serialize_media_detail(row: dict, media_type: str, cast: list, choices: list[str]) -> dict:
+    """Full title-page JSON (list-card fields plus cast, match, and links)."""
+    from services.cast_service import MAIN_CAST_LIMIT
+
+    item = serialize_media_item(row, media_type)
+    media = row.get('media')
+    match = row.get('match') or {}
+    mt = item.get('media_type') or media_type
+    trakt_id = item.get('trakt_id')
+    slug = item.get('slug') or trakt_id
+    imdb = item.get('imdb_id')
+    return {
+        'item': item,
+        'homepage': (media.homepage or None) if media else None,
+        'trakt_listed_at': _iso(getattr(media, 'trakt_listed_at', None)) if media else None,
+        'released_at': _iso(getattr(media, 'released_at', None)) if media else None,
+        'match': {
+            'matched': bool(match.get('matched')),
+            'genres': match.get('genres') or [],
+            'keywords': match.get('keywords') or [],
+        },
+        'providers': row.get('providers') or [],
+        'found_on_choices': list(choices or []),
+        'cast': [serialize_cast_member(actor) for actor in (cast or [])],
+        'main_cast_limit': MAIN_CAST_LIMIT,
+        'trakt_url': f'https://trakt.tv/{mt}s/{slug}' if mt and trakt_id else None,
+        'imdb_url': f'https://www.imdb.com/title/{imdb}/' if imdb else None,
+    }
+
+
 def serialize_progress(ctx: dict) -> dict:
     """JSON for the series progress panel."""
     media = ctx.get('media')

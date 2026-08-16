@@ -135,6 +135,9 @@ data class SearchResponse(
     val genres: List<String> = emptyList(),
     @SerializedName("genre_choices") val genreChoices: List<String> = emptyList(),
     @SerializedName("fetch_error") val fetchError: String? = null,
+    @SerializedName("actor_q") val actorQ: String? = null,
+    @SerializedName("actor_id") val actorId: Int? = null,
+    @SerializedName("actor_name") val actorName: String? = null,
 )
 
 data class EpisodeIdsDto(
@@ -225,6 +228,10 @@ data class ActionRequest(
     @SerializedName("show_trakt_id") val showTraktId: Int? = null,
     val season: Int? = null,
     val episode: Int? = null,
+    @SerializedName("service_labels") val serviceLabels: List<String>? = null,
+    val comment: String? = null,
+    val spoiler: Boolean? = null,
+    @SerializedName("comment_id") val commentId: Int? = null,
 )
 
 data class PinResponse(
@@ -270,4 +277,66 @@ data class ListsResponse(
     val defaults: List<String> = emptyList(),
     @SerializedName("on_watchlist") val onWatchlist: Boolean? = null,
     val selected: List<String>? = null,
+)
+
+data class MatchDto(
+    val matched: Boolean = false,
+    val genres: List<String> = emptyList(),
+    val keywords: List<String> = emptyList(),
+)
+
+data class CastMemberDto(
+    @SerializedName("trakt_id") val traktId: Int = 0,
+    val name: String = "",
+    val characters: List<String> = emptyList(),
+    @SerializedName("episode_count") val episodeCount: Int? = null,
+    val favorited: Boolean = false,
+    @SerializedName("headshot_url") val headshotUrl: String? = null,
+)
+
+data class MediaDetailResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val item: MediaItemDto? = null,
+    val homepage: String? = null,
+    @SerializedName("trakt_listed_at") val traktListedAt: String? = null,
+    @SerializedName("released_at") val releasedAt: String? = null,
+    val match: MatchDto? = null,
+    val providers: List<String> = emptyList(),
+    @SerializedName("found_on_choices") val foundOnChoices: List<String> = emptyList(),
+    val cast: List<CastMemberDto> = emptyList(),
+    @SerializedName("main_cast_limit") val mainCastLimit: Int = 8,
+    @SerializedName("trakt_url") val traktUrl: String? = null,
+    @SerializedName("imdb_url") val imdbUrl: String? = null,
+)
+
+data class FoundOnResponse(
+    val success: Boolean,
+    val message: String? = null,
+    @SerializedName("found_on") val foundOn: List<String> = emptyList(),
+)
+
+data class FeedbackResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val rating: Int? = null,
+    val comment: String? = null,
+    val spoiler: Boolean = false,
+    @SerializedName("comment_id") val commentId: Int? = null,
+    val review: Boolean = false,
+)
+
+data class CommentResponse(
+    val success: Boolean,
+    val message: String? = null,
+    @SerializedName("comment_id") val commentId: Int? = null,
+    val review: Boolean = false,
+)
+
+data class FavoriteActorResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val favorited: Boolean = false,
+    @SerializedName("trakt_id") val traktId: Int? = null,
+    val name: String? = null,
 )

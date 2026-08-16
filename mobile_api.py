@@ -14,7 +14,9 @@ from flask_wtf.csrf import generate_csrf
 
 from models import MobileLoginToken, Notification, User, UserSession, db
 from services.mobile_payloads import (
+    found_on_service_choices,
     serialize_alert_card,
+    serialize_media_detail,
     serialize_media_item,
     serialize_progress,
 )
@@ -187,6 +189,53 @@ def api_search():
         'genre_choices': ctx.get('genre_choices') or [],
         'fetch_error': ctx.get('fetch_error'),
     })
+
+
+@mobile_api_bp.route('/catalog/<media_type>/<int:trakt_id>', methods=['GET'])
+@login_required
+def api_catalog_detail(media_type, trakt_id):
+    from routes.catalog_routes import load_media_detail
+    result = load_media_detail(media_type, trakt_id)
+    if not result.get('ok'):
+        return jsonify({
+            'success': False,
+            'message': result.get('message') or 'Title not found.',
+        }), int(result.get('status') or 404)
+    payload = serialize_media_detail(
+        result['row'],
+        media_type,
+        result.get('cast') or [],
+        found_on_service_choices(current_user),
+    )
+    return jsonify({'success': True, **payload})
+
+
+@mobile_api_bp.route('/found-on/<media_type>/<int:trakt_id>', methods=['POST'])
+@login_required
+def api_found_on(media_type, trakt_id):
+    from routes.catalog_routes import api_found_on as impl
+    return impl(media_type, trakt_id)
+
+
+@mobile_api_bp.route('/favorite-actor/<int:person_id>', methods=['POST'])
+@login_required
+def api_favorite_actor(person_id):
+    from routes.catalog_routes import api_favorite_actor as impl
+    return impl(person_id)
+
+
+@mobile_api_bp.route('/feedback/<media_type>/<int:trakt_id>', methods=['GET'])
+@login_required
+def api_feedback(media_type, trakt_id):
+    from routes.catalog_routes import api_feedback as impl
+    return impl(media_type, trakt_id)
+
+
+@mobile_api_bp.route('/comment/<media_type>/<int:trakt_id>', methods=['POST'])
+@login_required
+def api_comment(media_type, trakt_id):
+    from routes.catalog_routes import api_comment as impl
+    return impl(media_type, trakt_id)
 
 
 @mobile_api_bp.route('/shows/<int:trakt_id>/progress', methods=['GET'])

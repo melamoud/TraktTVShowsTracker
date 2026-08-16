@@ -1026,16 +1026,16 @@ def _latest_page(media_type: str):
         ),
     )
 
-@catalog_bp.route('/catalog/<media_type>/<int:trakt_id>')
-@login_required
-def media_detail(media_type, trakt_id):
-    """Show detail metadata, links, providers, and actions for one title."""
+def load_media_detail(media_type: str, trakt_id: int) -> dict:
+    """Load one title for the HTML page or Android JSON API.
+
+    Returns ``{ok, row, genres, cast}`` or ``{ok: False, status, message}``.
+    """
     import json
     from services.sync_jobs import enrich_media_details_for_display, upsert_cached_media
 
     if media_type not in ('movie', 'show'):
-        flash('Unknown media type.', 'danger')
-        return redirect(url_for('catalog.home'))
+        return {'ok': False, 'status': 400, 'message': 'Unknown media type.'}
     media = CachedMedia.query.filter_by(media_type=media_type, trakt_id=trakt_id).first()
     if not media:
         try:
@@ -1044,8 +1044,7 @@ def media_detail(media_type, trakt_id):
             db.session.commit()
         except Exception as exc:
             current_app.logger.warning('Detail fetch failed: %s', exc)
-            flash('Title not found.', 'warning')
-            return redirect(url_for('catalog.home'))
+            return {'ok': False, 'status': 404, 'message': 'Title not found.'}
 
     enrich_media_details_for_display(media)
     sync_providers_for_media(media)
@@ -1055,14 +1054,32 @@ def media_detail(media_type, trakt_id):
         genres = json.loads(media.genres_json or '[]')
     except json.JSONDecodeError:
         genres = []
-    from services.cast_service import MAIN_CAST_LIMIT, cast_for_detail
+    from services.cast_service import cast_for_detail
     cast = cast_for_detail(media, current_user)
+    return {
+        'ok': True,
+        'row': rows[0],
+        'genres': genres if isinstance(genres, list) else [],
+        'cast': cast,
+    }
+
+
+@catalog_bp.route('/catalog/<media_type>/<int:trakt_id>')
+@login_required
+def media_detail(media_type, trakt_id):
+    """Show detail metadata, links, providers, and actions for one title."""
+    from services.cast_service import MAIN_CAST_LIMIT
+
+    result = load_media_detail(media_type, trakt_id)
+    if not result.get('ok'):
+        flash(result.get('message') or 'Title not found.', 'warning')
+        return redirect(url_for('catalog.home'))
     return render_template(
         'media_detail.html',
-        row=rows[0],
+        row=result['row'],
         media_type=media_type,
-        genres=genres if isinstance(genres, list) else [],
-        cast=cast,
+        genres=result.get('genres') or [],
+        cast=result.get('cast') or [],
         main_cast_limit=MAIN_CAST_LIMIT,
     )
 

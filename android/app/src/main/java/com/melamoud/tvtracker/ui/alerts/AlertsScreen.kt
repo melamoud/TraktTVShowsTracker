@@ -1,5 +1,6 @@
 package com.melamoud.tvtracker.ui.alerts
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +53,7 @@ fun AlertsScreen(
     viewModel: AlertsViewModel,
     baseUrl: String,
     onProgress: (Int) -> Unit,
+    onOpenDetail: (String, Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     ReloadOnResume(viewModel::reload)
@@ -85,7 +87,13 @@ fun AlertsScreen(
                     items(state.items, key = { it.id }) { item ->
                         Card(
                             colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
-                            modifier = Modifier.alpha(if (item.isRead) 0.55f else 1f),
+                            modifier = Modifier
+                                .alpha(if (item.isRead) 0.55f else 1f)
+                                .then(
+                                    if (item.mediaType != null && item.traktId != null) {
+                                        Modifier.clickable { onOpenDetail(item.mediaType, item.traktId) }
+                                    } else Modifier
+                                ),
                         ) {
                             Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                 AsyncImage(

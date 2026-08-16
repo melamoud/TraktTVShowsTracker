@@ -4,7 +4,12 @@ import com.melamoud.tvtracker.data.api.AuthLog
 import com.melamoud.tvtracker.data.api.TvTrackerApi
 import com.melamoud.tvtracker.data.api.dto.ActionRequest
 import com.melamoud.tvtracker.data.api.dto.AlertsResponse
+import com.melamoud.tvtracker.data.api.dto.CommentResponse
+import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
+import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
+import com.melamoud.tvtracker.data.api.dto.FoundOnResponse
 import com.melamoud.tvtracker.data.api.dto.ListsResponse
+import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
@@ -44,6 +49,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
         year: String? = null,
         genres: List<String>? = null,
         persistGenres: Boolean = false,
+        actor: Int? = null,
+        actorQ: String? = null,
     ): Result<SearchResponse> = runCatching {
         api.search(
             query = query,
@@ -54,6 +61,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
             year = year,
             genre = genres?.takeIf { persistGenres },
             genresSet = if (persistGenres) 1 else null,
+            actor = actor,
+            actorQ = actorQ,
         )
     }.recoverCatching { e ->
         throw IllegalStateException(AuthLog.userMessage(e), e)
@@ -119,4 +128,36 @@ class CatalogRepository(private val api: TvTrackerApi) {
     suspend fun seasonWatched(traktId: Int, season: Int, watched: Boolean) = runCatching {
         if (watched) api.seasonWatched(traktId, season) else api.seasonUnwatched(traktId, season)
     }
+
+    suspend fun catalogDetail(mediaType: String, traktId: Int): Result<MediaDetailResponse> =
+        runCatching { api.catalogDetail(mediaType, traktId) }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun foundOn(mediaType: String, traktId: Int, labels: List<String>): Result<FoundOnResponse> =
+        runCatching { api.foundOn(mediaType, traktId, ActionRequest(serviceLabels = labels)) }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun favoriteActor(personId: Int, favorite: Boolean): Result<FavoriteActorResponse> =
+        runCatching {
+            api.favoriteActor(personId, ActionRequest(action = if (favorite) "add" else "remove"))
+        }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun feedback(mediaType: String, traktId: Int): Result<FeedbackResponse> =
+        runCatching { api.feedback(mediaType, traktId) }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun comment(
+        mediaType: String,
+        traktId: Int,
+        text: String,
+        spoiler: Boolean,
+        commentId: Int?,
+    ): Result<CommentResponse> =
+        runCatching {
+            api.comment(
+                mediaType,
+                traktId,
+                ActionRequest(comment = text, spoiler = spoiler, commentId = commentId),
+            )
+        }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 }

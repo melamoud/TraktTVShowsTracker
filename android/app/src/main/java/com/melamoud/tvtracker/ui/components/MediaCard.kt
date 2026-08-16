@@ -1,6 +1,7 @@
 package com.melamoud.tvtracker.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -54,10 +55,13 @@ fun MediaCard(
     onRate: () -> Unit,
     onFavorite: () -> Unit,
     onProgress: (() -> Unit)? = null,
+    onOpen: (() -> Unit)? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().then(
+            if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier
+        ),
         colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
         shape = RoundedCornerShape(10.dp),
     ) {

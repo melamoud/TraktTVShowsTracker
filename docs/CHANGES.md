@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-16 — Android movie and show title pages
+
+- Tap a title on My Shows, My Movies, Search, or Alerts to open the same kind of page as the website: poster, overview, genres, streaming, Found on, actions, and cast
+- Lists, rate, favorite, watched, Found on…, write review, and series progress work from that page; IMDb / Trailer / Homepage / Trakt open in the browser
+- Cast **Titles** jumps to Search for that actor; **Favorite** is the same local favorite-actor toggle as Preferences
+
 ## 2026-08-16 — Actor lives in More filters (next to Year)
 
 - Search, Latest, Rec, and My put **Actor** in **More filters** on the Year row so the toolbar stays one line

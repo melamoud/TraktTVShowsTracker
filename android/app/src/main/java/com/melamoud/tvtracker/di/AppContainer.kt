@@ -22,6 +22,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
+data class ActorSearchRequest(val traktId: Int, val name: String)
+
 class AppContainer(context: Context) {
     val baseUrl: String = BuildConfig.BASE_URL.trimEnd('/')
     val sessionStore = SessionStore(context)
@@ -72,5 +74,16 @@ class AppContainer(context: Context) {
 
     fun setUnreadAlerts(count: Int) {
         _unreadAlerts.value = count.coerceAtLeast(0)
+    }
+
+    private val _pendingActorSearch = MutableStateFlow<ActorSearchRequest?>(null)
+    val pendingActorSearch: StateFlow<ActorSearchRequest?> = _pendingActorSearch.asStateFlow()
+
+    fun requestActorSearch(traktId: Int, name: String) {
+        _pendingActorSearch.value = ActorSearchRequest(traktId, name)
+    }
+
+    fun consumePendingActorSearch() {
+        _pendingActorSearch.value = null
     }
 }

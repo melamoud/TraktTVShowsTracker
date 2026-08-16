@@ -49,6 +49,7 @@ fun MyMediaScreen(
     baseUrl: String,
     isShows: Boolean,
     onProgress: (Int) -> Unit,
+    onOpenDetail: (String, Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val statusOptions = statusChoices(isShows)
@@ -148,6 +149,9 @@ fun MyMediaScreen(
                             onRate = { viewModel.openRate(item) },
                             onFavorite = { viewModel.favorite(item) },
                             onProgress = if (isShows) ({ onProgress(item.traktId) }) else null,
+                            onOpen = {
+                                onOpenDetail(item.mediaType ?: if (isShows) "show" else "movie", item.traktId)
+                            },
                         )
                     }
                     if (state.pages > 1) {

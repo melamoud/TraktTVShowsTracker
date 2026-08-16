@@ -118,3 +118,99 @@ fun ListsDialog(
         },
     )
 }
+
+@Composable
+fun FoundOnDialog(
+    selected: List<String>,
+    choices: List<String>,
+    onApply: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val chosen = selected.map { it.lowercase() }.toSet()
+    var checked by remember {
+        mutableStateOf(choices.filter { it.lowercase() in chosen }.toSet())
+    }
+    val extraInitial = selected.filter { label ->
+        choices.none { it.equals(label, ignoreCase = true) }
+    }.joinToString(", ")
+    var other by remember { mutableStateOf(extraInitial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Found on") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                choices.forEach { name ->
+                    androidx.compose.foundation.layout.Row {
+                        Checkbox(
+                            checked = name in checked,
+                            onCheckedChange = { on ->
+                                checked = if (on) checked + name else checked - name
+                            },
+                        )
+                        Text(name, modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+                    }
+                }
+                OutlinedTextField(
+                    value = other,
+                    onValueChange = { other = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Other") },
+                    placeholder = { Text("Comma-separated") },
+                    singleLine = true,
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val extras = other.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+                onApply((checked.toList() + extras).distinctBy { it.lowercase() })
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@Composable
+fun ReviewDialog(
+    loading: Boolean,
+    error: String?,
+    comment: String,
+    spoiler: Boolean,
+    onSave: (String, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var text by remember(comment, loading) { mutableStateOf(comment) }
+    var markSpoiler by remember(spoiler, loading) { mutableStateOf(spoiler) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Write review") },
+        text = {
+            Column {
+                if (loading) {
+                    Text("Loading your Trakt review…")
+                } else if (error != null) {
+                    Text(error)
+                } else {
+                    OutlinedTextField(
+                        value = text,
+                        onValueChange = { text = it },
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text("Review") },
+                        minLines = 4,
+                    )
+                    androidx.compose.foundation.layout.Row {
+                        Checkbox(checked = markSpoiler, onCheckedChange = { markSpoiler = it })
+                        Text("Spoiler", modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onSave(text.trim(), markSpoiler) },
+                enabled = !loading && text.trim().isNotEmpty(),
+            ) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}

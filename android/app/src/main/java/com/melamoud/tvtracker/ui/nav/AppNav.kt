@@ -37,6 +37,8 @@ import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.di.AppContainer
 import com.melamoud.tvtracker.ui.alerts.AlertsScreen
 import com.melamoud.tvtracker.ui.alerts.AlertsViewModel
+import com.melamoud.tvtracker.ui.detail.DetailScreen
+import com.melamoud.tvtracker.ui.detail.DetailViewModel
 import com.melamoud.tvtracker.ui.login.LoginScreen
 import com.melamoud.tvtracker.ui.login.LoginViewModel
 import com.melamoud.tvtracker.ui.media.MyMediaScreen
@@ -79,9 +81,26 @@ fun AppNav(
     val navController = rememberNavController()
     val backStack by navController.currentBackStackEntryAsState()
     val currentRoute = backStack?.destination?.route
-    val showChrome = currentRoute?.startsWith("progress/") != true
+    val showChrome = currentRoute?.startsWith("progress/") != true &&
+        currentRoute?.startsWith("detail/") != true
     val unreadAlerts by container.unreadAlerts.collectAsStateWithLifecycle()
+    val pendingActor by container.pendingActorSearch.collectAsStateWithLifecycle()
     val onUnread = container::setUnreadAlerts
+
+    fun openDetail(mediaType: String, traktId: Int) {
+        navController.navigate("detail/$mediaType/$traktId")
+    }
+    fun openProgress(traktId: Int) {
+        navController.navigate("progress/$traktId")
+    }
+    fun openActorSearch(personId: Int, name: String) {
+        container.requestActorSearch(personId, name)
+        navController.navigate("search") {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -158,25 +177,64 @@ fun AppNav(
                 val vm: MyMediaViewModel = viewModel(
                     factory = MyMediaViewModel.factory("shows", container.catalogRepository, onUnread),
                 )
-                MyMediaScreen(vm, container.baseUrl, isShows = true) { navController.navigate("progress/$it") }
+                MyMediaScreen(
+                    vm, container.baseUrl, isShows = true,
+                    onProgress = ::openProgress,
+                    onOpenDetail = ::openDetail,
+                )
             }
             composable("movies") {
                 val vm: MyMediaViewModel = viewModel(
                     factory = MyMediaViewModel.factory("movies", container.catalogRepository, onUnread),
                 )
-                MyMediaScreen(vm, container.baseUrl, isShows = false) {}
+                MyMediaScreen(
+                    vm, container.baseUrl, isShows = false,
+                    onProgress = {},
+                    onOpenDetail = ::openDetail,
+                )
             }
             composable("search") {
                 val vm: SearchViewModel = viewModel(
                     factory = SearchViewModel.factory(container.catalogRepository, onUnread),
                 )
-                SearchScreen(vm, container.baseUrl) { navController.navigate("progress/$it") }
+                SearchScreen(
+                    vm,
+                    container.baseUrl,
+                    pendingActor = pendingActor,
+                    onConsumeActor = container::consumePendingActorSearch,
+                    onProgress = ::openProgress,
+                    onOpenDetail = ::openDetail,
+                )
             }
             composable("alerts") {
                 val vm: AlertsViewModel = viewModel(
                     factory = AlertsViewModel.factory(container.catalogRepository, onUnread),
                 )
-                AlertsScreen(vm, container.baseUrl) { navController.navigate("progress/$it") }
+                AlertsScreen(
+                    vm, container.baseUrl,
+                    onProgress = ::openProgress,
+                    onOpenDetail = ::openDetail,
+                )
+            }
+            composable(
+                "detail/{mediaType}/{traktId}",
+                arguments = listOf(
+                    navArgument("mediaType") { type = NavType.StringType },
+                    navArgument("traktId") { type = NavType.IntType },
+                ),
+            ) { entry ->
+                val mediaType = entry.arguments?.getString("mediaType") ?: return@composable
+                val traktId = entry.arguments?.getInt("traktId") ?: return@composable
+                val vm: DetailViewModel = viewModel(
+                    factory = DetailViewModel.factory(mediaType, traktId, container.catalogRepository, onUnread),
+                )
+                DetailScreen(
+                    vm,
+                    container.baseUrl,
+                    onBack = { navController.popBackStack() },
+                    onProgress = ::openProgress,
+                    onActorTitles = ::openActorSearch,
+                )
             }
             composable(
                 "progress/{traktId}",

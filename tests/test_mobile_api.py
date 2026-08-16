@@ -104,6 +104,57 @@ def test_alerts_json_includes_found_on(app, client, user):
     assert (item.get('last_episode_aired_at') or '').startswith('2026-08-14')
 
 
+def test_catalog_detail_json(app, client, user):
+    """Android title page loads the same decorated row + cast as the website."""
+    login_client(client, app, user)
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=42, title='The Bear', year=2022,
+            overview='A Chicago restaurant.', runtime=30, network='FX',
+            imdb_id='tt14452776', slug='the-bear', homepage='https://fx.com/the-bear',
+        ))
+        db.session.add(MediaFoundOn(
+            user_id=user, media_type='show', trakt_id=42, service_label='Hulu',
+        ))
+        db.session.commit()
+
+    fake_cast = [{
+        'trakt_id': 9, 'name': 'Jeremy Allen White', 'characters': ['Carmy'],
+        'episode_count': 28, 'favorited': False, 'headshot_url': '/cache/actors/9',
+    }]
+    with patch('services.sync_jobs.enrich_media_details_for_display'), \
+         patch('routes.catalog_routes.sync_providers_for_media'), \
+         patch('services.cast_service.cast_for_detail', return_value=fake_cast):
+        resp = client.get('/api/v1/catalog/show/42')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['success'] is True
+    assert data['item']['title'] == 'The Bear'
+    assert data['item']['found_on'] == ['Hulu']
+    assert data['homepage'] == 'https://fx.com/the-bear'
+    assert data['imdb_url'] == 'https://www.imdb.com/title/tt14452776/'
+    assert 'trakt.tv/shows/the-bear' in data['trakt_url']
+    assert data['cast'][0]['name'] == 'Jeremy Allen White'
+    assert 'found_on_choices' in data
+    assert data['match']['matched'] is False
+
+    with patch('services.trakt_client.fetch_media_summary', side_effect=RuntimeError('missing')):
+        missing = client.get('/api/v1/catalog/movie/999999')
+    assert missing.status_code == 404
+    bad = client.get('/api/v1/catalog/book/1')
+    assert bad.status_code == 400
+
+
+def test_found_on_v1_updates_labels(app, client, user):
+    login_client(client, app, user)
+    resp = client.post(
+        '/api/v1/found-on/show/42',
+        json={'service_labels': ['toFlx', 'Hulu']},
+    )
+    assert resp.status_code == 200
+    assert resp.get_json()['found_on'] == ['toFlx', 'Hulu']
+
+
 def test_alerts_mark_read(app, client, user):
     login_client(client, app, user)
     with app.app_context():

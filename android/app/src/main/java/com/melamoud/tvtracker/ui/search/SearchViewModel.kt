@@ -32,6 +32,8 @@ data class SearchUiState(
     val listsDialog: ListsDialogState? = null,
     val rateTarget: MediaItemDto? = null,
     val watchConfirm: MediaItemDto? = null,
+    val actorId: Int? = null,
+    val actorName: String = "",
 )
 
 class SearchViewModel(
@@ -66,14 +68,25 @@ class SearchViewModel(
 
     fun onQuery(value: String) { _state.value = _state.value.copy(query = value) }
 
+    fun searchActor(traktId: Int, name: String) {
+        _state.value = _state.value.copy(actorId = traktId, actorName = name, query = "")
+        search()
+    }
+
+    fun clearActor() {
+        _state.value = _state.value.copy(actorId = null, actorName = "", items = emptyList(), total = 0)
+    }
+
     fun reloadFromServer() {
-        if (_state.value.query.trim().length >= 2) search()
+        val s = _state.value
+        if (s.query.trim().length >= 2 || s.actorId != null) search()
     }
 
     fun search() {
-        val q = _state.value.query.trim()
-        if (q.length < 2) {
-            _state.value = _state.value.copy(items = emptyList(), error = null, total = 0)
+        val s0 = _state.value
+        val q = s0.query.trim()
+        if (q.length < 2 && s0.actorId == null) {
+            _state.value = s0.copy(items = emptyList(), error = null, total = 0)
             return
         }
         viewModelScope.launch {
@@ -83,28 +96,33 @@ class SearchViewModel(
         }
     }
 
-    fun setType(type: String) { _state.value = _state.value.copy(type = type); if (_state.value.query.length >= 2) search() }
+    fun setType(type: String) { _state.value = _state.value.copy(type = type); if (canSearch()) search() }
     fun setHideWatched(value: Boolean) {
         persistHideWatched = true
         _state.value = _state.value.copy(hideWatched = value)
-        if (_state.value.query.length >= 2) search()
+        if (canSearch()) search()
     }
     fun setHideLists(value: Boolean) {
         persistHideLists = true
         _state.value = _state.value.copy(hideLists = value)
-        if (_state.value.query.length >= 2) search()
+        if (canSearch()) search()
     }
     fun setYear(value: String) {
         persistYear = true
         _state.value = _state.value.copy(year = value)
     }
-    fun applyYear() { if (_state.value.query.length >= 2) search() }
+    fun applyYear() { if (canSearch()) search() }
     fun toggleGenre(label: String) {
         persistGenres = true
         val cur = _state.value.genres.toMutableSet()
         if (!cur.add(label)) cur.remove(label)
         _state.value = _state.value.copy(genres = cur)
-        if (_state.value.query.length >= 2) search()
+        if (canSearch()) search()
+    }
+
+    private fun canSearch(): Boolean {
+        val s = _state.value
+        return s.query.trim().length >= 2 || s.actorId != null
     }
 
     private suspend fun load(s: SearchUiState) {
@@ -117,6 +135,8 @@ class SearchViewModel(
             year = s.year.trim().takeIf { persistYear },
             genres = s.genres.toList().takeIf { persistGenres },
             persistGenres = persistGenres,
+            actor = s.actorId,
+            actorQ = s.actorName.takeIf { it.isNotBlank() },
         )
         _state.value = result.fold(
             onSuccess = {
@@ -132,6 +152,8 @@ class SearchViewModel(
                     genres = if (it.genres.isNotEmpty() || s.genres.isEmpty()) it.genres.toSet() else s.genres,
                     genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
                     error = it.fetchError,
+                    actorId = it.actorId ?: s.actorId,
+                    actorName = it.actorName?.takeIf { name -> name.isNotBlank() } ?: s.actorName,
                 )
             },
             onFailure = { s.copy(loading = false, error = it.message) },

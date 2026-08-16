@@ -18,11 +18,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,6 +33,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.R
+import com.melamoud.tvtracker.di.ActorSearchRequest
 import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
 import com.melamoud.tvtracker.ui.components.FilterMenuButton
@@ -46,9 +49,18 @@ import com.melamoud.tvtracker.ui.theme.TextMuted
 fun SearchScreen(
     viewModel: SearchViewModel,
     baseUrl: String,
+    pendingActor: ActorSearchRequest?,
+    onConsumeActor: () -> Unit,
     onProgress: (Int) -> Unit,
+    onOpenDetail: (String, Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(pendingActor) {
+        if (pendingActor != null) {
+            viewModel.searchActor(pendingActor.traktId, pendingActor.name)
+            onConsumeActor()
+        }
+    }
     val typeLabel = when (state.type) {
         "movie" -> "Movies"
         "show" -> "Shows"
@@ -80,6 +92,13 @@ fun SearchScreen(
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            if (state.actorName.isNotBlank()) {
+                FilterChip(
+                    selected = true,
+                    onClick = viewModel::clearActor,
+                    label = { Text("Actor: ${state.actorName}") },
+                )
+            }
             FilterMenuButton(typeLabel) { _ ->
                 CheckMenuItem("Movies", state.type == "both" || state.type == "movie") {
                     viewModel.setType(
@@ -130,7 +149,12 @@ fun SearchScreen(
             when {
                 state.loading && state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 state.error != null && state.items.isEmpty() -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
-                state.items.isEmpty() -> Text(stringResource(R.string.empty_search), color = TextMuted, modifier = Modifier.padding(24.dp))
+                state.items.isEmpty() -> Text(
+                    if (state.actorId != null) "No titles found for this actor."
+                    else stringResource(R.string.empty_search),
+                    color = TextMuted,
+                    modifier = Modifier.padding(24.dp),
+                )
                 else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
                         MediaCard(
@@ -143,6 +167,9 @@ fun SearchScreen(
                             onRate = { viewModel.openRate(item) },
                             onFavorite = { viewModel.favorite(item) },
                             onProgress = if (item.mediaType == "show") ({ onProgress(item.traktId) }) else null,
+                            onOpen = {
+                                item.mediaType?.let { onOpenDetail(it, item.traktId) }
+                            },
                         )
                     }
                 }
