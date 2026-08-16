@@ -39,10 +39,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.data.api.absoluteUrl
+import com.melamoud.tvtracker.data.api.dto.AlertItemDto
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
+import com.melamoud.tvtracker.ui.components.ServiceLinksLine
 import com.melamoud.tvtracker.ui.theme.AccentGold
-import com.melamoud.tvtracker.ui.theme.Primary
 import com.melamoud.tvtracker.ui.theme.SurfaceAlt
 import com.melamoud.tvtracker.ui.theme.TextMuted
 
@@ -95,30 +96,36 @@ fun AlertsScreen(
                                 )
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                                     Text(item.typeLabel.orEmpty(), color = AccentGold, style = MaterialTheme.typography.labelMedium)
-                                    Text(item.title, fontWeight = FontWeight.SemiBold)
+                                    Text(
+                                        item.mediaTitle?.takeIf { it.isNotBlank() } ?: item.title,
+                                        fontWeight = FontWeight.SemiBold,
+                                    )
                                     if (!item.message.isNullOrBlank()) {
                                         Text(item.message, color = TextMuted, style = MaterialTheme.typography.bodySmall)
                                     }
-                                    if (item.foundOn.isNotEmpty()) {
-                                        Text(
-                                            "Found on: ${item.foundOn.joinToString()}",
-                                            color = Primary,
-                                            style = MaterialTheme.typography.bodySmall,
+                                    lastAiredLine(item)?.let { line ->
+                                        Text(line, color = AccentGold, style = MaterialTheme.typography.bodySmall)
+                                    }
+                                    if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
+                                        ServiceLinksLine(
+                                            prefix = "Found on:",
+                                            links = item.foundOnLinks,
+                                            fallbackLabels = item.foundOn,
                                         )
                                     }
-                                    if (item.myProviders.isNotEmpty()) {
-                                        Text(
-                                            "Plays on your services: ${item.myProviders.joinToString()}",
-                                            color = Primary,
-                                            style = MaterialTheme.typography.bodySmall,
+                                    if (item.myProviders.isNotEmpty() || item.myProviderLinks.isNotEmpty()) {
+                                        ServiceLinksLine(
+                                            prefix = "Plays on your services:",
+                                            links = item.myProviderLinks,
+                                            fallbackLabels = item.myProviders,
                                         )
                                     }
-                                    if (item.otherProviders.isNotEmpty()) {
-                                        Text(
-                                            (if (item.myProviders.isNotEmpty()) "Also streaming: " else "Streaming: ") +
-                                                item.otherProviders.joinToString(),
+                                    if (item.otherProviders.isNotEmpty() || item.otherProviderLinks.isNotEmpty()) {
+                                        ServiceLinksLine(
+                                            prefix = if (item.myProviders.isNotEmpty()) "Also streaming:" else "Streaming:",
+                                            links = item.otherProviderLinks,
+                                            fallbackLabels = item.otherProviders,
                                             color = TextMuted,
-                                            style = MaterialTheme.typography.bodySmall,
                                         )
                                     }
                                     item.createdAt?.let { Text(it, color = TextMuted, style = MaterialTheme.typography.bodySmall) }
@@ -138,4 +145,11 @@ fun AlertsScreen(
             }
         }
     }
+}
+
+private fun lastAiredLine(item: AlertItemDto): String? {
+    val day = item.lastEpisodeAiredAt?.take(10)?.takeIf { it.length == 10 }
+    val label = item.lastEpisodeLabel?.takeIf { it.isNotBlank() }
+    if (day == null && label == null) return null
+    return listOfNotNull("Latest aired", label, day).joinToString(" · ")
 }

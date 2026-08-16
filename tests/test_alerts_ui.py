@@ -101,6 +101,36 @@ def test_notifications_hide_read_filter(app, client, user):
     assert 'Showing all' in shown
 
 
+def test_legacy_alert_without_trakt_id_still_gets_found_on(app, client, user):
+    """Older episode alerts stored title only; Found on still resolves by show name."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=280856, title='Stuart Fails to Save the Universe',
+            year=2026,
+        ))
+        db.session.add(MediaFoundOn(
+            user_id=user, media_type='show', trakt_id=280856, service_label='toFlx',
+        ))
+        db.session.add(Notification(
+            user_id=user,
+            alert_type='episode_aired',
+            title='New episode: Stuart Fails to Save the Universe',
+            message='S01E04 — Spoiler · aired 2026-08-14',
+            media_type=None,
+            trakt_id=None,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Stuart Fails to Save the Universe' in html
+    assert 'Found on:' in html and 'toFlx' in html
+    data = client.get('/api/v1/alerts').get_json()
+    item = next(row for row in data['items'] if 'Stuart' in (row.get('title') or ''))
+    assert item['found_on'] == ['toFlx']
+    assert item['trakt_id'] == 280856
+    assert item['media_type'] == 'show'
+
+
 def test_notifications_page_without_media_still_works(app, client, user):
     """Login alerts (no media link) render in the single-column layout."""
     with app.app_context():

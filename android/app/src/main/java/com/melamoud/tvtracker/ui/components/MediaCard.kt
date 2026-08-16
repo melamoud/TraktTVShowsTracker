@@ -100,17 +100,12 @@ fun MediaCard(
                 if (showProgress) {
                     val aired = item.episodesAired
                     val done = item.episodesCompleted
-                    val next = item.nextEp
                     val progressBits = buildList {
                         if (aired != null && done != null) add("$done/$aired eps")
-                        if (next != null) {
-                            add(listOfNotNull(next.label, next.title).joinToString(" "))
-                        } else if (item.nextEpisodeSeason != null && item.nextEpisodeNumber != null) {
-                            add("S${item.nextEpisodeSeason}E${item.nextEpisodeNumber}")
-                        }
+                        nextEpisodeLine(item)?.let { add(it) }
                     }
                     if (progressBits.isNotEmpty()) {
-                        Text(progressBits.joinToString(" · "), color = Ok, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(progressBits.joinToString(" · "), color = Ok, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 if (showNewestAired) {
@@ -118,6 +113,13 @@ fun MediaCard(
                     if (newestLine != null) {
                         Text(newestLine, color = AccentGold, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
+                }
+                if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
+                    ServiceLinksLine(
+                        prefix = "Found on:",
+                        links = item.foundOnLinks,
+                        fallbackLabels = item.foundOn,
+                    )
                 }
                 if (!item.overview.isNullOrBlank()) {
                     Text(
@@ -128,15 +130,18 @@ fun MediaCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                val providers = item.myProviders.ifEmpty { item.otherProviders.take(3) }
-                if (providers.isNotEmpty()) {
-                    Text(
-                        (if (item.myProviders.isNotEmpty()) "On your services: " else "Streaming: ") +
-                            providers.joinToString(),
-                        color = if (item.myProviders.isNotEmpty()) Primary else TextMuted,
-                        style = MaterialTheme.typography.bodySmall,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                if (item.myProviders.isNotEmpty() || item.myProviderLinks.isNotEmpty()) {
+                    ServiceLinksLine(
+                        prefix = "On your services:",
+                        links = item.myProviderLinks,
+                        fallbackLabels = item.myProviders,
+                    )
+                } else if (item.otherProviders.isNotEmpty() || item.otherProviderLinks.isNotEmpty()) {
+                    ServiceLinksLine(
+                        prefix = "Streaming:",
+                        links = item.otherProviderLinks.take(3),
+                        fallbackLabels = item.otherProviders.take(3),
+                        color = TextMuted,
                     )
                 }
                 Row(
@@ -183,12 +188,31 @@ fun MediaCard(
     }
 }
 
+private fun dayPrefix(raw: String?): String? =
+    raw?.take(10)?.takeIf { it.length == 10 }
+
+private fun nextEpisodeLine(item: MediaItemDto): String? {
+    val next = item.nextEp
+    val label = next?.label
+        ?: item.nextEpisodeSeason?.let { s ->
+            item.nextEpisodeNumber?.let { e -> "S${s}E${e}" }
+        }
+        ?: return null
+    val title = next?.title ?: item.nextEpisodeTitle
+    val day = dayPrefix(next?.date)
+    return buildString {
+        append("Next: ")
+        append(label)
+        if (!title.isNullOrBlank()) append(" — ").append(title)
+        if (day != null) append(" · ").append(day)
+    }
+}
+
 private fun newestAiredLine(item: MediaItemDto): String? {
-    val day = { raw: String? -> raw?.take(10)?.takeIf { it.length == 10 } }
     return if (item.mediaType == "movie") {
-        day(item.avail?.releasedAt)?.let { "Released: $it" }
+        dayPrefix(item.avail?.releasedAt)?.let { "Released: $it" }
     } else {
-        val aired = day(item.lastEpisodeAiredAt) ?: return null
+        val aired = dayPrefix(item.lastEpisodeAiredAt) ?: return null
         listOfNotNull("Latest aired: $aired", item.lastEpisodeLabel).joinToString(" · ")
     }
 }

@@ -63,6 +63,62 @@ def test_my_shows_remembers_per_page(app, client, user):
     assert '>10</strong> of' in html or '10 / page' in html
 
 
+def test_my_shows_api_keeps_saved_filter_when_omitted(app, client, user):
+    """Android must omit filter= on first load or it overwrites the saved status."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=1, on_watchlist=True,
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        saved = client.get(
+            '/api/v1/my/shows?filter=unwatched_episodes&lists_set=1&lists=watchlist'
+        )
+        assert saved.status_code == 200
+        assert saved.get_json()['filter'] == 'unwatched_episodes'
+
+        bare = client.get('/api/v1/my/shows')
+        assert bare.status_code == 200
+        assert bare.get_json()['filter'] == 'unwatched_episodes'
+
+        wiped = client.get('/api/v1/my/shows?filter=lists')
+        assert wiped.get_json()['filter'] == 'lists'
+
+
+def test_my_shows_remembers_avail_filter(app, client, user):
+    """Availability filter is stored like status / display."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=1, on_watchlist=True,
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        resp = client.get('/my/shows?avail=streaming&lists_set=1&lists=watchlist')
+        assert resp.status_code == 200
+
+        bare = client.get('/api/v1/my/shows')
+    assert bare.status_code == 200
+    assert bare.get_json()['avail'] == 'streaming'
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        assert '"avail": "streaming"' in (prefs.ui_view_settings_json or '') or \
+            '"avail":"streaming"' in (prefs.ui_view_settings_json or '')
+
+
 def test_latest_remembers_hide_watched_off(app, client, user):
     """Latest Show watched toggle persists across bare navigation."""
     login_client(client, app, user)

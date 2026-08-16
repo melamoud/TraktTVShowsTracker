@@ -10,9 +10,9 @@ Login diagnostics: Android logcat tags `TVTrackerAuth` and `TVTrackerHttp`; serv
 
 ## Screens (v1)
 
-- **My Shows / My Movies** — list + newest-aired, status filters, Lists…, availability chips, in-list title search, pin / lists / watched / rate / favorite
-- **Search** — Trakt-wide search; add to lists; hide watched / already-listed
-- **Alerts** — unread badge, mark read, Progress on episode/season alerts
+- **My Shows / My Movies** — list + newest-aired, status filters, Lists…, availability chips, in-list title search, pin / lists / watched / rate / favorite. Filters are remembered on the server; **Found on** chips open the service
+- **Search** — Trakt-wide search; add to lists; hide watched / already-listed (remembered)
+- **Alerts** — unread badge, mark read, Progress on episode/season alerts; **Found on** chips open the service
 - **Progress** — watch / unwatch episodes and seasons
 
 Latest and Recommended screens are not in this build.

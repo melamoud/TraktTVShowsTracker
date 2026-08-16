@@ -1,5 +1,20 @@
 # Changes log
 
+## 2026-08-15 — Android: remember filters; Found on opens the service
+
+- The app no longer sends default My / Search / Alerts filters on first load (that was overwriting the saved website choices). Changing a filter still saves it for both app and web
+- Availability (Upcoming / Theater / Streaming) is remembered the same way as status and List vs Newest aired
+- **Found on** and streaming chips on the app are links, same as the website (title search when the service has one)
+
+## 2026-08-15 — Found on on Android alerts and My cards
+
+- Alert cards resolve Found on even for older rows that only stored the show name (no trakt id)
+- My Shows / Search cards now show **Found on** the same way as the website
+
+## 2026-08-15 — Android: last aired vs next episode
+
+- Alert cards and My Shows use **Latest aired** for the episode that already aired; the upcoming one is labeled **Next:** with its date (same as the website)
+
 ## 2026-08-15 — Search year + genre filters
 
 - Main Search (web + Android) has **Year** (`2018` or `2015-2020`) and multi-select **Genres** (match any). A title is still required; filters narrow Trakt hits locally

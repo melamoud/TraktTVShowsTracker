@@ -13,7 +13,7 @@ Opening this page uses a local cache. Trakt is contacted at most every **N hours
 - **Search titles in this list…** — filters the full filtered set by title (backfills missing local titles first; not remembered; see [Search](search) for Trakt-wide search)
 - **More filters** — year (`2018` or `2015-2020`) and genres (any selected); remembered like other My filters
 - **View: List / Newest aired / Weekly / Daily / Monthly** — switch to a **Newest aired** sort (movies sorted by release date, newest released first, future releases hidden; pins stay on top) or a Trakt-style **calendar** of upcoming releases limited to your current **Lists…** selection and status filter; click an entry to open the title. Mode is remembered.
-- **Upcoming / Theater window / Streaming** — release & streaming availability (chips under the poster). Theater = public release within ±30 days; Upcoming = more than 30 days out; Streaming = TMDB lists a subscription/free vendor
+- **Upcoming / Theater window / Streaming** — release & streaming availability (chips under the poster). Theater = public release within ±30 days; Upcoming = more than 30 days out; Streaming = TMDB lists a subscription/free vendor. Remembered like status and view.
 
 ## Paging
 

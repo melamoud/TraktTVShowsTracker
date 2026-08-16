@@ -24,12 +24,13 @@ class AlertsViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(AlertsUiState())
     val state: StateFlow<AlertsUiState> = _state.asStateFlow()
+    private var persistHideRead = false
 
     fun reload() {
         viewModelScope.launch {
             val s = _state.value
             _state.value = s.copy(loading = true, error = null)
-            val result = repo.alerts(s.hideRead)
+            val result = repo.alerts(s.hideRead.takeIf { persistHideRead })
             _state.value = result.fold(
                 onSuccess = {
                     onUnread(it.unreadCount)
@@ -41,6 +42,7 @@ class AlertsViewModel(
     }
 
     fun setHideRead(value: Boolean) {
+        persistHideRead = true
         _state.value = _state.value.copy(hideRead = value)
         reload()
     }

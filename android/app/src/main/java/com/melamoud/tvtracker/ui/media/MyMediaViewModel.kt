@@ -44,6 +44,9 @@ class MyMediaViewModel(
     val state: StateFlow<MyMediaUiState> = _state.asStateFlow()
     private val mediaType = if (kind == "shows") "show" else "movie"
     private var loadSeq = 0
+    private var persistFilter = false
+    private var persistAvail = false
+    private var persistDisplay = false
 
     fun reload(lists: List<String>? = null) {
         val seq = ++loadSeq
@@ -52,10 +55,10 @@ class MyMediaViewModel(
             _state.value = s.copy(loading = true, error = null)
             val result = repo.myMedia(
                 kind = kind,
-                filter = s.filter,
-                avail = s.avail.ifBlank { null },
+                filter = s.filter.takeIf { persistFilter },
+                avail = s.avail.takeIf { persistAvail },
                 query = s.query,
-                display = s.display.takeIf { it.isNotBlank() },
+                display = s.display.takeIf { persistDisplay && it.isNotBlank() },
                 page = s.page,
                 refresh = false,
                 lists = lists,
@@ -81,9 +84,21 @@ class MyMediaViewModel(
         }
     }
 
-    fun setFilter(value: String) { _state.value = _state.value.copy(filter = value, page = 1); reload() }
-    fun setAvail(value: String) { _state.value = _state.value.copy(avail = value, page = 1); reload() }
-    fun setDisplay(value: String) { _state.value = _state.value.copy(display = value, page = 1); reload() }
+    fun setFilter(value: String) {
+        persistFilter = true
+        _state.value = _state.value.copy(filter = value, page = 1)
+        reload()
+    }
+    fun setAvail(value: String) {
+        persistAvail = true
+        _state.value = _state.value.copy(avail = value, page = 1)
+        reload()
+    }
+    fun setDisplay(value: String) {
+        persistDisplay = true
+        _state.value = _state.value.copy(display = value, page = 1)
+        reload()
+    }
     fun setQuery(value: String) { _state.value = _state.value.copy(query = value) }
     fun applyQuery() { _state.value = _state.value.copy(page = 1); reload() }
     fun setPage(page: Int) { _state.value = _state.value.copy(page = page); reload() }

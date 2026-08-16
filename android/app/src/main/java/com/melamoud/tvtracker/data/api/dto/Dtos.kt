@@ -50,6 +50,11 @@ data class NextEpDto(
     val title: String? = null,
 )
 
+data class ServiceLinkDto(
+    val label: String = "",
+    val url: String? = null,
+)
+
 data class MediaItemDto(
     @SerializedName("media_type") val mediaType: String? = null,
     @SerializedName("trakt_id") val traktId: Int = 0,
@@ -76,6 +81,9 @@ data class MediaItemDto(
     @SerializedName("my_providers") val myProviders: List<String> = emptyList(),
     @SerializedName("other_providers") val otherProviders: List<String> = emptyList(),
     @SerializedName("found_on") val foundOn: List<String> = emptyList(),
+    @SerializedName("found_on_links") val foundOnLinks: List<ServiceLinkDto> = emptyList(),
+    @SerializedName("my_provider_links") val myProviderLinks: List<ServiceLinkDto> = emptyList(),
+    @SerializedName("other_provider_links") val otherProviderLinks: List<ServiceLinkDto> = emptyList(),
     val avail: AvailDto? = null,
     @SerializedName("avail_chips") val availChips: List<AvailChipDto> = emptyList(),
     @SerializedName("imdb_id") val imdbId: String? = null,
@@ -193,6 +201,12 @@ data class AlertItemDto(
     @SerializedName("my_providers") val myProviders: List<String> = emptyList(),
     @SerializedName("other_providers") val otherProviders: List<String> = emptyList(),
     @SerializedName("found_on") val foundOn: List<String> = emptyList(),
+    @SerializedName("found_on_links") val foundOnLinks: List<ServiceLinkDto> = emptyList(),
+    @SerializedName("my_provider_links") val myProviderLinks: List<ServiceLinkDto> = emptyList(),
+    @SerializedName("other_provider_links") val otherProviderLinks: List<ServiceLinkDto> = emptyList(),
+    val year: Int? = null,
+    @SerializedName("last_episode_aired_at") val lastEpisodeAiredAt: String? = null,
+    @SerializedName("last_episode_label") val lastEpisodeLabel: String? = null,
 )
 
 data class AlertsResponse(

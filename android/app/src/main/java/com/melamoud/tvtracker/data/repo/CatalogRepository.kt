@@ -39,20 +39,21 @@ class CatalogRepository(private val api: TvTrackerApi) {
         query: String,
         type: String,
         page: Int,
-        hideWatched: Boolean,
-        hideLists: Boolean,
-        year: String = "",
-        genres: List<String> = emptyList(),
+        hideWatched: Boolean? = null,
+        hideLists: Boolean? = null,
+        year: String? = null,
+        genres: List<String>? = null,
+        persistGenres: Boolean = false,
     ): Result<SearchResponse> = runCatching {
         api.search(
             query = query,
             type = type,
             page = page,
-            hideWatched = if (hideWatched) 1 else 0,
-            hideLists = if (hideLists) 1 else 0,
-            year = year.takeIf { it.isNotBlank() },
-            genre = genres.takeIf { it.isNotEmpty() },
-            genresSet = 1,
+            hideWatched = hideWatched?.let { if (it) 1 else 0 },
+            hideLists = hideLists?.let { if (it) 1 else 0 },
+            year = year,
+            genre = genres?.takeIf { persistGenres },
+            genresSet = if (persistGenres) 1 else null,
         )
     }.recoverCatching { e ->
         throw IllegalStateException(AuthLog.userMessage(e), e)
@@ -65,8 +66,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
     suspend fun unreadAlerts(): Int =
         runCatching { api.me().user?.unreadAlerts ?: 0 }.getOrDefault(0)
 
-    suspend fun alerts(hideRead: Boolean): Result<AlertsResponse> =
-        runCatching { api.alerts(if (hideRead) 1 else 0) }
+    suspend fun alerts(hideRead: Boolean? = null): Result<AlertsResponse> =
+        runCatching { api.alerts(hideRead?.let { if (it) 1 else 0 }) }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
     suspend fun alertRead(id: Int, read: Boolean) = runCatching {

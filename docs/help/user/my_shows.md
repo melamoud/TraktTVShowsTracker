@@ -14,7 +14,7 @@ Filter choices (status, Lists…, titles per page) are remembered for your accou
 
 **Search titles in this list…** filters by title across the full filtered set (query is not remembered). **More filters** adds year range and genres. Missing local titles are backfilled from Trakt before the filter runs. For titles not on your lists yet, use nav **Search**.
 
-**Upcoming / Theater window / Streaming** chips sit under the poster; the same names are filter pills (Theater = ±30 days, Upcoming = >30 days out).
+**Upcoming / Theater window / Streaming** chips sit under the poster; the same names are filter pills (Theater = ±30 days, Upcoming = >30 days out). The availability filter is remembered like status and view.
 
 Opening the page uses a local cache shared with Progress, Latest tags, and Alerts. Trakt is contacted at most every **N hours** (admin **Trakt read cache** TTL, default 2) for list membership, calendar, and per-show progress — or after **Refresh from Trakt**. In-app watch / rate / list actions update those same objects immediately. Adds you made only on trakt.tv wait for the TTL or a manual refresh. **Refresh from Trakt** forces a full re-pull of membership **and** queues a background pass over episode/progress data (results appear within a minute). Sync is **read-only** — it never writes episode history.
 

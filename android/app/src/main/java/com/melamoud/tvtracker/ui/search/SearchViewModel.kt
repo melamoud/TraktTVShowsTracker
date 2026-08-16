@@ -40,6 +40,29 @@ class SearchViewModel(
 ) : ViewModel() {
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
+    private var persistHideWatched = false
+    private var persistHideLists = false
+    private var persistYear = false
+    private var persistGenres = false
+
+    init {
+        loadPrefs()
+    }
+
+    private fun loadPrefs() {
+        viewModelScope.launch {
+            repo.search(query = "", type = _state.value.type, page = 1).onSuccess {
+                val cur = _state.value
+                _state.value = cur.copy(
+                    hideWatched = if (persistHideWatched) cur.hideWatched else it.hideWatched,
+                    hideLists = if (persistHideLists) cur.hideLists else it.hideLists,
+                    year = if (persistYear) cur.year else (it.year ?: cur.year),
+                    genres = if (persistGenres) cur.genres else it.genres.toSet(),
+                    genreChoices = it.genreChoices.ifEmpty { cur.genreChoices },
+                )
+            }
+        }
+    }
 
     fun onQuery(value: String) { _state.value = _state.value.copy(query = value) }
 
@@ -61,11 +84,23 @@ class SearchViewModel(
     }
 
     fun setType(type: String) { _state.value = _state.value.copy(type = type); if (_state.value.query.length >= 2) search() }
-    fun setHideWatched(value: Boolean) { _state.value = _state.value.copy(hideWatched = value); if (_state.value.query.length >= 2) search() }
-    fun setHideLists(value: Boolean) { _state.value = _state.value.copy(hideLists = value); if (_state.value.query.length >= 2) search() }
-    fun setYear(value: String) { _state.value = _state.value.copy(year = value) }
+    fun setHideWatched(value: Boolean) {
+        persistHideWatched = true
+        _state.value = _state.value.copy(hideWatched = value)
+        if (_state.value.query.length >= 2) search()
+    }
+    fun setHideLists(value: Boolean) {
+        persistHideLists = true
+        _state.value = _state.value.copy(hideLists = value)
+        if (_state.value.query.length >= 2) search()
+    }
+    fun setYear(value: String) {
+        persistYear = true
+        _state.value = _state.value.copy(year = value)
+    }
     fun applyYear() { if (_state.value.query.length >= 2) search() }
     fun toggleGenre(label: String) {
+        persistGenres = true
         val cur = _state.value.genres.toMutableSet()
         if (!cur.add(label)) cur.remove(label)
         _state.value = _state.value.copy(genres = cur)
@@ -74,8 +109,14 @@ class SearchViewModel(
 
     private suspend fun load(s: SearchUiState) {
         val result = repo.search(
-            s.query.trim(), s.type, s.page, s.hideWatched, s.hideLists,
-            s.year.trim(), s.genres.toList(),
+            query = s.query.trim(),
+            type = s.type,
+            page = s.page,
+            hideWatched = s.hideWatched.takeIf { persistHideWatched },
+            hideLists = s.hideLists.takeIf { persistHideLists },
+            year = s.year.trim().takeIf { persistYear },
+            genres = s.genres.toList().takeIf { persistGenres },
+            persistGenres = persistGenres,
         )
         _state.value = result.fold(
             onSuccess = {

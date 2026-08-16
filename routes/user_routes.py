@@ -574,7 +574,12 @@ def _my_media(media_type: str):
     from services.availability import (
         normalize_avail, theater_window_bounds, upcoming_after,
     )
-    avail = normalize_avail(request.args.get('avail'))
+    if 'avail' in request.args:
+        avail = normalize_avail(request.args.get('avail'))
+        view_prefs.update_view(current_user, view, avail=avail)
+    else:
+        stored_avail = view_prefs.get_view(current_user, view).get('avail')
+        avail = normalize_avail(stored_avail if isinstance(stored_avail, str) else None)
 
     # View mode: List (rows), calendar grid, or newest-aired sort.
     display_mode = view_prefs.resolve_choice(
@@ -1321,6 +1326,28 @@ ALERT_TYPE_LABELS = {
 }
 
 
+def _media_name_from_alert_title(title: str) -> str | None:
+    """Best-effort show/movie name from older alert titles that lack trakt_id."""
+    raw = (title or '').strip()
+    for prefix in ('New episode: ', 'Released: '):
+        if raw.startswith(prefix):
+            return raw[len(prefix):].strip() or None
+    if raw.startswith('Season ') and ' out: ' in raw:
+        return raw.split(' out: ', 1)[1].strip() or None
+    if raw.startswith('Now on ') and ': ' in raw[7:]:
+        return raw.split(': ', 1)[1].strip() or None
+    return None
+
+
+def _alert_media_pair(n, title_to_pair: dict) -> tuple | None:
+    if n.media_type and n.trakt_id:
+        return n.media_type, int(n.trakt_id)
+    name = _media_name_from_alert_title(n.title or '')
+    if name:
+        return title_to_pair.get(name.casefold())
+    return None
+
+
 def _collect_alert_cards() -> dict:
     """Build Alerts page/API payload for the current user."""
     from services import view_prefs
@@ -1334,32 +1361,76 @@ def _collect_alert_cards() -> dict:
         q = q.filter_by(is_read=False)
     rows = q.order_by(Notification.created_at.desc()).limit(200).all()
 
-    pairs = {
-        (n.media_type, int(n.trakt_id))
-        for n in rows
-        if n.media_type and n.trakt_id
-    }
+    need_names = []
+    for n in rows:
+        if not (n.media_type and n.trakt_id):
+            name = _media_name_from_alert_title(n.title or '')
+            if name:
+                need_names.append(name)
+    title_to_pair: dict[str, tuple] = {}
+    if need_names:
+        found_by_title = CachedMedia.query.filter(CachedMedia.title.in_(need_names)).all()
+        title_to_pair = {
+            m.title.casefold(): (m.media_type, int(m.trakt_id))
+            for m in found_by_title
+        }
+
+    pairs = set()
+    pair_by_notif: dict[int, tuple] = {}
+    for n in rows:
+        pair = _alert_media_pair(n, title_to_pair)
+        if pair:
+            pairs.add(pair)
+            pair_by_notif[n.id] = pair
     media_map = {}
     if pairs:
-        found = CachedMedia.query.filter(
-            db.tuple_(CachedMedia.media_type, CachedMedia.trakt_id).in_(pairs)
-        ).all()
-        media_map = {(m.media_type, m.trakt_id): m for m in found}
+        show_ids = [tid for mt, tid in pairs if mt == 'show']
+        movie_ids = [tid for mt, tid in pairs if mt == 'movie']
+        found = []
+        if show_ids:
+            found.extend(CachedMedia.query.filter(
+                CachedMedia.media_type == 'show',
+                CachedMedia.trakt_id.in_(show_ids),
+            ).all())
+        if movie_ids:
+            found.extend(CachedMedia.query.filter(
+                CachedMedia.media_type == 'movie',
+                CachedMedia.trakt_id.in_(movie_ids),
+            ).all())
+        media_map = {(m.media_type, int(m.trakt_id)): m for m in found}
+    show_ids = [int(mt_id[1]) for mt_id in pairs if mt_id[0] == 'show']
+    state_map = {}
+    if show_ids:
+        state_map = {
+            int(st.trakt_id): st
+            for st in UserMediaState.query.filter(
+                UserMediaState.user_id == current_user.id,
+                UserMediaState.media_type == 'show',
+                UserMediaState.trakt_id.in_(show_ids),
+            ).all()
+        }
 
     from services.streaming_matcher import split_providers_for_user
     found_map: dict[tuple, list[str]] = {}
     if pairs:
-        for fo in MediaFoundOn.query.filter(
-            MediaFoundOn.user_id == current_user.id,
-            db.tuple_(MediaFoundOn.media_type, MediaFoundOn.trakt_id).in_(pairs),
-        ).all():
-            found_map.setdefault((fo.media_type, int(fo.trakt_id)), []).append(fo.service_label)
+        for mt, ids in (
+            ('show', [tid for mt, tid in pairs if mt == 'show']),
+            ('movie', [tid for mt, tid in pairs if mt == 'movie']),
+        ):
+            if not ids:
+                continue
+            for fo in MediaFoundOn.query.filter(
+                MediaFoundOn.user_id == current_user.id,
+                MediaFoundOn.media_type == mt,
+                MediaFoundOn.trakt_id.in_(ids),
+            ).all():
+                found_map.setdefault((fo.media_type, int(fo.trakt_id)), []).append(
+                    fo.service_label,
+                )
     cards = []
     for n in rows:
-        media = (
-            media_map.get((n.media_type, n.trakt_id))
-            if n.media_type and n.trakt_id else None
-        )
+        pair = pair_by_notif.get(n.id)
+        media = media_map.get(pair) if pair else None
         my_providers: list[str] = []
         other_providers: list[str] = []
         if media is not None:
@@ -1370,12 +1441,13 @@ def _collect_alert_cards() -> dict:
             my_providers, other_providers = split_providers_for_user(
                 sorted(set(names)), current_user,
             )
-        found_on = []
-        if n.media_type and n.trakt_id:
-            found_on = found_map.get((n.media_type, int(n.trakt_id)), [])
+        found_on = found_map.get(pair, []) if pair else []
+        st = state_map.get(pair[1]) if pair and pair[0] == 'show' else None
         cards.append({
             'n': n,
             'media': media,
+            'state': st,
+            'media_pair': pair,
             'my_providers': my_providers,
             'other_providers': other_providers,
             'found_on': found_on,

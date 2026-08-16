@@ -3,7 +3,7 @@
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from models import CachedMedia, MediaFoundOn, MobileLoginToken, Notification, User, db
+from models import CachedMedia, MediaFoundOn, MobileLoginToken, Notification, User, UserMediaState, db
 from tests.conftest import login_client
 
 
@@ -87,11 +87,21 @@ def test_alerts_json_includes_found_on(app, client, user):
         db.session.add(MediaFoundOn(
             user_id=user, media_type='show', trakt_id=42, service_label='Hulu',
         ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=42, on_watchlist=True,
+            last_episode_aired_at=datetime(2026, 8, 14),
+            last_episode_label='S03E01 — Next',
+        ))
         db.session.commit()
     data = client.get('/api/v1/alerts').get_json()
     assert data['success'] is True
     item = next(row for row in data['items'] if row['trakt_id'] == 42)
     assert item['found_on'] == ['Hulu']
+    links = item.get('found_on_links') or []
+    assert links and links[0]['label'] == 'Hulu'
+    assert links[0]['url'] and 'hulu.com' in links[0]['url']
+    assert item['last_episode_label'] == 'S03E01 — Next'
+    assert (item.get('last_episode_aired_at') or '').startswith('2026-08-14')
 
 
 def test_alerts_mark_read(app, client, user):

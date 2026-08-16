@@ -5,6 +5,46 @@ from __future__ import annotations
 from datetime import date, datetime
 
 
+def _link_maps():
+    """User service URLs + search templates, cached on the request."""
+    from services.found_on_links import service_link_maps
+    try:
+        from flask import g, has_app_context
+        from flask_login import current_user
+        if has_app_context():
+            cached = getattr(g, '_found_on_link_maps', None)
+            if cached is None:
+                user = current_user if getattr(current_user, 'is_authenticated', False) else None
+                cached = service_link_maps(user)
+                g._found_on_link_maps = cached
+            return cached
+    except Exception:
+        pass
+    return service_link_maps()
+
+
+def service_link_entries(labels, title=None, year=None) -> list[dict]:
+    """[{label, url}] for Found on / Plays on chips (url is None when not clickable)."""
+    from services.found_on_links import found_on_open_url
+    base, templates = _link_maps()
+    out = []
+    for label in labels or []:
+        name = str(label).strip()
+        if not name:
+            continue
+        out.append({
+            'label': name,
+            'url': found_on_open_url(
+                name,
+                title=title,
+                year=year,
+                base_urls=base,
+                search_templates=templates,
+            ),
+        })
+    return out
+
+
 def _iso(value) -> str | None:
     if value is None:
         return None
@@ -40,11 +80,17 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
     if mt and trakt_id:
         poster_url = f'/cache/posters/{mt}/{int(trakt_id)}'
 
+    title = media.title if media else f'{mt} {trakt_id}'
+    year = media.year if media else None
+    found_on = row.get('found_on') or []
+    my_providers = row.get('my_providers') or []
+    other_providers = row.get('other_providers') or []
+
     return {
         'media_type': mt,
         'trakt_id': trakt_id,
-        'title': media.title if media else f'{mt} {trakt_id}',
-        'year': media.year if media else None,
+        'title': title,
+        'year': year,
         'overview': (media.overview or '') if media else '',
         'poster_url': poster_url,
         'genres': row.get('genres') or [],
@@ -71,9 +117,12 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
         ),
         'last_episode_label': st.last_episode_label if st is not None else None,
         'next_ep': next_payload,
-        'my_providers': row.get('my_providers') or [],
-        'other_providers': row.get('other_providers') or [],
-        'found_on': row.get('found_on') or [],
+        'my_providers': my_providers,
+        'other_providers': other_providers,
+        'found_on': found_on,
+        'found_on_links': service_link_entries(found_on, title, year),
+        'my_provider_links': service_link_entries(my_providers, title, year),
+        'other_provider_links': service_link_entries(other_providers, title, year),
         'avail': {
             'upcoming': bool(avail.get('upcoming')),
             'theater': bool(avail.get('theater')),
@@ -135,11 +184,21 @@ def serialize_alert_card(card: dict) -> dict:
     """JSON for one Alerts card."""
     n = card.get('n')
     media = card.get('media')
-    trakt_id = n.trakt_id if n else None
-    media_type = n.media_type if n else None
+    st = card.get('state')
+    pair = card.get('media_pair')
+    if pair:
+        media_type, trakt_id = pair
+    else:
+        trakt_id = n.trakt_id if n else None
+        media_type = n.media_type if n else None
     poster_url = None
     if media_type in ('movie', 'show') and trakt_id:
         poster_url = f'/cache/posters/{media_type}/{int(trakt_id)}'
+    title = media.title if media else (n.title if n else '')
+    year = media.year if media else None
+    found_on = card.get('found_on') or []
+    my_providers = card.get('my_providers') or []
+    other_providers = card.get('other_providers') or []
     return {
         'id': n.id if n else None,
         'alert_type': n.alert_type if n else None,
@@ -154,7 +213,13 @@ def serialize_alert_card(card: dict) -> dict:
         'created_at': _iso(n.created_at) if n else None,
         'poster_url': poster_url,
         'media_title': media.title if media else None,
-        'my_providers': card.get('my_providers') or [],
-        'other_providers': card.get('other_providers') or [],
-        'found_on': card.get('found_on') or [],
+        'year': year,
+        'my_providers': my_providers,
+        'other_providers': other_providers,
+        'found_on': found_on,
+        'found_on_links': service_link_entries(found_on, title, year),
+        'my_provider_links': service_link_entries(my_providers, title, year),
+        'other_provider_links': service_link_entries(other_providers, title, year),
+        'last_episode_aired_at': _iso(st.last_episode_aired_at) if st else None,
+        'last_episode_label': st.last_episode_label if st else None,
     }
