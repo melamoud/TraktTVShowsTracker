@@ -338,6 +338,12 @@ def _search_catalog() -> dict:
     hide_lists = view_prefs.resolve_bool(
         current_user, 'search', 'hide_lists', 'hide_lists', default=True,
     )
+    from services.list_filters import (
+        advanced_context, parse_year_filter, resolve_advanced, row_passes_advanced,
+    )
+    year, filter_genres = resolve_advanced(current_user, 'search')
+    year_range = parse_year_filter(year)
+    has_advanced = bool(year_range or filter_genres)
 
     types: list[str] = ['movie', 'show'] if type_raw == 'both' else [type_raw]
     rows: list[dict] = []
@@ -357,7 +363,7 @@ def _search_catalog() -> dict:
         try:
             # Over-fetch when filters are on so a page still has room after hiding.
             base_limit = per_page if type_raw != 'both' else max(per_page // 2, 10)
-            mult = 3 if (hide_watched or hide_lists) else 1
+            mult = 3 if (hide_watched or hide_lists or has_advanced) else 1
             per_type_limit = min(base_limit * mult, 50)
             for media_type in types:
                 hits = trakt_client.search_titles(
@@ -390,6 +396,8 @@ def _search_catalog() -> dict:
             rows = [r for r in rows if not r.get('watched')]
         if hide_lists:
             rows = [r for r in rows if not _search_on_any_list(r)]
+        if has_advanced:
+            rows = [r for r in rows if row_passes_advanced(r, year_range, filter_genres)]
 
         # Enrich + providers for the visible slice only (after simple paging).
         total = len(rows)
@@ -446,6 +454,7 @@ def _search_catalog() -> dict:
         'raw_total': raw_total,
         'hide_watched': hide_watched,
         'hide_lists': hide_lists,
+        **advanced_context(year, filter_genres),
         'fetch_error': fetch_error,
         'tmdb_configured': tmdb_is_configured(),
         'streaming_region': current_app.config.get('STREAMING_REGION', 'US'),
@@ -628,6 +637,13 @@ def _recommendations_page(media_type: str):
     search_q = _normalize_search_q(request.args.get('q'))
     if search_q:
         rows_all = [r for r in rows_all if _row_title_matches(r, search_q)]
+    from services.list_filters import (
+        advanced_context, parse_year_filter, resolve_advanced, row_passes_advanced,
+    )
+    year, filter_genres = resolve_advanced(current_user, view)
+    year_range = parse_year_filter(year)
+    if year_range or filter_genres:
+        rows_all = [r for r in rows_all if row_passes_advanced(r, year_range, filter_genres)]
     avail = normalize_avail(request.args.get('avail'))
     if avail:
         for r in rows_all:
@@ -672,6 +688,7 @@ def _recommendations_page(media_type: str):
         fetch_error=fetch_error,
         search_q=search_q,
         avail=avail,
+        **advanced_context(year, filter_genres),
         title='Recommended Movies' if media_type == 'movie' else 'Recommended Shows',
     )
 
@@ -820,6 +837,13 @@ def _latest_page(media_type: str):
     search_q = _normalize_search_q(request.args.get('q'))
     if search_q:
         rows_all = [r for r in rows_all if _row_title_matches(r, search_q)]
+    from services.list_filters import (
+        advanced_context, parse_year_filter, resolve_advanced, row_passes_advanced,
+    )
+    year, filter_genres = resolve_advanced(current_user, view)
+    year_range = parse_year_filter(year)
+    if year_range or filter_genres:
+        rows_all = [r for r in rows_all if row_passes_advanced(r, year_range, filter_genres)]
     avail = normalize_avail(request.args.get('avail'))
     if avail:
         # Streaming filter needs providers — enrich a capped batch when cold.
@@ -915,6 +939,7 @@ def _latest_page(media_type: str):
         has_more_older=has_more_older,
         search_q=search_q,
         avail=avail,
+        **advanced_context(year, filter_genres),
         tmdb_configured=tmdb_is_configured(),
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='Latest Movies' if media_type == 'movie' else 'Latest Shows',

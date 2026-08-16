@@ -1,0 +1,55 @@
+{# Year + genre filters. Future filters can be added in this panel.
+   Expects: year, filter_genres, genre_choices, has_advanced (optional).
+   collapsed=true wraps in <details> (My / Latest / Rec). #}
+{% set _year = year|default('') %}
+{% set _genres = filter_genres|default([]) %}
+{% set _choices = genre_choices|default([]) %}
+{% set _open = has_advanced|default(false) %}
+{% if collapsed %}
+<details class="adv-filters"{% if _open %} open{% endif %}>
+  <summary>
+    More filters
+    {% if _open %}
+      <span class="meta">
+        {% if _year %}year {{ _year }}{% endif %}
+        {% if _genres %}{% if _year %} · {% endif %}{{ _genres|join(', ') }}{% endif %}
+      </span>
+    {% endif %}
+  </summary>
+  <div class="adv-filters-body">
+{% else %}
+  <div class="adv-filters adv-filters-open">
+    <div class="adv-filters-body">
+{% endif %}
+    <div class="adv-year-row">
+      <label class="adv-label" for="adv-year">Year</label>
+      <input class="search-input adv-year" id="adv-year" type="text" name="year"
+             value="{{ _year }}" placeholder="2018 or 2015-2020" inputmode="numeric"
+             autocomplete="off">
+      <input type="hidden" name="genres_set" value="1">
+    </div>
+    <fieldset class="adv-genres">
+      <legend class="adv-label">Genres</legend>
+      <div class="adv-genre-grid">
+        {% for g in _choices %}
+          <label class="adv-genre">
+            <input type="checkbox" name="genre" value="{{ g }}"
+                   {% if g in _genres %}checked{% endif %}>
+            {{ g }}
+          </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    {# Future filters (cast, network, …) go here. #}
+    {% if _open %}
+      <p class="meta" style="margin:.35rem 0 0;">
+        <button class="btn btn-small" type="submit">Apply filters</button>
+      </p>
+    {% endif %}
+{% if collapsed %}
+  </div>
+</details>
+{% else %}
+    </div>
+  </div>
+{% endif %}

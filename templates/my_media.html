@@ -1,14 +1,16 @@
 {% extends "base.html" %}
 {% block title %}{{ title }} — {{ app_name }}{% endblock %}
 {% block content %}
+{% set _year = year|default('') %}
+{% set _genres = filter_genres|default([]) %}
 {% macro lists_qs() -%}
 lists_set=1{% for lid in selected_lists %}&lists={{ lid }}{% endfor %}
 {%- endmacro %}
 {% macro cal_qs(anchor=None, mode_v=None) -%}
-{% set mm = mode_v if mode_v is not none else display_mode %}display={{ mm }}&{{ lists_qs() }}&filter={{ filt }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if avail %}&avail={{ avail }}{% endif %}{% if anchor %}&cal_date={{ anchor.isoformat() }}{% endif %}
+{% set mm = mode_v if mode_v is not none else display_mode %}display={{ mm }}&{{ lists_qs() }}&filter={{ filt }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if avail %}&avail={{ avail }}{% endif %}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}{% if anchor %}&cal_date={{ anchor.isoformat() }}{% endif %}
 {%- endmacro %}
 {% macro qs(page_n=None, per=None, filter_v=None, q_v=None, avail_v=None, mode_v=None, cal_anchor=None) -%}
-page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&filter={{ filter_v if filter_v is not none else filt }}&{{ lists_qs() }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}{% set mm = mode_v if mode_v is not none else display_mode %}{% if mm %}&display={{ mm }}{% if mm != 'list' %}{% if cal_anchor %}&cal_date={{ cal_anchor.isoformat() }}{% elif calendar %}&cal_date={{ calendar.anchor.isoformat() }}{% endif %}{% endif %}{% endif %}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&filter={{ filter_v if filter_v is not none else filt }}&{{ lists_qs() }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}{% set mm = mode_v if mode_v is not none else display_mode %}{% if mm %}&display={{ mm }}{% if mm != 'list' %}{% if cal_anchor %}&cal_date={{ cal_anchor.isoformat() }}{% elif calendar %}&cal_date={{ calendar.anchor.isoformat() }}{% endif %}{% endif %}{% endif %}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 %}
@@ -117,6 +119,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     {% if search_q %}
       <a class="btn btn-small" href="?{{ qs(page_n=1, q_v='') }}">Clear</a>
     {% endif %}
+    {% set collapsed = true %}
+    {% include '_advanced_filters.html' %}
   </form>
   {% include '_avail_filters.html' %}
 </div>

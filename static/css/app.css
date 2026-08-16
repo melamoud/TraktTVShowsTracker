@@ -139,6 +139,40 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 650; letter-spacing:
   border: 1px solid var(--line); background: rgba(12, 16, 24, .85);
   color: var(--text); font: inherit;
 }
+.adv-filters {
+  width: 100%;
+  margin-top: .35rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: .65rem .8rem;
+  background: rgba(12, 16, 24, .45);
+}
+.adv-filters-open { margin-top: .55rem; }
+.adv-filters > summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  flex-wrap: wrap;
+  gap: .4rem .75rem;
+  align-items: center;
+}
+.adv-filters-body { margin-top: .65rem; }
+.adv-year-row {
+  display: flex; flex-wrap: wrap; gap: .45rem; align-items: center;
+  margin-bottom: .65rem;
+}
+.adv-year { max-width: 12rem; flex: 0 1 12rem; }
+.adv-label { font-size: .85rem; font-weight: 700; color: var(--muted); }
+.adv-genres { border: 0; margin: 0; padding: 0; }
+.adv-genre-grid {
+  display: flex; flex-wrap: wrap; gap: .35rem .65rem;
+  margin-top: .35rem;
+}
+.adv-genre {
+  display: inline-flex; align-items: center; gap: .3rem;
+  font-size: .88rem; color: var(--text); text-transform: capitalize;
+}
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
   overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;

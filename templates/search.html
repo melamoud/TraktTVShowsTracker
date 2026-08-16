@@ -3,8 +3,10 @@
 {% block content %}
 {% set hw = 1 if hide_watched else 0 %}
 {% set hl = 1 if hide_lists else 0 %}
+{% set _year = year|default('') %}
+{% set _genres = filter_genres|default([]) %}
 {% macro qs(page_n=None, type_v=None, q_v=None, hw_v=None, hl_v=None) -%}
-page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is not none else search_type }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_lists={{ hl_v if hl_v is not none else hl }}&q={{ (q_v if q_v is not none else q)|urlencode }}
+page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is not none else search_type }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_lists={{ hl_v if hl_v is not none else hl }}&q={{ (q_v if q_v is not none else q)|urlencode }}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 and q %}
@@ -35,6 +37,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
 <p class="muted">
   Search Trakt’s movie and show database. Add hits to Wishlist / personal lists, or mark watched — same actions as Latest.
   By default, watched titles and titles already on Wishlist / personal lists are hidden.
+  Year and genres narrow Trakt title hits (a title is still required).
   For titles already on your lists, use the search box on My / Latest / Rec pages instead.
 </p>
 
@@ -79,6 +82,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
       <a class="pill" href="?{{ qs(page_n=1, hl_v=1) }}">Not in lists</a>
     {% endif %}
   </div>
+  {% include '_advanced_filters.html' %}
 </form>
 
 {% if not q %}
@@ -94,6 +98,8 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
     {% endif %}
     {% if hide_watched %} · hiding watched{% endif %}
     {% if hide_lists %} · hiding list titles{% endif %}
+    {% if _year %} · year {{ _year }}{% endif %}
+    {% if _genres %} · {{ _genres|join(', ') }}{% endif %}
     {% if pages > 1 %} · page {{ page }}/{{ pages }}{% endif %}.
   </p>
   {{ pager('top') }}

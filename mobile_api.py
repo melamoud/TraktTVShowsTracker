@@ -179,6 +179,9 @@ def api_search():
         'total': ctx.get('total') or 0,
         'hide_watched': bool(ctx.get('hide_watched')),
         'hide_lists': bool(ctx.get('hide_lists')),
+        'year': ctx.get('year') or '',
+        'genres': ctx.get('filter_genres') or [],
+        'genre_choices': ctx.get('genre_choices') or [],
         'fetch_error': ctx.get('fetch_error'),
     })
 

@@ -54,7 +54,8 @@ fun SearchScreen(
         "show" -> "Shows"
         else -> "Type"
     }
-    val filterCount = listOf(state.hideWatched, state.hideLists).count { it }
+    val filterCount = listOf(state.hideWatched, state.hideLists).count { it } +
+        (if (state.year.isNotBlank()) 1 else 0) + state.genres.size
     val filtersLabel = if (filterCount == 0) "Filters" else "Filters ($filterCount)"
     ReloadOnResume(viewModel::reloadFromServer)
 
@@ -102,6 +103,23 @@ fun SearchScreen(
             FilterMenuButton(filtersLabel) { _ ->
                 CheckMenuItem("Not watched", state.hideWatched) { viewModel.setHideWatched(!state.hideWatched) }
                 CheckMenuItem("Not in lists", state.hideLists) { viewModel.setHideLists(!state.hideLists) }
+                OutlinedTextField(
+                    value = state.year,
+                    onValueChange = viewModel::setYear,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                    label = { Text("Year or range") },
+                    placeholder = { Text("2018 or 2015-2020") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { viewModel.applyYear() }),
+                )
+                state.genreChoices.forEach { label ->
+                    CheckMenuItem(label.replaceFirstChar { it.uppercase() }, label in state.genres) {
+                        viewModel.toggleGenre(label)
+                    }
+                }
             }
         }
         ServerRefreshBox(

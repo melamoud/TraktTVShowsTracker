@@ -1,6 +1,7 @@
 """Smoke tests for the Android /api/v1 JSON API."""
 
 from datetime import datetime, timedelta
+from unittest.mock import patch
 
 from models import CachedMedia, MediaFoundOn, MobileLoginToken, Notification, User, db
 from tests.conftest import login_client
@@ -122,3 +123,46 @@ def test_search_json_empty_query(app, client, user):
     data = resp.get_json()
     assert data['success'] is True
     assert data['items'] == []
+    assert 'year' in data
+    assert 'genres' in data
+    assert data['genre_choices']
+
+
+def test_search_json_year_and_genre_filter(app, client, user):
+    login_client(client, app, user)
+
+    def fake_search(_user, media_type, query, *, limit=20):
+        return [
+            {
+                'type': 'movie', 'score': 2,
+                'movie': {
+                    'title': 'Old Drama', 'year': 2010, 'genres': ['drama'],
+                    'ids': {'trakt': 21},
+                },
+            },
+            {
+                'type': 'movie', 'score': 1,
+                'movie': {
+                    'title': 'New Drama', 'year': 2019, 'genres': ['drama'],
+                    'ids': {'trakt': 23},
+                },
+            },
+        ]
+
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_titles', side_effect=fake_search), \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+        resp = client.get(
+            '/api/v1/search?q=film&type=movie&hide_watched=0&hide_lists=0'
+            '&year=2015-2020&genre=drama'
+        )
+
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['success'] is True
+    assert data['year'] == '2015-2020'
+    assert data['genres'] == ['drama']
+    ids = [item['trakt_id'] for item in data['items']]
+    assert 23 in ids
+    assert 21 not in ids

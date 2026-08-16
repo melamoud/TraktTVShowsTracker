@@ -20,6 +20,107 @@ def test_search_page_prompts_without_query(app, client, user):
     assert '>Shows</' in html
     assert 'class="active"' in html
     assert 'aria-current="page">Search</a>' in html
+    assert 'id="adv-year"' in html
+    assert 'name="genre"' in html
+
+
+def test_search_year_and_genre_filter_trakt_hits(app, client, user):
+    """Year range + genre OR filter Trakt title hits locally."""
+    login_client(client, app, user)
+
+    def fake_search(_user, media_type, query, *, limit=20):
+        return [
+            {
+                'type': 'movie', 'score': 3,
+                'movie': {
+                    'title': 'Old Drama', 'year': 2010, 'genres': ['drama'],
+                    'ids': {'trakt': 21},
+                },
+            },
+            {
+                'type': 'movie', 'score': 2,
+                'movie': {
+                    'title': 'New Action', 'year': 2018, 'genres': ['action'],
+                    'ids': {'trakt': 22},
+                },
+            },
+            {
+                'type': 'movie', 'score': 1,
+                'movie': {
+                    'title': 'New Drama', 'year': 2019, 'genres': ['drama'],
+                    'ids': {'trakt': 23},
+                },
+            },
+        ]
+
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_titles', side_effect=fake_search), \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+        resp = client.get(
+            '/search?q=film&type=movie&hide_watched=0&hide_lists=0'
+            '&year=2015-2020&genre=drama'
+        )
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'data-trakt-id="23"' in html
+    assert 'data-trakt-id="21"' not in html
+    assert 'data-trakt-id="22"' not in html
+
+
+def test_search_remembers_year_and_genres(app, client, user):
+    login_client(client, app, user)
+
+    def fake_search(_user, media_type, query, *, limit=20):
+        return [{
+            'type': 'movie', 'score': 1,
+            'movie': {'title': 'Solo', 'year': 2018, 'genres': ['action'], 'ids': {'trakt': 31}},
+        }]
+
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_titles', side_effect=fake_search), \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+        client.get('/search?q=solo&type=movie&year=2018&genre=action&genres_set=1')
+        resp = client.get('/search?q=solo&type=movie')
+
+    html = resp.get_data(as_text=True)
+    assert 'value="2018"' in html
+    assert 'value="action"' in html and 'checked' in html
+
+
+def test_latest_year_genre_filter_without_title_q(app, client, user):
+    """In-list Latest can narrow by year/genre with no title search."""
+    from datetime import datetime
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=41, title='Keep Me', year=2018,
+            genres_json='["drama"]', trakt_listed_at=datetime(2026, 8, 1),
+            feed_source='trakt_db_updates',
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=42, title='Drop Me', year=2010,
+            genres_json='["drama"]', trakt_listed_at=datetime(2026, 8, 2),
+            feed_source='trakt_db_updates',
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.catalog_routes.feed_count', return_value=2), \
+         patch('routes.catalog_routes.ensure_catalog_through_marker'), \
+         patch('routes.catalog_routes.catalog_has_more_older', return_value=False), \
+         patch('services.sync_jobs.enrich_media_list_for_display'), \
+         patch('services.user_media_sync.ensure_user_media_fresh', return_value=False):
+        resp = client.get(
+            '/latest/movies?hide_lists=0&hide_watched=0&match_only=0'
+            '&recent_years=0&year=2015-2020&genre=drama'
+        )
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'data-trakt-id="41"' in html
+    assert 'data-trakt-id="42"' not in html
+    assert 'More filters' in html
 
 
 def test_search_type_pills_toggle_movies_and_shows(app, client, user):

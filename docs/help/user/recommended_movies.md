@@ -17,7 +17,8 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **On my services** — keep only titles TMDB lists on a streaming service you marked in Preferences  
 - **Matches only** — purple genre/keyword preference matches only  
 - **10 / 50 / 100** per page  
-- **Search titles in this list…** — filter the current recommendation results by title/year (not remembered)
+- **Search titles in this list…** — filter the current recommendation results by title (not remembered)
+- **More filters** — year range and genres (any selected); remembered for this page
 - **Upcoming / Theater window / Streaming** — same availability chips/filters as My / Latest
 
 The recommendation list is cached locally for the admin **Trakt read cache** TTL (default 2 hours). Wishlist/watched **tags** always come from the same local title state as My / Latest, so a watch on another screen shows up here immediately.

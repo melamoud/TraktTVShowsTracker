@@ -16,6 +16,13 @@ data class SearchUiState(
     val type: String = "both",
     val hideWatched: Boolean = true,
     val hideLists: Boolean = true,
+    val year: String = "",
+    val genres: Set<String> = emptySet(),
+    val genreChoices: List<String> = listOf(
+        "action", "adventure", "animation", "comedy", "crime", "documentary",
+        "drama", "family", "fantasy", "history", "horror", "music", "mystery",
+        "romance", "science fiction", "thriller", "war", "western", "reality",
+    ),
     val loading: Boolean = false,
     val error: String? = null,
     val items: List<MediaItemDto> = emptyList(),
@@ -56,9 +63,20 @@ class SearchViewModel(
     fun setType(type: String) { _state.value = _state.value.copy(type = type); if (_state.value.query.length >= 2) search() }
     fun setHideWatched(value: Boolean) { _state.value = _state.value.copy(hideWatched = value); if (_state.value.query.length >= 2) search() }
     fun setHideLists(value: Boolean) { _state.value = _state.value.copy(hideLists = value); if (_state.value.query.length >= 2) search() }
+    fun setYear(value: String) { _state.value = _state.value.copy(year = value) }
+    fun applyYear() { if (_state.value.query.length >= 2) search() }
+    fun toggleGenre(label: String) {
+        val cur = _state.value.genres.toMutableSet()
+        if (!cur.add(label)) cur.remove(label)
+        _state.value = _state.value.copy(genres = cur)
+        if (_state.value.query.length >= 2) search()
+    }
 
     private suspend fun load(s: SearchUiState) {
-        val result = repo.search(s.query.trim(), s.type, s.page, s.hideWatched, s.hideLists)
+        val result = repo.search(
+            s.query.trim(), s.type, s.page, s.hideWatched, s.hideLists,
+            s.year.trim(), s.genres.toList(),
+        )
         _state.value = result.fold(
             onSuccess = {
                 s.copy(
@@ -69,6 +87,9 @@ class SearchViewModel(
                     total = it.total,
                     hideWatched = it.hideWatched,
                     hideLists = it.hideLists,
+                    year = it.year ?: s.year,
+                    genres = if (it.genres.isNotEmpty() || s.genres.isEmpty()) it.genres.toSet() else s.genres,
+                    genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
                     error = it.fetchError,
                 )
             },

@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-15 — Search year + genre filters
+
+- Main Search (web + Android) has **Year** (`2018` or `2015-2020`) and multi-select **Genres** (match any). A title is still required; filters narrow Trakt hits locally
+- My / Latest / Rec hide the same filters under **More filters** so they do not take space until needed; year/genre can stand alone there
+- Choices are remembered per page like other view filters
+
 ## 2026-08-15 — Newest aired: among pins, still newest episode/release first
 
 - Pin only lifts titles above unpinned ones. Two pinned shows (or movies) now sort by last aired / release date, not by who was pinned last

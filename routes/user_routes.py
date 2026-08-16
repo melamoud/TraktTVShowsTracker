@@ -9,7 +9,7 @@ from flask import (
     request, session, url_for,
 )
 from flask_login import current_user, login_required
-from sqlalchemy import String, and_, case, cast, or_
+from sqlalchemy import String, and_, case, cast, extract, or_
 
 
 def _parse_air_datetime(value: str | None) -> datetime | None:
@@ -566,6 +566,11 @@ def _my_media(media_type: str):
     search_q = (request.args.get('q') or '').strip()
     if len(search_q) < 2:
         search_q = ''
+    from services.list_filters import (
+        advanced_context, parse_year_filter, resolve_advanced,
+    )
+    year, filter_genres = resolve_advanced(current_user, view)
+    year_range = parse_year_filter(year)
     from services.availability import (
         normalize_avail, theater_window_bounds, upcoming_after,
     )
@@ -642,7 +647,7 @@ def _my_media(media_type: str):
     # Backfill missing titles for the filtered candidate set first — otherwise
     # q= cannot match rows that only exist in UserMediaState (Search page used
     # to "unlock" them by upserting CachedMedia as a side effect).
-    needs_media_join = bool(search_q) or bool(avail)
+    needs_media_join = bool(search_q) or bool(avail) or bool(year_range) or bool(filter_genres)
     if needs_media_join:
         # Snapshot ids without mutating `q` (legacy Query.with_entities is in-place).
         candidate_ids = [
@@ -673,6 +678,23 @@ def _my_media(media_type: str):
             CachedMedia.title.ilike(like),
             cast(CachedMedia.year, String).ilike(like),
         ))
+    if year_range:
+        ymin, ymax = year_range
+        year_col = CachedMedia.year
+        released_year = extract('year', CachedMedia.released_at)
+        q = q.filter(or_(
+            and_(year_col.isnot(None), year_col >= ymin, year_col <= ymax),
+            and_(
+                year_col.is_(None),
+                CachedMedia.released_at.isnot(None),
+                released_year >= ymin,
+                released_year <= ymax,
+            ),
+        ))
+    if filter_genres:
+        q = q.filter(or_(*[
+            CachedMedia.genres_json.ilike(f'%{g}%') for g in filter_genres
+        ]))
     if avail == 'upcoming':
         q = q.filter(CachedMedia.released_at >= upcoming_after())
     elif avail == 'theater':
@@ -927,6 +949,7 @@ def _my_media(media_type: str):
         'page_links': _pagination_pages(page, pages),
         'search_q': search_q,
         'avail': avail,
+        **advanced_context(year, filter_genres),
         'display_mode': display_mode,
         'calendar': calendar_ctx,
         'tmdb_configured': tmdb_ok,

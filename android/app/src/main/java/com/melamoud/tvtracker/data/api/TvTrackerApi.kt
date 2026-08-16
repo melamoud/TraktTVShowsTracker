@@ -54,6 +54,9 @@ interface TvTrackerApi {
         @Query("page") page: Int = 1,
         @Query("hide_watched") hideWatched: Int? = null,
         @Query("hide_lists") hideLists: Int? = null,
+        @Query("year") year: String? = null,
+        @Query("genre") genre: List<String>? = null,
+        @Query("genres_set") genresSet: Int? = null,
     ): SearchResponse
 
     @GET("/api/v1/shows/{traktId}/progress")

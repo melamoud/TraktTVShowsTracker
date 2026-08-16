@@ -123,6 +123,9 @@ data class SearchResponse(
     val total: Int = 0,
     @SerializedName("hide_watched") val hideWatched: Boolean = true,
     @SerializedName("hide_lists") val hideLists: Boolean = true,
+    val year: String? = null,
+    val genres: List<String> = emptyList(),
+    @SerializedName("genre_choices") val genreChoices: List<String> = emptyList(),
     @SerializedName("fetch_error") val fetchError: String? = null,
 )
 

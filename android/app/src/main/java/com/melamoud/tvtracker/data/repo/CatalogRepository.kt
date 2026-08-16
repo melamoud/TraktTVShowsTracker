@@ -41,6 +41,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
         page: Int,
         hideWatched: Boolean,
         hideLists: Boolean,
+        year: String = "",
+        genres: List<String> = emptyList(),
     ): Result<SearchResponse> = runCatching {
         api.search(
             query = query,
@@ -48,6 +50,9 @@ class CatalogRepository(private val api: TvTrackerApi) {
             page = page,
             hideWatched = if (hideWatched) 1 else 0,
             hideLists = if (hideLists) 1 else 0,
+            year = year.takeIf { it.isNotBlank() },
+            genre = genres.takeIf { it.isNotEmpty() },
+            genresSet = 1,
         )
     }.recoverCatching { e ->
         throw IllegalStateException(AuthLog.userMessage(e), e)
