@@ -193,6 +193,7 @@ data class AlertItemDto(
     @SerializedName("type_label") val typeLabel: String? = null,
     val title: String = "",
     val message: String? = null,
+    val headline: String? = null,
     val link: String? = null,
     @SerializedName("media_type") val mediaType: String? = null,
     @SerializedName("trakt_id") val traktId: Int? = null,

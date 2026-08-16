@@ -72,6 +72,63 @@ def test_notifications_page_renders_episode_card(app, client, user):
     assert '/catalog/show/7701' in html              # details link
     assert 'New episode' in html                     # type tag label
     assert 'Hiding read' in html
+    assert 'alert-title' in html and 'alert-ep' in html
+    assert html.find('S03E01') < html.find('Into the Fire')
+    assert 'alert-also' in html or 'Streaming:' in html
+    assert 'alert-services' in html
+    # Also streaming / Streaming is its own row above Found on / Plays on.
+    also_at = html.find('Streaming:')
+    found_at = html.find('Found on:')
+    assert also_at != -1 and found_at != -1 and also_at < found_at
+
+
+def test_streaming_movie_alert_shows_release_date_not_blurb(app, client, user):
+    """Now-streaming movies put the release date on the title line, not 'available on'."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=99, title='Altered', year=2014,
+            released_at=date(2014, 1, 15),
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='new_streaming',
+            title='Now on YouTube Free: Altered',
+            message='Altered is available on YouTube Free.',
+            media_type='movie', trakt_id=99, is_read=False,
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Altered' in html
+    assert 'Now streaming' in html
+    assert '2014-01-15' in html
+    assert 'is available on' not in html
+
+
+def test_legacy_episode_alert_hides_available_on_suffix(app, client, user):
+    """Older episode messages appended providers; title line keeps S#E# + date only."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=88, title='Lucky', year=2025,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='New episode: Lucky',
+            message=(
+                'S01E05 — Are We Bad People? aired 2026-08-05. '
+                'Available on: Apple TV, Apple TV Amazon Channel'
+            ),
+            media_type='show', trakt_id=88, is_read=False,
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Lucky' in html
+    assert 'S01E05' in html and 'Are We Bad People?' in html
+    assert '2026-08-05' in html
+    assert 'Available on:' not in html
+    assert 'Apple TV Amazon Channel' not in html
 
 
 def test_notifications_hide_read_filter(app, client, user):

@@ -23,9 +23,9 @@ A batch of episodes airing the same day only counts as a **season** alert when t
 
 ## Reading an alert card
 
-Each alert is a card: poster, title (links to the title page), a colored **type tag** (New episode, Season out, Released, Now streaming), and when it fired.
+Each alert is a compact card: poster, then **title + date** on one line (with the type tag). Type tags: New episode, Season out, Released, Now streaming.
 
-- Episode alerts show **S#E# — episode title · aired date**, **Found on** (your local labels, same as title cards), and where it streams as tags — **teal** = on one of your services, gray = elsewhere (kept current at view time).
+- Episode alerts add **S#E# — episode title · aired date** on that title line. Movie **Released** / **Now streaming** alerts show the movie’s release date — not “Title is available on Service” (the service is the type tag plus streaming chips). **Also streaming** (other services) is its own row above **Found on** / **Plays on your services**, which share a line — **teal** = on one of your services, gray = elsewhere (kept current at view time).
 - Episode/season alerts have a **Progress** button that opens the progress **side panel** in place — mark episodes watched without leaving Alerts. **Details** goes to the full title page.
 - **Mark read/unread** dims or brightens the card; the nav badge counts unread.
 - On the next **alert refresh**, movie release/streaming alerts auto-mark read when the movie is watched on Trakt, and episode/season alerts auto-mark read when that episode (or every episode in the season drop) is watched on Trakt.

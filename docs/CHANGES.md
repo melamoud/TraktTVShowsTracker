@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-16 — Compact alert cards
+
+- Alerts put episode name and air date on the title line; movies show the release date (not “available on”)
+- Also streaming sits above Found on / Plays on (those two share a row); older episode “Available on:” suffixes are hidden
+
 ## 2026-08-16 — Database backup in a private repo
 
 - Live `instance/trakttv.db` is no longer part of the code repo. Backup with `push-db.bat` to the private `TraktTVShowsTracker-db` repo. The app path is unchanged.

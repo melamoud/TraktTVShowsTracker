@@ -1326,6 +1326,37 @@ ALERT_TYPE_LABELS = {
 }
 
 
+def _strip_available_on_blurb(text: str) -> str:
+    """Drop legacy 'Available on: …' / 'is available on …' suffixes from alert copy."""
+    raw = (text or '').strip()
+    lower = raw.lower()
+    cut = -1
+    for marker in (' available on:', '. available on:', ' is available on '):
+        idx = lower.find(marker)
+        if idx != -1 and (cut == -1 or idx < cut):
+            cut = idx
+    if cut == -1:
+        return raw
+    return raw[:cut].rstrip(' .')
+
+
+def _alert_headline(n, media) -> str:
+    """First-line extra next to the title.
+
+    Episode/season alerts keep S#E# + aired date. Movies get a date — never
+    the 'Title is available on Service' blurb (that's the type tag + chips).
+    Older episode rows still store 'Available on: …' in message; strip it here.
+    """
+    kind = n.alert_type or ''
+    if kind in ('episode_aired', 'season_aired', 'new_user_login'):
+        return _strip_available_on_blurb(n.message or '')
+    if media is not None and media.released_at:
+        return media.released_at.isoformat()
+    if n.created_at:
+        return n.created_at.strftime('%Y-%m-%d')
+    return ''
+
+
 def _media_name_from_alert_title(title: str) -> str | None:
     """Best-effort show/movie name from older alert titles that lack trakt_id."""
     raw = (title or '').strip()
@@ -1454,6 +1485,7 @@ def _collect_alert_cards() -> dict:
             'type_label': ALERT_TYPE_LABELS.get(
                 n.alert_type, (n.alert_type or '').replace('_', ' '),
             ),
+            'headline': _alert_headline(n, media),
         })
     return {
         'cards': cards,

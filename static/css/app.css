@@ -919,8 +919,40 @@ body.modal-open { overflow: hidden; }
 }
 
 /* Alerts page cards */
+.media-row.alert-row {
+  padding: .75rem .9rem;
+  gap: .7rem;
+}
+.media-list:has(.alert-row) { gap: .55rem; }
 .media-row.alert-row.no-poster { grid-template-columns: 1fr; }
-.alert-message { margin: .3rem 0 0; font-size: 1rem; }
+.alert-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .2rem .65rem;
+}
+.alert-title-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .3rem .4rem;
+  min-width: 0;
+}
+.alert-ep {
+  margin: 0;
+  font-weight: 500;
+  font-size: .95rem;
+  color: var(--muted);
+}
+.alert-row .alert-also { margin-top: .28rem; }
+.alert-row .alert-services {
+  margin-top: .28rem;
+}
+.alert-row .alert-services.mine {
+  margin-top: .28rem;
+  padding: .22rem .4rem;
+}
+.alert-row .actions { margin-top: .4rem; }
 .tag.alert-episode_aired { color: #bfdbfe; border-color: #3b82f6; }
 .tag.alert-season_aired { color: #ddd6fe; border-color: #8b5cf6; }
 .tag.alert-release_day { color: #fde68a; border-color: #f59e0b; }

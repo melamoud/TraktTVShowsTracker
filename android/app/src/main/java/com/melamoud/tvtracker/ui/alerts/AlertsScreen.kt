@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -48,6 +50,7 @@ import com.melamoud.tvtracker.ui.theme.AccentGold
 import com.melamoud.tvtracker.ui.theme.SurfaceAlt
 import com.melamoud.tvtracker.ui.theme.TextMuted
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun AlertsScreen(
     viewModel: AlertsViewModel,
@@ -102,31 +105,32 @@ fun AlertsScreen(
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.width(64.dp).height(96.dp).clip(RoundedCornerShape(6.dp)),
                                 )
-                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Text(item.typeLabel.orEmpty(), color = AccentGold, style = MaterialTheme.typography.labelMedium)
-                                    Text(
-                                        item.mediaTitle?.takeIf { it.isNotBlank() } ?: item.title,
-                                        fontWeight = FontWeight.SemiBold,
-                                    )
-                                    if (!item.message.isNullOrBlank()) {
-                                        Text(item.message, color = TextMuted, style = MaterialTheme.typography.bodySmall)
-                                    }
-                                    lastAiredLine(item)?.let { line ->
-                                        Text(line, color = AccentGold, style = MaterialTheme.typography.bodySmall)
-                                    }
-                                    if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
-                                        ServiceLinksLine(
-                                            prefix = "Found on:",
-                                            links = item.foundOnLinks,
-                                            fallbackLabels = item.foundOn,
+                                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                    Row(
+                                        Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                    ) {
+                                        Text(
+                                            item.mediaTitle?.takeIf { it.isNotBlank() } ?: item.title,
+                                            fontWeight = FontWeight.SemiBold,
                                         )
-                                    }
-                                    if (item.myProviders.isNotEmpty() || item.myProviderLinks.isNotEmpty()) {
-                                        ServiceLinksLine(
-                                            prefix = "Plays on your services:",
-                                            links = item.myProviderLinks,
-                                            fallbackLabels = item.myProviders,
-                                        )
+                                        if (!item.typeLabel.isNullOrBlank()) {
+                                            Text(
+                                                item.typeLabel,
+                                                color = AccentGold,
+                                                style = MaterialTheme.typography.labelMedium,
+                                            )
+                                        }
+                                        val headline = item.headline?.takeIf { it.isNotBlank() }
+                                        if (headline != null) {
+                                            Text(
+                                                headline,
+                                                color = TextMuted,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                modifier = Modifier.weight(1f),
+                                            )
+                                        }
                                     }
                                     if (item.otherProviders.isNotEmpty() || item.otherProviderLinks.isNotEmpty()) {
                                         ServiceLinksLine(
@@ -136,7 +140,27 @@ fun AlertsScreen(
                                             color = TextMuted,
                                         )
                                     }
-                                    item.createdAt?.let { Text(it, color = TextMuted, style = MaterialTheme.typography.bodySmall) }
+                                    if (
+                                        item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty() ||
+                                        item.myProviders.isNotEmpty() || item.myProviderLinks.isNotEmpty()
+                                    ) {
+                                        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                            if (item.myProviders.isNotEmpty() || item.myProviderLinks.isNotEmpty()) {
+                                                ServiceLinksLine(
+                                                    prefix = "Plays on your services:",
+                                                    links = item.myProviderLinks,
+                                                    fallbackLabels = item.myProviders,
+                                                )
+                                            }
+                                            if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
+                                                ServiceLinksLine(
+                                                    prefix = "Found on:",
+                                                    links = item.foundOnLinks,
+                                                    fallbackLabels = item.foundOn,
+                                                )
+                                            }
+                                        }
+                                    }
                                     Row {
                                         TextButton(onClick = { viewModel.toggleRead(item) }) {
                                             Text(if (item.isRead) "Mark unread" else "Mark read")
@@ -153,11 +177,4 @@ fun AlertsScreen(
             }
         }
     }
-}
-
-private fun lastAiredLine(item: AlertItemDto): String? {
-    val day = item.lastEpisodeAiredAt?.take(10)?.takeIf { it.length == 10 }
-    val label = item.lastEpisodeLabel?.takeIf { it.isNotBlank() }
-    if (day == null && label == null) return null
-    return listOfNotNull("Latest aired", label, day).joinToString(" · ")
 }

@@ -50,41 +50,46 @@
         </div>
       {% endif %}
       <div class="media-body">
-        <h2 class="media-title">
-          {% if m %}
-            <a href="{{ url_for('catalog.media_detail', media_type=m.media_type, trakt_id=m.trakt_id) }}">{{ m.title }}</a>
-          {% else %}
-            {{ n.title }}
+        <h2 class="media-title alert-title">
+          <span class="alert-title-main">
+            {% if m %}
+              <a href="{{ url_for('catalog.media_detail', media_type=m.media_type, trakt_id=m.trakt_id) }}">{{ m.title }}</a>
+            {% else %}
+              {{ n.title }}
+            {% endif %}
+            <span class="tag alert-{{ n.alert_type or 'info' }}">{{ card.type_label }}</span>
+            {% if not n.is_read %}<span class="tag found">Unread</span>{% endif %}
+          </span>
+          {% if card.headline %}
+            <span class="alert-ep">{{ card.headline }}</span>
           {% endif %}
-          <span class="tag alert-{{ n.alert_type or 'info' }}">{{ card.type_label }}</span>
-          {% if not n.is_read %}<span class="tag found">Unread</span>{% endif %}
         </h2>
-        <div class="meta">{{ n.created_at.strftime('%Y-%m-%d %H:%M') }}</div>
-        <p class="alert-message">{{ n.message }}</p>
-        {% if card.my_providers %}
-          <div class="streaming-line mine">
-            <span class="streaming-label mine">Plays on your services:</span>
-            {% set labels = card.my_providers %}
-            {% set title = m.title if m else n.title %}
-            {% set year = m.year if m else none %}
-            {% set tag_class = 'stream mine' %}
-            {% include '_service_link_tags.html' %}
-          </div>
-        {% endif %}
+        {% set title = m.title if m else n.title %}
+        {% set year = m.year if m else none %}
         {% if card.other_providers %}
-          <div class="streaming-line meta">
+          <div class="streaming-line alert-also">
             <span class="streaming-label">{% if card.my_providers %}Also streaming:{% else %}Streaming:{% endif %}</span>
             {% set labels = card.other_providers %}
-            {% set title = m.title if m else n.title %}
-            {% set year = m.year if m else none %}
             {% set tag_class = 'stream' %}
             {% include '_service_link_tags.html' %}
           </div>
         {% endif %}
-        {% set found_on = card.found_on %}
-        {% set title = m.title if m else n.title %}
-        {% set year = m.year if m else none %}
-        {% include '_found_on_tags.html' %}
+        {% if card.my_providers or card.found_on %}
+          <div class="streaming-line alert-services{% if card.my_providers %} mine{% endif %}">
+            {% if card.my_providers %}
+              <span class="streaming-label mine">Plays on your services:</span>
+              {% set labels = card.my_providers %}
+              {% set tag_class = 'stream mine' %}
+              {% include '_service_link_tags.html' %}
+            {% endif %}
+            {% if card.found_on %}
+              <span class="streaming-label">Found on:</span>
+              {% set labels = card.found_on %}
+              {% set tag_class = 'found' %}
+              {% include '_service_link_tags.html' %}
+            {% endif %}
+          </div>
+        {% endif %}
         <div class="actions">
           {% if n.media_type == 'show' and n.trakt_id and n.alert_type in ('episode_aired', 'season_aired') %}
             <button class="btn btn-primary btn-small" type="button"
