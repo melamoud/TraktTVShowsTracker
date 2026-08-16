@@ -1,10 +1,16 @@
-{# Year + genre filters. Future filters can be added in this panel.
+{# Year + genre filters. Search also puts Actor on the Year row.
    Expects: year, filter_genres, genre_choices, has_advanced (optional).
-   collapsed=true wraps in <details> (My / Latest / Rec). #}
+   collapsed=true wraps in <details> (My / Latest / Rec / Search).
+   include_actor_filter=true shows Actor next to Year.
+   actor_jump=true: fields submit to /search via actor_form_id (list pages). #}
 {% set _year = year|default('') %}
 {% set _genres = filter_genres|default([]) %}
 {% set _choices = genre_choices|default([]) %}
-{% set _open = has_advanced|default(false) %}
+{% set _actor_q = actor_q|default('') %}
+{% set _actor_id = actor_id|default('') %}
+{% set _actor_name = actor_name|default('') %}
+{% set _include_actor = include_actor_filter|default(false) %}
+{% set _open = has_advanced|default(false) or (_include_actor and (_actor_q or _actor_id or _actor_name)) %}
 {% if collapsed %}
 <details class="adv-filters"{% if _open %} open{% endif %}>
   <summary>
@@ -12,7 +18,8 @@
     {% if _open %}
       <span class="meta">
         {% if _year %}year {{ _year }}{% endif %}
-        {% if _genres %}{% if _year %} · {% endif %}{{ _genres|join(', ') }}{% endif %}
+        {% if _include_actor and (_actor_name or _actor_q) %}{% if _year %} · {% endif %}actor {{ _actor_name or _actor_q }}{% endif %}
+        {% if _genres %}{% if _year or (_include_actor and (_actor_name or _actor_q)) %} · {% endif %}{{ _genres|join(', ') }}{% endif %}
       </span>
     {% endif %}
   </summary>
@@ -26,6 +33,12 @@
       <input class="search-input adv-year" id="adv-year" type="text" name="year"
              value="{{ _year }}" placeholder="2018 or 2015-2020" inputmode="numeric"
              autocomplete="off">
+      {% if _include_actor %}
+        {% include '_actor_search_fields.html' %}
+        {% if actor_jump %}
+          <button class="btn btn-small" type="submit"{% if actor_form_id %} form="{{ actor_form_id }}"{% endif %}>Search actor</button>
+        {% endif %}
+      {% endif %}
       <input type="hidden" name="genres_set" value="1">
     </div>
     <fieldset class="adv-genres">
@@ -40,7 +53,7 @@
         {% endfor %}
       </div>
     </fieldset>
-    {# Future filters (cast, network, …) go here. #}
+    {# Future filters (network, …) go here. #}
     {% if _open %}
       <p class="meta" style="margin:.35rem 0 0;">
         <button class="btn btn-small" type="submit">Apply filters</button>

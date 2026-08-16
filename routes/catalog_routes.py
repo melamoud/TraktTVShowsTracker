@@ -311,7 +311,7 @@ def _search_on_any_list(row: dict) -> bool:
 @login_required
 def search():
     """
-    Trakt-wide title search (movies and/or shows).
+    Trakt-wide title and/or actor search (movies and/or shows).
 
     Results use the same decorated card fields as Latest (lists / watched / streaming).
     Defaults hide watched and already-listed titles (Wishlist + personal lists).
@@ -322,11 +322,18 @@ def search():
 def _search_catalog() -> dict:
     """Collect Trakt-wide search results and filter state for HTML or JSON."""
     from services import view_prefs
+    from services.cast_service import list_favorite_actors, resolve_actor_for_search
     from services.sync_jobs import enrich_media_list_for_display, upsert_cached_media
     from services.streaming_matcher import split_providers_for_user
     from services.tmdb_client import is_configured as tmdb_is_configured
 
     q = _normalize_search_q(request.args.get('q'))
+    actor_q = (request.args.get('actor_q') or '').strip()
+    try:
+        actor_id_raw = int(request.args.get('actor') or 0)
+    except (TypeError, ValueError):
+        actor_id_raw = 0
+    actor_id = actor_id_raw if actor_id_raw > 0 else None
     type_raw = (request.args.get('type') or 'both').lower()
     if type_raw not in ('movie', 'show', 'both'):
         type_raw = 'both'
@@ -349,8 +356,28 @@ def _search_catalog() -> dict:
     rows: list[dict] = []
     fetch_error = None
     raw_total = 0
+    actor = None
+    actor_missing = False
+    wanted_actor = bool(actor_id or len(actor_q) >= 2)
 
-    if q:
+    if wanted_actor:
+        try:
+            actor = resolve_actor_for_search(
+                current_user, actor_id=actor_id, actor_q=actor_q,
+            )
+        except Exception as exc:
+            current_app.logger.warning('Actor resolve failed: %s', exc)
+            actor = None
+        if actor:
+            actor_id = actor.trakt_id
+            if not actor_q:
+                actor_q = actor.name or ''
+        else:
+            actor_missing = True
+
+    has_query = bool(q) or bool(actor)
+
+    if has_query:
         try:
             from services.user_media_sync import ensure_user_media_fresh
             ensure_user_media_fresh(
@@ -361,18 +388,54 @@ def _search_catalog() -> dict:
 
         cached_items: list[tuple[str, CachedMedia]] = []
         try:
-            # Over-fetch when filters are on so a page still has room after hiding.
-            base_limit = per_page if type_raw != 'both' else max(per_page // 2, 10)
-            mult = 3 if (hide_watched or hide_lists or has_advanced) else 1
-            per_type_limit = min(base_limit * mult, 50)
-            for media_type in types:
-                hits = trakt_client.search_titles(
-                    current_user, media_type, q, limit=per_type_limit,
+            from services.trakt_cache import (
+                cache_http_span,
+                load_search_cache,
+                log_cache_event,
+                media_from_search_ids,
+                save_search_cache,
+                search_cache_key,
+            )
+            force_search = request.args.get('refresh') == '1'
+            skey = search_cache_key(
+                q=q, actor_id=actor.trakt_id if actor else None, type_raw=type_raw,
+            )
+            payload = None if force_search else load_search_cache(current_user.id, skey)
+            if payload is not None:
+                cached_items = media_from_search_ids(payload, types)
+                log_cache_event(
+                    'search', 'hit', user=current_user, item=skey[:12], calls=0,
                 )
-                for entry in hits:
-                    row = upsert_cached_media(media_type, entry)
-                    if row:
-                        cached_items.append((media_type, row))
+            else:
+                span = cache_http_span()
+                id_payload: dict[str, list[int]] = {'movie': [], 'show': []}
+                if actor:
+                    for media_type in types:
+                        hits = trakt_client.fetch_person_cast_titles(
+                            current_user, actor.trakt_id, media_type, limit=80,
+                        )
+                        for entry in hits:
+                            row = upsert_cached_media(media_type, entry)
+                            if row:
+                                cached_items.append((media_type, row))
+                                id_payload[media_type].append(int(row.trakt_id))
+                else:
+                    # Stable over-fetch so Back / filter toggles reuse this payload.
+                    per_type_limit = 50 if type_raw != 'both' else 25
+                    for media_type in types:
+                        hits = trakt_client.search_titles(
+                            current_user, media_type, q, limit=per_type_limit,
+                        )
+                        for entry in hits:
+                            row = upsert_cached_media(media_type, entry)
+                            if row:
+                                cached_items.append((media_type, row))
+                                id_payload[media_type].append(int(row.trakt_id))
+                save_search_cache(current_user.id, skey, id_payload)
+                log_cache_event(
+                    'search', 'fetch', user=current_user, item=skey[:12],
+                    reason='force' if force_search else 'stale', calls=span(),
+                )
             db.session.commit()
         except Exception as exc:
             fetch_error = str(exc)
@@ -390,6 +453,9 @@ def _search_catalog() -> dict:
             for r in decorated:
                 r['media_type'] = media_type
             rows.extend(decorated)
+
+        if actor and q:
+            rows = [r for r in rows if _row_title_matches(r, q)]
 
         raw_total = len(rows)
         if hide_watched:
@@ -444,6 +510,12 @@ def _search_catalog() -> dict:
 
     return {
         'q': q,
+        'actor_q': actor_q,
+        'actor_id': actor.trakt_id if actor else (actor_id or ''),
+        'actor_name': (actor.name if actor else ''),
+        'actor_missing': actor_missing,
+        'wanted_actor': wanted_actor,
+        'favorite_actors': list_favorite_actors(current_user),
         'search_type': type_raw,
         'rows': page_rows,
         'page': page,

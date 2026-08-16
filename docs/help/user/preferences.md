@@ -14,6 +14,7 @@ On any title detail page, the **Cast** section lists main actors (expand for the
 
 - Manage removals under Preferences → **Favorite actors**
 - Headshots: one TMDB credits lookup per title; each actor image is downloaded into the local actors cache **at most once** and reused on every title
+- An actor’s name (or **Titles**) opens Search for their movies/shows, with the same hide-watched / lists / year / genre filters
 - Not synced to Trakt favorites — reserved for a future “new titles with your actors” highlight/alert
 
 ## Trakt lists in Set lists

@@ -124,7 +124,10 @@
           {% endif %}
         </div>
         <div class="cast-info">
-          <div class="cast-name">{{ actor.name }}</div>
+          <div class="cast-name">
+            <a href="{{ url_for('catalog.search', actor=actor.trakt_id, actor_q=actor.name) }}"
+               title="Search titles with {{ actor.name }}">{{ actor.name }}</a>
+          </div>
           {% if actor.characters %}
             <div class="cast-role muted">{{ actor.characters|join(', ') }}</div>
           {% endif %}
@@ -132,15 +135,19 @@
             <div class="cast-eps muted">{{ actor.episode_count }} ep{% if actor.episode_count != 1 %}s{% endif %}</div>
           {% endif %}
         </div>
-        <button class="btn btn-small{% if actor.favorited %} btn-primary{% endif %}"
-                type="button"
-                data-action="{{ 'favorite-actor-remove' if actor.favorited else 'favorite-actor-add' }}"
-                data-trakt-id="{{ actor.trakt_id }}"
-                data-media-type="person"
-                data-title="{{ actor.name|e }}"
-                title="{{ 'Remove from favorite actors' if actor.favorited else 'Add to favorite actors' }}">
-          {{ '★ Favorite' if actor.favorited else '☆ Favorite' }}
-        </button>
+        <div class="cast-actions">
+          <button class="btn btn-small{% if actor.favorited %} btn-primary{% endif %}"
+                  type="button"
+                  data-action="{{ 'favorite-actor-remove' if actor.favorited else 'favorite-actor-add' }}"
+                  data-trakt-id="{{ actor.trakt_id }}"
+                  data-media-type="person"
+                  data-title="{{ actor.name|e }}"
+                  title="{{ 'Remove from favorite actors' if actor.favorited else 'Add to favorite actors' }}">
+            {{ '★ Favorite' if actor.favorited else '☆ Favorite' }}
+          </button>
+          <a class="btn btn-small" href="{{ url_for('catalog.search', actor=actor.trakt_id, actor_q=actor.name) }}"
+             title="Search titles with {{ actor.name }}">Titles</a>
+        </div>
       </li>
     {% endfor %}
   </ul>

@@ -927,6 +927,11 @@ window.addEventListener('beforeunload', function () {
     showPageLoading('Loading page…');
   }
 });
+window.addEventListener('pageshow', function (ev) {
+  if (ev.persisted) {
+    hidePageLoading();
+  }
+});
 
 document.addEventListener('submit', function (ev) {
   const form = ev.target.closest('form');
@@ -1361,4 +1366,21 @@ document.addEventListener('click', async function (ev) {
       hidePageLoading();
     }
   }
+});
+
+document.addEventListener('change', function (ev) {
+  const sel = ev.target.closest('select[name="actor"]');
+  if (!sel || !sel.form || !sel.value) return;
+  const q = sel.form.elements.namedItem('actor_q');
+  const opt = sel.options[sel.selectedIndex];
+  if (q && opt) q.value = (opt.textContent || '').trim();
+  if (typeof sel.form.requestSubmit === 'function') sel.form.requestSubmit();
+  else sel.form.submit();
+});
+
+document.addEventListener('input', function (ev) {
+  const inp = ev.target.closest('input[name="actor_q"]');
+  if (!inp || !inp.form) return;
+  const sel = inp.form.elements.namedItem('actor');
+  if (sel && sel.tagName === 'SELECT') sel.value = '';
 });

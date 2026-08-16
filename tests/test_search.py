@@ -11,7 +11,7 @@ def test_search_page_prompts_without_query(app, client, user):
     resp = client.get('/search')
     assert resp.status_code == 200
     html = resp.get_data(as_text=True)
-    assert 'Type at least 2 characters' in html
+    assert 'Type a title' in html
     assert 'class="media-list"' not in html
     assert 'data-action="lists-edit"' not in html
     assert 'search-select' not in html
@@ -22,6 +22,8 @@ def test_search_page_prompts_without_query(app, client, user):
     assert 'aria-current="page">Search</a>' in html
     assert 'id="adv-year"' in html
     assert 'name="genre"' in html
+    assert 'More filters' in html
+    assert 'name="actor_q"' in html
 
 
 def test_search_year_and_genre_filter_trakt_hits(app, client, user):
@@ -424,3 +426,147 @@ def test_recommendations_q_filters_by_title(app, client, user):
     html = resp.get_data(as_text=True)
     assert 'Night Runner' in html
     assert 'Day Walker' not in html
+
+
+def test_search_by_actor_id_uses_filmography_not_title_search(app, client, user):
+    """Actor id loads Trakt cast credits and keeps Search filters."""
+    from models import CachedPerson
+
+    with app.app_context():
+        db.session.add(CachedPerson(trakt_id=501, name='Ada Actor'))
+        db.session.commit()
+
+    def fake_credits(_user, person_id, media_type, *, limit=80):
+        assert person_id == 501
+        if media_type != 'movie':
+            return []
+        return [{
+            'movie': {
+                'title': 'Ada Film', 'year': 2021, 'genres': ['drama'],
+                'ids': {'trakt': 77},
+            },
+        }]
+
+    login_client(client, app, user)
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_titles') as title_search, \
+         patch('services.trakt_client.fetch_person_cast_titles', side_effect=fake_credits), \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+        resp = client.get('/search?actor=501&type=movie&hide_watched=0&hide_lists=0')
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'Ada Film' in html
+    assert 'data-trakt-id="77"' in html
+    assert 'for actor' in html and 'Ada Actor' in html
+    title_search.assert_not_called()
+
+
+def test_search_actor_q_matches_favorite_then_filters_year(app, client, user):
+    """Typed actor name uses a favorite; year filter still applies."""
+    from models import CachedPerson, UserFavoriteActor
+
+    with app.app_context():
+        person = CachedPerson(trakt_id=501, name='Ada Actor')
+        db.session.add(person)
+        db.session.flush()
+        db.session.add(UserFavoriteActor(user_id=user, person_id=person.id))
+        db.session.commit()
+
+    def fake_credits(_user, person_id, media_type, *, limit=80):
+        assert person_id == 501
+        if media_type != 'movie':
+            return []
+        return [
+            {
+                'movie': {
+                    'title': 'Old Ada', 'year': 2010, 'genres': ['drama'],
+                    'ids': {'trakt': 81},
+                },
+            },
+            {
+                'movie': {
+                    'title': 'New Ada', 'year': 2019, 'genres': ['drama'],
+                    'ids': {'trakt': 82},
+                },
+            },
+        ]
+
+    login_client(client, app, user)
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_people') as people_search, \
+         patch('services.trakt_client.fetch_person_cast_titles', side_effect=fake_credits), \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+        resp = client.get(
+            '/search?actor_q=Ada+Actor&type=movie&hide_watched=0&hide_lists=0&year=2015-2020'
+        )
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'data-trakt-id="82"' in html
+    assert 'data-trakt-id="81"' not in html
+    people_search.assert_not_called()
+
+
+def test_latest_page_has_actor_search_jump(app, client, user):
+    """List pages expose actor fields that post to the main Search page."""
+    login_client(client, app, user)
+    with patch('routes.catalog_routes.feed_count', return_value=0), \
+         patch('routes.catalog_routes.ensure_catalog_through_marker'), \
+         patch('routes.catalog_routes.catalog_has_more_older', return_value=False), \
+         patch('services.sync_jobs.enrich_media_list_for_display'), \
+         patch('services.user_media_sync.ensure_user_media_fresh', return_value=False):
+        resp = client.get('/latest/movies?hide_lists=0&hide_watched=0&match_only=0')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'name="actor_q"' in html
+    assert 'Search actor' in html
+    assert '/search' in html
+
+
+def test_search_second_load_uses_local_cache(app, client, user):
+    """Repeating the same Search URL (browser Back) must not call Trakt again."""
+    login_client(client, app, user)
+
+    def fake_search(_user, media_type, query, *, limit=20):
+        if media_type != 'movie':
+            return []
+        return [{
+            'type': 'movie', 'score': 1,
+            'movie': {'title': 'Cached Hit', 'year': 2024, 'ids': {'trakt': 91}},
+        }]
+
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_titles', side_effect=fake_search) as title_search, \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+        first = client.get('/search?q=cached&type=movie&hide_watched=0&hide_lists=0')
+        second = client.get('/search?q=cached&type=movie&hide_watched=0&hide_lists=0')
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert 'data-trakt-id="91"' in second.get_data(as_text=True)
+    assert title_search.call_count == 1
+
+
+def test_search_refresh_bypasses_cache(app, client, user):
+    """refresh=1 re-fetches Trakt even when the search cache is fresh."""
+    login_client(client, app, user)
+
+    def fake_search(_user, media_type, query, *, limit=20):
+        return [{
+            'type': 'movie', 'score': 1,
+            'movie': {'title': 'Fresh Hit', 'year': 2024, 'ids': {'trakt': 92}},
+        }] if media_type == 'movie' else []
+
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch('services.trakt_client.search_titles', side_effect=fake_search) as title_search, \
+         patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]), \
+         patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+        client.get('/search?q=fresh&type=movie&hide_watched=0&hide_lists=0')
+        client.get('/search?q=fresh&type=movie&hide_watched=0&hide_lists=0&refresh=1')
+
+    assert title_search.call_count == 2
+

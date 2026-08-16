@@ -45,6 +45,7 @@ class User(UserMixin, db.Model):
     notifications = db.relationship('Notification', backref='user', cascade='all, delete-orphan')
     alert_events = db.relationship('AlertEvent', backref='user', cascade='all, delete-orphan')
     sessions = db.relationship('UserSession', backref='user', cascade='all, delete-orphan')
+    search_cache = db.relationship('UserSearchCache', backref='user', cascade='all, delete-orphan')
 
     def get_id(self):
         """Flask-Login user id."""
@@ -418,6 +419,21 @@ class UserRecommendationCache(db.Model):
     media_type = db.Column(db.String(16), nullable=False)
     genre_slug = db.Column(db.String(64), default='all', nullable=False)
     payload_json = db.Column(db.Text, default='[]')
+    fetched_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class UserSearchCache(db.Model):
+    """Cached Trakt search / actor-filmography ids for one user + query."""
+
+    __tablename__ = 'user_search_cache'
+    __table_args__ = (
+        db.UniqueConstraint('user_id', 'query_key', name='uq_user_search_cache'),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    query_key = db.Column(db.String(64), nullable=False)
+    payload_json = db.Column(db.Text, default='{}')
     fetched_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 

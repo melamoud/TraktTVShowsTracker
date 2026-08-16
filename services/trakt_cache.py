@@ -15,6 +15,7 @@ from datetime import date, datetime, timedelta
 from models import (
     UserMediaState,
     UserRecommendationCache,
+    UserSearchCache,
     UserTraktList,
     db,
 )
@@ -459,6 +460,102 @@ def drop_recommendation_from_cache(user_id: int, media_type: str, trakt_id: int)
             kept.append(entry)
         row.payload_json = json.dumps(kept)
         row.fetched_at = datetime.utcnow()
+
+
+# --- Search / actor filmography --------------------------------------------
+
+_SEARCH_CACHE_KEEP = 40
+
+
+def search_cache_key(*, q: str, actor_id: int | None, type_raw: str) -> str:
+    """Stable key for one Trakt search (title and/or actor + type)."""
+    import hashlib
+    raw = json.dumps(
+        {
+            'q': (q or '').strip().casefold(),
+            'actor': int(actor_id or 0),
+            'type': type_raw or 'both',
+        },
+        sort_keys=True,
+        separators=(',', ':'),
+    )
+    return hashlib.sha256(raw.encode('utf-8')).hexdigest()[:40]
+
+
+def load_search_cache(user_id: int, query_key: str) -> dict | None:
+    """Return ``{movie: [ids], show: [ids]}`` when within TTL; else None."""
+    row = UserSearchCache.query.filter_by(user_id=user_id, query_key=query_key).first()
+    if row is None or not cache_is_fresh(row.fetched_at):
+        return None
+    try:
+        data = json.loads(row.payload_json or '{}')
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    out = {'movie': [], 'show': []}
+    for kind in ('movie', 'show'):
+        ids = data.get(kind) or []
+        if not isinstance(ids, list):
+            continue
+        clean = []
+        for tid in ids:
+            try:
+                clean.append(int(tid))
+            except (TypeError, ValueError):
+                continue
+        out[kind] = clean
+    return out
+
+
+def save_search_cache(user_id: int, query_key: str, payload: dict) -> None:
+    """Store search ids and drop oldest extra rows for this user."""
+    blob = json.dumps({
+        'movie': [int(x) for x in (payload or {}).get('movie') or []],
+        'show': [int(x) for x in (payload or {}).get('show') or []],
+    })
+    now = datetime.utcnow()
+    row = UserSearchCache.query.filter_by(user_id=user_id, query_key=query_key).first()
+    if row is None:
+        db.session.add(UserSearchCache(
+            user_id=user_id,
+            query_key=query_key,
+            payload_json=blob,
+            fetched_at=now,
+        ))
+    else:
+        row.payload_json = blob
+        row.fetched_at = now
+    extras = (
+        UserSearchCache.query
+        .filter_by(user_id=user_id)
+        .order_by(UserSearchCache.fetched_at.desc())
+        .offset(_SEARCH_CACHE_KEEP)
+        .all()
+    )
+    for old in extras:
+        db.session.delete(old)
+
+
+def media_from_search_ids(payload: dict, types: list[str]) -> list[tuple[str, object]]:
+    """Load CachedMedia rows in cached order (skip missing)."""
+    from models import CachedMedia
+
+    out: list[tuple[str, object]] = []
+    for media_type in types:
+        ids = (payload or {}).get(media_type) or []
+        if not ids:
+            continue
+        rows = CachedMedia.query.filter(
+            CachedMedia.media_type == media_type,
+            CachedMedia.trakt_id.in_(ids),
+        ).all()
+        by_id = {int(m.trakt_id): m for m in rows}
+        for tid in ids:
+            media = by_id.get(int(tid))
+            if media:
+                out.append((media_type, media))
+    return out
 
 
 # --- Calendar window coverage ----------------------------------------------

@@ -333,3 +333,67 @@ def cast_for_detail(media: CachedMedia, user: User) -> list[dict]:
     if any(p.headshot_url for p in (c.person for c in credits if c.person)):
         db.session.commit()
     return out
+
+
+def _parse_actor_id(raw) -> int | None:
+    """Parse a Trakt person id from a form/query value."""
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    return value if value > 0 else None
+
+
+def resolve_actor_for_search(
+    user: User,
+    *,
+    actor_id: int | None = None,
+    actor_q: str = '',
+) -> CachedPerson | None:
+    """
+    Resolve a person for actor search.
+
+    Prefer an explicit Trakt person id (favorites dropdown / cast link).
+    Otherwise match a favorite by name, then Trakt ``/search/person``.
+    """
+    pid = _parse_actor_id(actor_id)
+    if pid:
+        person = CachedPerson.query.filter_by(trakt_id=pid).first()
+        if person:
+            return person
+        try:
+            payload = trakt_client.fetch_person(pid)
+        except Exception as exc:
+            current_app.logger.warning('Person fetch failed %s: %s', pid, exc)
+            return None
+        if payload:
+            person = upsert_person_from_trakt(payload)
+            if person:
+                db.session.commit()
+            return person
+        return None
+
+    needle = (actor_q or '').strip()
+    if len(needle) < 2:
+        return None
+    folded = needle.casefold()
+    favorites = list_favorite_actors(user)
+    exact = [p for p in favorites if (p.name or '').casefold() == folded]
+    if exact:
+        return exact[0]
+    partial = [p for p in favorites if folded in (p.name or '').casefold()]
+    if len(partial) == 1:
+        return partial[0]
+
+    try:
+        hits = trakt_client.search_people(user, needle, limit=8)
+    except Exception as exc:
+        current_app.logger.warning('People search failed %r: %s', needle, exc)
+        return None
+    for row in hits:
+        person = upsert_person_from_trakt((row or {}).get('person'))
+        if person:
+            db.session.commit()
+            return person
+    return None
+

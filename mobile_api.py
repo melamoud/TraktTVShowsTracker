@@ -171,6 +171,9 @@ def api_search():
     return jsonify({
         'success': True,
         'q': ctx.get('q') or '',
+        'actor_q': ctx.get('actor_q') or '',
+        'actor_id': ctx.get('actor_id') or None,
+        'actor_name': ctx.get('actor_name') or '',
         'search_type': ctx.get('search_type') or 'both',
         'items': items,
         'page': ctx.get('page') or 1,

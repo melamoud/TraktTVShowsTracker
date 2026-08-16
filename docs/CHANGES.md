@@ -1,5 +1,20 @@
 # Changes log
 
+## 2026-08-16 — Actor lives in More filters (next to Year)
+
+- Search, Latest, Rec, and My put **Actor** in **More filters** on the Year row so the toolbar stays one line
+- List pages still jump to Search via **Search actor**; Search uses the same form as title / year / genres
+
+## 2026-08-16 — Search Back uses the Trakt read cache
+
+- Title and actor Search results are stored locally for the admin TTL (same as Recs / My)
+- Browser Back (and repeating the same query) no longer re-hits Trakt; **Refresh from Trakt** on Search forces a new pull
+
+## 2026-08-16 — Search movies/shows by actor
+
+- Search accepts an actor name or a favorite-actor pick (plus optional title); results use the same hide-watched / lists / year / genre / type filters
+- Latest, Rec, and My toolbars can jump to that Search; Cast and Preferences actor names have a **Titles** link
+
 ## 2026-08-15 — Android: remember filters; Found on opens the service
 
 - The app no longer sends default My / Search / Alerts filters on first load (that was overwriting the saved website choices). Changing a filter still saves it for both app and web
@@ -73,7 +88,7 @@
 
 ## 2026-08-13 — Cache-first Trakt reads
 
-- Page loads (including browser Back) read local SQLite for watchlist, lists, calendar, progress, and recommendations
+- Page loads (including browser Back) read local SQLite for watchlist, lists, calendar, progress, recommendations, and Search results
 - Trakt is contacted when that **object** is older than the admin TTL (default 2 hours, **Admin → Scheduler**), after **Refresh from Trakt**, or when an in-app write could not update the local object
 - Progress / My / Alerts share one show-progress cache — marking an episode watched updates card counts and alert cleanup without a follow-up Trakt GET
 - In-app writes no longer probe `/sync/last_activities`; changes made only on trakt.tv appear at the next TTL expiry or manual refresh

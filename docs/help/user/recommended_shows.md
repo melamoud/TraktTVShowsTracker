@@ -18,7 +18,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **Matches only** — purple preference matches  
 - **10 / 50 / 100** per page  
 - **Search titles in this list…** — filter current results by title  
-- **More filters** — year range and genres (any selected)
+- **More filters** — year range, actor (jumps to Search), and genres (any selected)
 
 ## Highlights
 

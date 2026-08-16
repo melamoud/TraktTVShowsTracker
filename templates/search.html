@@ -5,11 +5,14 @@
 {% set hl = 1 if hide_lists else 0 %}
 {% set _year = year|default('') %}
 {% set _genres = filter_genres|default([]) %}
-{% macro qs(page_n=None, type_v=None, q_v=None, hw_v=None, hl_v=None) -%}
-page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is not none else search_type }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_lists={{ hl_v if hl_v is not none else hl }}&q={{ (q_v if q_v is not none else q)|urlencode }}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}
+{% set _actor_q = actor_q|default('') %}
+{% set _actor_id = actor_id|default('') %}
+{% set has_search = q or actor_name %}
+{% macro qs(page_n=None, type_v=None, q_v=None, hw_v=None, hl_v=None, actor_v=None, actor_q_v=None) -%}
+page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is not none else search_type }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_lists={{ hl_v if hl_v is not none else hl }}&q={{ (q_v if q_v is not none else q)|urlencode }}{%- if actor_v is not none -%}{%- if actor_v -%}&actor={{ actor_v }}{%- endif -%}{%- elif _actor_id -%}&actor={{ _actor_id }}{%- endif -%}{%- if actor_q_v is not none -%}{%- if actor_q_v -%}&actor_q={{ actor_q_v|urlencode }}{%- endif -%}{%- elif _actor_q -%}&actor_q={{ _actor_q|urlencode }}{%- endif -%}{%- if _year -%}&year={{ _year|urlencode }}{%- endif -%}{%- for g in _genres -%}&genre={{ g|urlencode }}{%- endfor -%}
 {%- endmacro %}
 {% macro pager(position) %}
-  {% if pages > 1 and q %}
+  {% if pages > 1 and has_search %}
   <nav class="pager pill-row" aria-label="Pagination {{ position }}">
     {% if page > 1 %}
       <a class="pill" href="?{{ qs(page_n=page - 1) }}" aria-label="Previous page">&lt;</a>
@@ -35,9 +38,10 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
 {% endmacro %}
 <h1>{{ title }}</h1>
 <p class="muted">
-  Search Trakt’s movie and show database. Add hits to Wishlist / personal lists, or mark watched — same actions as Latest.
+  Search Trakt’s movie and show database by <strong>title</strong> and/or <strong>actor</strong>.
+  Add hits to Wishlist / personal lists, or mark watched — same actions as Latest.
   By default, watched titles and titles already on Wishlist / personal lists are hidden.
-  Year and genres narrow Trakt title hits (a title is still required).
+  Actor, year, and genres live under <strong>More filters</strong> (actor uses Trakt cast filmography).
   For titles already on your lists, use the search box on My / Latest / Rec pages instead.
 </p>
 
@@ -45,13 +49,17 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
   <div class="search-fields">
     <label class="sr-only" for="search-q">Search titles</label>
     <input class="search-input" id="search-q" type="search" name="q" value="{{ q }}"
-           placeholder="Title (min. 2 characters)" minlength="2" autofocus>
+           placeholder="Title (min. 2 characters)" autofocus>
     <input type="hidden" name="type" value="{{ search_type }}">
     <input type="hidden" name="hide_watched" value="{{ hw }}">
     <input type="hidden" name="hide_lists" value="{{ hl }}">
     <button class="btn btn-primary btn-small" type="submit">Search</button>
-    {% if q %}
+    {% if has_search or actor_missing or _actor_q or _actor_id %}
       <a class="btn btn-small" href="{{ url_for('catalog.search', type=search_type, hide_watched=hw, hide_lists=hl) }}">Clear</a>
+    {% endif %}
+    {% if has_search %}
+      <a class="btn btn-small" data-loading data-loading-message="Refreshing search…"
+         href="?{{ qs(page_n=1) }}&refresh=1">Refresh from Trakt</a>
     {% endif %}
   </div>
   <div class="pill-row">
@@ -82,17 +90,22 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
       <a class="pill" href="?{{ qs(page_n=1, hl_v=1) }}">Not in lists</a>
     {% endif %}
   </div>
+  {% set collapsed = true %}
+  {% set include_actor_filter = true %}
   {% include '_advanced_filters.html' %}
 </form>
 
-{% if not q %}
-  <p class="muted">Type at least 2 characters and press Search.</p>
+{% if actor_missing %}
+  <p class="muted">No actor matched “{{ _actor_q or _actor_id }}”. Try a full name or pick a favorite.</p>
+{% elif not has_search %}
+  <p class="muted">Type a title (min. 2 characters), or open More filters for an actor / year / genres, then press Search.</p>
 {% elif fetch_error %}
   <p class="muted">Search failed. Try again in a moment.</p>
 {% else %}
   <p class="meta">
     Showing <strong>{{ rows|length }}</strong> of <strong>{{ total }}</strong> result{{ '' if total == 1 else 's' }}
-    for “{{ q }}”
+    {% if actor_name %}for actor <strong>{{ actor_name }}</strong>{% endif %}
+    {% if q %}{% if actor_name %} matching title “{{ q }}”{% else %}for “{{ q }}”{% endif %}{% endif %}
     {% if raw_total and raw_total != total %}
       · {{ raw_total }} before filters
     {% endif %}
@@ -210,11 +223,11 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
     {% else %}
       {% if raw_total %}
         <p class="muted">
-          Trakt found {{ raw_total }} title{{ '' if raw_total == 1 else 's' }} for “{{ q }}”, but all are hidden by your filters.
+          Found {{ raw_total }} title{{ '' if raw_total == 1 else 's' }}{% if actor_name %} with {{ actor_name }}{% elif q %} for “{{ q }}”{% endif %}, but all are hidden by your filters.
           <a href="?{{ qs(page_n=1, hw_v=0, hl_v=0) }}">Show watched and list titles</a>.
         </p>
       {% else %}
-        <p class="muted">No Trakt titles matched “{{ q }}”.</p>
+        <p class="muted">No Trakt titles matched{% if actor_name %} actor {{ actor_name }}{% endif %}{% if q %}{% if actor_name %} / “{{ q }}”{% else %} “{{ q }}”{% endif %}{% endif %}.</p>
       {% endif %}
     {% endfor %}
   </div>

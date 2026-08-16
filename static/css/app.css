@@ -138,7 +138,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 650; letter-spacing:
   padding: .4rem .55rem; border-radius: 10px;
   border: 1px solid var(--line); background: rgba(12, 16, 24, .85);
   color: var(--text); font: inherit;
+  max-width: 16rem;
 }
+.actor-search-input { flex: 1 1 10rem; max-width: 16rem; }
+.favorite-actor-name a { color: inherit; text-decoration: none; }
+.favorite-actor-name a:hover { text-decoration: underline; }
 .adv-filters {
   width: 100%;
   margin-top: .35rem;
@@ -159,10 +163,11 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 650; letter-spacing:
 }
 .adv-filters-body { margin-top: .65rem; }
 .adv-year-row {
-  display: flex; flex-wrap: wrap; gap: .45rem; align-items: center;
+  display: flex; flex-wrap: wrap; gap: .45rem .75rem; align-items: center;
   margin-bottom: .65rem;
 }
 .adv-year { max-width: 12rem; flex: 0 1 12rem; }
+.adv-year-row .actor-search-input { min-width: 8rem; }
 .adv-label { font-size: .85rem; font-weight: 700; color: var(--muted); }
 .adv-genres { border: 0; margin: 0; padding: 0; }
 .adv-genre-grid {
@@ -677,12 +682,13 @@ table.data th, table.data td { border-bottom: 1px solid var(--line); padding: .5
   font-size: .95rem;
 }
 .cast-info { min-width: 0; }
-.cast-name {
-  font-weight: 600;
-  line-height: 1.25;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.cast-name a { color: inherit; text-decoration: none; }
+.cast-name a:hover { text-decoration: underline; }
+.cast-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .3rem;
+  justify-content: flex-end;
 }
 .cast-role, .cast-eps {
   font-size: .82rem;
@@ -706,7 +712,7 @@ table.data th, table.data td { border-bottom: 1px solid var(--line); padding: .5
 }
 .favorite-actor-row {
   display: grid;
-  grid-template-columns: 40px 1fr auto;
+  grid-template-columns: 40px 1fr auto auto;
   gap: .75rem;
   align-items: center;
   padding: .4rem .5rem;

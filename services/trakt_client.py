@@ -462,6 +462,78 @@ def fetch_media_people(media_type: str, trakt_id: int) -> dict:
     return api_request('GET', f'/{media_type}s/{trakt_id}/people') or {}
 
 
+def fetch_person(trakt_person_id: int) -> dict:
+    """GET /people/{id} — minimal person object with name + ids."""
+    return api_request('GET', f'/people/{int(trakt_person_id)}') or {}
+
+
+def search_people(user: User, query: str, *, limit: int = 10) -> list[dict]:
+    """
+    Search Trakt people by name.
+
+    Returns ``{type, score, person: {...}}`` rows, highest score first.
+    """
+    q = (query or '').strip()
+    if len(q) < 2:
+        return []
+    lim = max(1, min(int(limit), 20))
+    data = api_request(
+        'GET',
+        '/search/person',
+        user=user,
+        params={'query': q, 'limit': lim},
+    ) or []
+    return [row for row in data if isinstance(row, dict)]
+
+
+def fetch_person_cast_titles(
+    user: User,
+    trakt_person_id: int,
+    media_type: str,
+    *,
+    limit: int = 80,
+) -> list[dict]:
+    """
+    Cast filmography for a person (movies or shows).
+
+    GET /people/{id}/movies|shows — cast only (crew omitted). Newest year first.
+    Each item is a ``{movie|show: {...}}`` dict suitable for upsert_cached_media.
+    """
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    kind = 'movies' if media_type == 'movie' else 'shows'
+    payload = api_request(
+        'GET',
+        f'/people/{int(trakt_person_id)}/{kind}',
+        user=user,
+        params={'extended': 'full'},
+    ) or {}
+    cast_list = payload.get('cast') if isinstance(payload, dict) else []
+    if not isinstance(cast_list, list):
+        cast_list = []
+    rows: list[tuple[int, dict]] = []
+    seen: set[int] = set()
+    for entry in cast_list:
+        if not isinstance(entry, dict):
+            continue
+        entity = entry.get(media_type) or {}
+        ids = entity.get('ids') or {}
+        try:
+            tid = int(ids.get('trakt') or 0)
+        except (TypeError, ValueError):
+            tid = 0
+        if not tid or tid in seen:
+            continue
+        seen.add(tid)
+        try:
+            year = int(entity.get('year') or 0)
+        except (TypeError, ValueError):
+            year = 0
+        rows.append((year, {media_type: entity}))
+    rows.sort(key=lambda x: x[0], reverse=True)
+    return [item for _year, item in rows[: max(1, min(int(limit), 150))]]
+
+
 def get_watchlist(
     user: User,
     media_type: str,

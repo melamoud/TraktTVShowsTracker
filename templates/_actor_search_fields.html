@@ -1,0 +1,22 @@
+{# Actor name + favorite-actor picker. Submits to the main Search page.
+   Optional: actor_q, actor_id, actor_q_id, actor_sel_id, favorite_actors, actor_form_id. #}
+{% set _actor_q = actor_q|default('') %}
+{% set _actor_id = actor_id|default('') %}
+{% set _q_id = actor_q_id|default('actor-q') %}
+{% set _sel_id = actor_sel_id|default('actor-fav') %}
+{% set _favs = favorite_actors|default([]) %}
+{% set _form = actor_form_id|default('') %}
+<label class="adv-label" for="{{ _q_id }}">Actor</label>
+<input class="search-input actor-search-input" id="{{ _q_id }}" type="search" name="actor_q"
+       value="{{ _actor_q }}" placeholder="{{ 'Name or pick a favorite' if _favs else 'Actor name' }}" autocomplete="off"{% if _form %} form="{{ _form }}"{% endif %}>
+{% if _favs %}
+<label class="sr-only" for="{{ _sel_id }}">Favorite actors</label>
+<select class="search-select" id="{{ _sel_id }}" name="actor"{% if _form %} form="{{ _form }}"{% endif %}>
+  <option value="">Favorite actors…</option>
+  {% for a in _favs %}
+    <option value="{{ a.trakt_id }}"{% if _actor_id and _actor_id|string == a.trakt_id|string %} selected{% endif %}>{{ a.name }}</option>
+  {% endfor %}
+</select>
+{% elif _actor_id %}
+<input type="hidden" name="actor" value="{{ _actor_id }}"{% if _form %} form="{{ _form }}"{% endif %}>
+{% endif %}

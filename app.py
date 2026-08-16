@@ -89,8 +89,10 @@ def create_app(config_object=Config):
         found_on_service_urls = {}
         found_on_search_templates = {}
         show_prefs_reminder = False
+        favorite_actors = []
         if getattr(current_user, 'is_authenticated', False):
             from models import Notification, StreamingService, UserStreamingService
+            from services.cast_service import list_favorite_actors
             from services.found_on_links import service_link_maps
             from services.streaming_matcher import user_needs_prefs_reminder
             unread = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
@@ -113,6 +115,7 @@ def create_app(config_object=Config):
             # Skip reminder on the setup wizard itself.
             if request.endpoint != 'user.preferences_setup':
                 show_prefs_reminder = user_needs_prefs_reminder(current_user)
+            favorite_actors = list_favorite_actors(current_user)
         return {
             'app_name': 'TraktTV Shows Tracker',
             'unread_notifications': unread,
@@ -121,6 +124,7 @@ def create_app(config_object=Config):
             'found_on_service_urls': found_on_service_urls,
             'found_on_search_templates': found_on_search_templates,
             'show_prefs_reminder': show_prefs_reminder,
+            'favorite_actors': favorite_actors,
         }
 
     from services.found_on_links import found_on_open_url as _found_on_open_url

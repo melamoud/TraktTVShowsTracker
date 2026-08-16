@@ -120,9 +120,8 @@
   <section>
     <h2>Favorite actors</h2>
     <p class="meta">
-      Pick actors from a title’s Cast section (☆ Favorite). Used later to highlight new titles
-      featuring people you follow — not synced to Trakt. Cast headshots are cached once per actor
-      when you open a title (reused across shows).
+      Pick actors from a title’s Cast section (☆ Favorite). Click a name or <strong>Titles</strong>
+      to search their movies/shows on the Search page. Headshots are cached once per actor.
     </p>
     {% if favorite_actors %}
       <ul class="favorite-actors-list">
@@ -135,7 +134,11 @@
                 <span class="cast-initials">{{ actor.name[:1]|upper }}</span>
               {% endif %}
             </div>
-            <span class="favorite-actor-name">{{ actor.name }}</span>
+            <span class="favorite-actor-name">
+              <a href="{{ url_for('catalog.search', actor=actor.trakt_id, actor_q=actor.name) }}"
+                 title="Search titles with {{ actor.name }}">{{ actor.name }}</a>
+            </span>
+            <a class="btn btn-small" href="{{ url_for('catalog.search', actor=actor.trakt_id, actor_q=actor.name) }}">Titles</a>
             <label class="favorite-actor-remove">
               <input type="checkbox" name="remove_favorite_actor_ids" value="{{ actor.trakt_id }}">
               Remove

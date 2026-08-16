@@ -99,8 +99,14 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <a class="btn btn-small" href="?{{ qs(page_n=1, q_v='') }}">Clear</a>
     {% endif %}
     {% set collapsed = true %}
+    {% set include_actor_filter = true %}
+    {% set actor_jump = true %}
+    {% set actor_form_id = 'latest-actor-jump' %}
+    {% set actor_q_id = 'latest-actor-q' %}
+    {% set actor_sel_id = 'latest-actor-fav' %}
     {% include '_advanced_filters.html' %}
   </form>
+  <form id="latest-actor-jump" method="get" action="{{ url_for('catalog.search') }}" hidden></form>
   {% include '_avail_filters.html' %}
 </div>
 <p class="meta">
