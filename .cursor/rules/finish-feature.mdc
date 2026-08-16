@@ -1,0 +1,19 @@
+---
+description: Finish-feature shortcut — docs, commit, push, then DB backup
+alwaysApply: true
+---
+
+# Finish Feature Shortcut
+
+When the user says "finish feature" (or a close variant like "finish this feature"), treat that as an explicit request to wrap up the current work end-to-end:
+
+1. Docs / help (if applicable): Update docs/help/ and related docs/README when the change affects user-facing or admin-facing behavior. Skip docs only when the change is purely internal with no behavioral or UI impact worth documenting.
+2. Commit: Stage the relevant files (exclude secrets and local DB noise unless the user asked to include it). Commit with a concise message that explains the why of the feature/fix, following the repo's commit style and the usual git commit safety rules.
+3. Push: Push the branch to its remote tracking branch (git push; use -u only when first publishing the branch).
+
+Do not ask for confirmation of this sequence when they used the shortcut — they already asked for it. Still follow normal safety rules (no force-push to main/master, no skipping hooks, no committing secrets).
+
+After that, back up the instance DB (do not ask for confirmation):
+
+- If `push-db.bat` exists in the project root, run it.
+- Otherwise commit and push the db instance with the comment "DB update".
