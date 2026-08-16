@@ -52,7 +52,11 @@ Or PowerShell:
 
 They need their own Trakt accounts. They use the same **Login with TraktTV** button. No local passwords.
 
-## 5. Production host
+## 5. Database backup (this machine)
+
+`instance/trakttv.db` stays in this folder so the app path never changes. It is **not** committed to the public code repo. Double-click `push-db.bat` to commit and push it to the private `melamoud/TraktTVShowsTracker-db` repo (`DB update`).
+
+## 6. Production host
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for Cloudflare / `tvtracker.melamoud.com` checklist.
 
@@ -62,7 +66,7 @@ Short version:
 2. Prefer Cloudflare or Caddy TLS; update Trakt redirect URI  
 3. Set `TRAKT_REDIRECT_URI`, `PUBLIC_HOST`, and free `TMDB_API_KEY`  
 
-## 6. Test credentials
+## 7. Test credentials
 
 For automated live tests (optional), create a dedicated Trakt test user and put secrets in **`.env.test`** (gitignored):
 

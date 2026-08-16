@@ -78,7 +78,7 @@ Then you may run Flask with `run.py --http` and `SESSION_COOKIE_SECURE=1` still 
 - [ ] Admin can log in; friends/family can log in  
 - [ ] Admin → **Run release check now** works after TMDB key  
 - [ ] `stop.bat` / restart verified on the host  
-- [ ] Backup `instance/trakttv.db` and `instance/poster_cache/` periodically  
+- [ ] Backup `instance/trakttv.db` (double-click `push-db.bat` → private `TraktTVShowsTracker-db` repo) and `instance/poster_cache/` periodically  
 
 ## 7. What is not automated yet
 

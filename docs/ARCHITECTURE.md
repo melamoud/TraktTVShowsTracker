@@ -6,7 +6,7 @@
 |--------|--------|
 | Web framework | Flask + Jinja templates |
 | Auth | Trakt OAuth2 + Flask-Login sessions |
-| DB | SQLite via Flask-SQLAlchemy (`instance/trakttv.db`) |
+| DB | SQLite via Flask-SQLAlchemy (`instance/trakttv.db`; backed up to a private git repo, not the public code repo) |
 | CSRF | Flask-WTF |
 | Background jobs | APScheduler |
 | Streaming availability | Local assignment + TMDB Watch Providers (`US`) |

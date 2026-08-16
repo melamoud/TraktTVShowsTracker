@@ -73,6 +73,8 @@ Same server and Trakt login on the phone: My Shows / My Movies / Search / Alerts
 .venv\Scripts\pytest.exe -q
 ```
 
+The live SQLite file (`instance/trakttv.db`) is not in this repo. First run creates an empty DB. To back up your own data, use `push-db.bat` against a **private** GitHub repo.
+
 ## License
 
 Copyright (c) 2026 Nir Melamoud. All rights reserved.

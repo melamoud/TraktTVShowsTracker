@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-16 — Database backup in a private repo
+
+- Live `instance/trakttv.db` is no longer part of the code repo. Backup with `push-db.bat` to the private `TraktTVShowsTracker-db` repo. The app path is unchanged.
+
 ## 2026-08-16 — Android movie and show title pages
 
 - Tap a title on My Shows, My Movies, Search, or Alerts to open the same kind of page as the website: poster, overview, genres, streaming, Found on, actions, and cast

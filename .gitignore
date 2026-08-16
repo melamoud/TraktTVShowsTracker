@@ -32,6 +32,9 @@ config_local.py
 .flask_secret_key
 instance/poster_cache/
 instance/actor_cache/
+# Live SQLite + nested private backup repo (push-db.bat). Keep .gitkeep so clones still have instance/.
+instance/*
+!instance/.gitkeep
 *.db-shm
 *.db-wal
 
