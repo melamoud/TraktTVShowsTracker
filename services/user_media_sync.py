@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from models import db
 from services import trakt_client
 from services.sync_jobs import sync_user_media_state
-from services.trakt_cache import bump_user_sync_stamp, cache_http_span, cache_is_fresh, log_cache_event
+from services.trakt_cache import bump_user_sync_stamp, cache_http_span, log_cache_event
 
 logger = logging.getLogger('app')
 
@@ -121,6 +121,12 @@ def ensure_user_media_fresh(
 
     Fingerprint is only advanced after a successful sync so a failed pull cannot
     mark the cache “fresh” and hide remote wishlist/list adds.
+
+    The admin read-cache TTL must not skip ``last_activities``. Skipping that
+    cheap probe for hours left My Shows / Set lists on a stale watchlist after
+    the user moved titles on trakt.tv (or after a local write bumped the TTL).
+    Saving Set lists from those stale checkboxes wrote Wishlist / default lists
+    back to Trakt.
     """
     types = media_types or ('movie', 'show')
     span = cache_http_span()
@@ -136,10 +142,6 @@ def ensure_user_media_fresh(
         except Exception as exc:
             logger.warning('Could not store activities after sync: %s', exc)
             db.session.rollback()
-
-    if not force and cache_is_fresh(getattr(user, 'last_sync_at', None)):
-        log_cache_event('user_media', 'hit', user=user, calls=0)
-        return False
 
     if force:
         ok = sync_user_media_state(user, media_types=types)
@@ -207,14 +209,30 @@ def note_user_media_write(
 ) -> None:
     """
     After a local write that already updated the DB cache (watchlist / lists /
-    watched / ratings / favorites), extend the membership TTL so the next page
-    load does not probe Trakt. Fingerprint keys stay as they were; the next
-    TTL expiry uses last_activities to pick up remote-only changes.
+    watched / ratings / favorites), bump ``last_sync_at`` and store the current
+    ``last_activities`` fingerprint.
+
+    Without that fingerprint, the next My Shows load treats this write as a
+    remote change and full-pulls lists. A lagging Trakt GET can put a title
+    back on Wishlist / default lists after the user already moved it off.
 
     ``aspects`` / ``media_types`` are accepted for call-site compatibility.
     """
     try:
         bump_user_sync_stamp(user)
+        types = media_types or ('movie', 'show')
+        try:
+            activities = get_last_activities(user)
+            fp = activity_fingerprint(activities, types)
+            if fp:
+                merged = dict(_stored_fingerprint(user))
+                merged.update(fp)
+                user.trakt_activities_json = json.dumps(merged)
+        except Exception as exc:
+            logger.warning(
+                'Could not refresh activities after media write for user %s: %s',
+                user.id, exc,
+            )
         db.session.commit()
     except Exception as exc:
         logger.warning('Could not note media write for user %s: %s', user.id, exc)

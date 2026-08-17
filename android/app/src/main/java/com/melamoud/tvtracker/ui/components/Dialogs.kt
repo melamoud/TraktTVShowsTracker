@@ -87,7 +87,7 @@ fun ListsDialog(
     onApply: (List<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var selected by remember {
+    var selected by remember(title, lists) {
         mutableStateOf(lists.filter { it.selected || it.onList }.map { it.id }.toSet())
     }
     AlertDialog(

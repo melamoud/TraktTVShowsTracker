@@ -194,8 +194,8 @@ def test_failed_sync_does_not_advance_fingerprint(app, user):
         assert stored.get('watchlist') == old_fp['watchlist']
 
 
-def test_note_user_media_write_extends_ttl_without_trakt_get(app, user):
-    """Local writes bump last_sync_at and do not probe last_activities."""
+def test_note_user_media_write_stores_activities_fingerprint(app, user):
+    """Local writes bump last_sync_at and store last_activities so the next load does not full-pull lists."""
     from models import User
     from services.user_media_sync import note_user_media_write
 
@@ -212,16 +212,24 @@ def test_note_user_media_write_extends_ttl_without_trakt_get(app, user):
         user_obj.trakt_activities_json = json.dumps(old_fp)
         db.session.commit()
 
-        with patch('services.user_media_sync.get_last_activities') as probe:
+        activities = {
+            'watchlist': {'updated_at': '2026-08-16T22:00:00.000Z'},
+            'lists': {'updated_at': '2026-08-16T22:00:00.000Z'},
+            'ratings': {'updated_at': '2026-08-16T22:00:00.000Z'},
+            'movies': {
+                'watchlisted_at': '2026-08-16T22:00:00.000Z',
+                'rated_at': '2026-08-16T22:00:00.000Z',
+            },
+        }
+        with patch('services.user_media_sync.get_last_activities', return_value=activities) as probe:
             note_user_media_write(user_obj, media_types=('movie',), aspects=('ratings',))
 
-        probe.assert_not_called()
+        probe.assert_called_once()
         db.session.refresh(user_obj)
         stored = json.loads(user_obj.trakt_activities_json or '{}')
-        assert stored == old_fp
+        assert stored.get('watchlist') == '2026-08-16T22:00:00.000Z'
+        assert stored.get('lists') == '2026-08-16T22:00:00.000Z'
         assert user_obj.last_sync_at > datetime(2026, 8, 1)
-        assert stored.get('watchlist') == '2026-08-01T00:00:00.000Z'
-        assert stored.get('movies_watchlisted') == '2026-08-01T00:00:00.000Z'
 
 
 def test_my_movies_lists_set_overrides_defaults(app, client, user):

@@ -30,6 +30,7 @@ from services.sync_jobs import (
     sync_catalog,
     sync_providers_for_media,
 )
+from services.user_media_sync import ensure_user_media_fresh
 
 catalog_bp = Blueprint('catalog', __name__)
 
@@ -1327,6 +1328,16 @@ def api_lists_membership(media_type, trakt_id):
         if lid == WATCHLIST_LIST_ID or lid in visible_ids
     ]
 
+    # Pick up trakt.tv watchlist/list moves even if the 2h membership TTL is
+    # still “fresh” from an earlier page load or in-app write.
+    try:
+        ensure_user_media_fresh(current_user, media_types=(media_type,), force=False)
+        st = UserMediaState.query.filter_by(
+            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
+        ).first()
+    except Exception as exc:
+        current_app.logger.warning('List membership cache refresh failed: %s', exc)
+
     if request.method == 'GET':
         try:
             # Local cache only — never paginate personal lists here. My pages
@@ -1382,14 +1393,15 @@ def api_lists_membership(media_type, trakt_id):
 
     try:
         # Diff against local membership cache only (no list_contains_item).
+        # Unchecked Wishlist always removes on Trakt — skipping when the local
+        # row already said off left a stale Trakt watchlist in place, and a
+        # later sync pulled the title back onto My Shows.
         if want_watchlist:
             if not (st and st.on_watchlist):
                 trakt_client.add_to_watchlist(current_user, media_type, trakt_id)
             on_watchlist = True
         else:
-            # Remove when local says on, or clear-all (empty selection).
-            if (st and st.on_watchlist) or clear_all:
-                trakt_client.remove_from_watchlist(current_user, media_type, trakt_id)
+            trakt_client.remove_from_watchlist(current_user, media_type, trakt_id)
             on_watchlist = False
 
         if clear_all:
@@ -1400,6 +1412,7 @@ def api_lists_membership(media_type, trakt_id):
                 media_type=media_type,
                 trakt_id=trakt_id,
             ).all()
+            removed_ids = set()
             for mem in mems:
                 trakt_client.remove_from_list(
                     current_user, mem.list_id, media_type, trakt_id,
@@ -1407,6 +1420,15 @@ def api_lists_membership(media_type, trakt_id):
                 set_list_membership(
                     current_user.id, mem.list_id, media_type, trakt_id, on_list=False
                 )
+                removed_ids.add(mem.list_id)
+            # Local cache can already say off while Trakt still has the title
+            # (skipped remove). A later membership pull then puts it back on
+            # My Shows. Always tell Trakt to drop visible lists too.
+            for lst in visible:
+                if lst['id'] not in removed_ids:
+                    trakt_client.remove_from_list(
+                        current_user, lst['id'], media_type, trakt_id,
+                    )
         else:
             for lst in visible:
                 lid = lst['id']
@@ -1422,11 +1444,16 @@ def api_lists_membership(media_type, trakt_id):
                     set_list_membership(
                         current_user.id, lid, media_type, trakt_id, on_list=True
                     )
-                elif not want and currently:
-                    trakt_client.remove_from_list(current_user, lid, media_type, trakt_id)
-                    set_list_membership(
-                        current_user.id, lid, media_type, trakt_id, on_list=False
+                elif not want:
+                    # Unchecked lists always remove on Trakt — same leftover
+                    # problem as Wishlist (TV Show Favs coming back on My Shows).
+                    trakt_client.remove_from_list(
+                        current_user, lid, media_type, trakt_id,
                     )
+                    if currently:
+                        set_list_membership(
+                            current_user.id, lid, media_type, trakt_id, on_list=False
+                        )
 
         # Re-load after set_list_membership / _upsert_state may have created the row
         # in this same session (stale ``st is None`` caused duplicate INSERT).

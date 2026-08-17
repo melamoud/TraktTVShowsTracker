@@ -2,8 +2,17 @@
 
 from unittest.mock import patch
 
+import pytest
+
 from models import UserListMembership, UserMediaState, UserPreference, db
 from tests.conftest import login_client
+
+
+@pytest.fixture(autouse=True)
+def _skip_membership_bulk_sync():
+    """Membership tests stub last_activities so they do not hit Trakt."""
+    with patch('routes.catalog_routes.ensure_user_media_fresh', return_value=False):
+        yield
 
 
 def test_lists_membership_get_wishlist_first(app, client, user):
@@ -292,7 +301,8 @@ def test_lists_membership_post_empty_selected_removes_all(app, client, user):
     assert data['on_watchlist'] is False
     assert data['selected'] == []
     rm_wl.assert_called_once()
-    rm_list.assert_called_once()
+    removed = {call.args[1] for call in rm_list.call_args_list}
+    assert removed == {'55', '66'}
     add_wl.assert_not_called()
     add_list.assert_not_called()
     # Clear-all must not paginate every personal list (that was the hang).
@@ -326,6 +336,34 @@ def test_lists_membership_post_removes_watchlist_even_if_local_stale(app, client
     assert resp.get_json()['on_watchlist'] is False
     rm_wl.assert_called_once()
     add_wl.assert_not_called()
+
+
+def test_lists_membership_post_removes_unchecked_list_even_if_local_stale(
+    app, client, user,
+):
+    """Unchecked personal lists always call Trakt remove (Favs leftover → My Shows)."""
+    login_client(client, app, user)
+    personal = [
+        {'id': '21576412', 'slug': 'tv-show-favs-favorites', 'name': 'TV Show Favs Favorites'},
+        {'id': '36680464', 'slug': 'stop-watching-mid-way', 'name': 'Stop watching mid way'},
+    ]
+
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
+         patch('routes.catalog_routes.trakt_client.remove_from_watchlist'), \
+         patch('routes.catalog_routes.trakt_client.add_to_watchlist') as add_wl, \
+         patch('routes.catalog_routes.trakt_client.add_to_list') as add_list, \
+         patch('routes.catalog_routes.trakt_client.remove_from_list') as rm_list, \
+         patch('services.user_media_sync.note_user_media_write'):
+        resp = client.post(
+            '/api/lists/membership/show/145781',
+            json={'selected': ['36680464']},
+        )
+
+    assert resp.status_code == 200
+    add_wl.assert_not_called()
+    add_list.assert_called_once()
+    removed = {call.args[1] for call in rm_list.call_args_list}
+    assert '21576412' in removed
 
 
 def test_preferences_list_show_and_default(app, client, user):

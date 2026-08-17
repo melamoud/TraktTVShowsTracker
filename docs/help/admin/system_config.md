@@ -18,7 +18,7 @@ Each cache object decision is written to `logs/app.log` as `Cache user_media hit
 
 ## Trakt read cache
 
-**Admin → Scheduler** also has **Trakt read cache TTL (hours)** (default `2`). Page loads — including browser Back — read SQLite for that user’s watchlist, lists, calendar, per-show progress, recommendations, and Search results. Trakt is contacted when **that object** is older than the TTL, after **Refresh from Trakt**, or when an in-app write could not update the local object. Progress, My, Latest tags, Recs tags, and Alerts share the same title/progress rows, so a watch on Progress is what Alerts sees. Changes made only on trakt.tv wait for the TTL or a manual refresh.
+**Admin → Scheduler** also has **Trakt read cache TTL (hours)** (default `2`). Page loads — including browser Back — read SQLite for calendar, per-show progress, recommendations, Search results, and list *names*. Watchlist and personal-list **membership** always cheap-check Trakt `last_activities` on My / Set lists and refresh when those timestamps moved (including moves made on trakt.tv). Other objects contact Trakt when they are older than the TTL, after **Refresh from Trakt**, or when an in-app write could not update the local object. Progress, My, Latest tags, Recs tags, and Alerts share the same title/progress rows, so a watch on Progress is what Alerts sees.
 
 ## Environment variables
 

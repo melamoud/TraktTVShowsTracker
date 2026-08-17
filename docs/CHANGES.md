@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-16 — Don’t put dropped shows back on Wishlist
+
+- My Shows/Movies always check Trakt `last_activities` (the 2h cache TTL no longer skips that). Moving Silo / Daredevil / etc. off Wishlist onto a “stop watching” list on trakt.tv was invisible for hours; opening **Set lists** and Save then wrote the old ticks back to Trakt
+- Unchecking Wishlist **or** a personal list (e.g. TV Show Favs) on Save always removes it on Trakt, even if the local row already said off — a later sync was putting those titles back on My Shows
+- After an in-app list save, store `last_activities` so the next page load does not full-pull lists and re-import a lagging Trakt GET
+
 ## 2026-08-16 — Set Found on from Android lists
 
 - My Shows, My Movies, and Search cards can set **Found on…** from the ⋮ menu (same picker as the website and the title page)
