@@ -35,6 +35,7 @@ import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
 import com.melamoud.tvtracker.ui.components.FilterMenuButton
+import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
 import com.melamoud.tvtracker.ui.components.RateDialog
@@ -145,6 +146,7 @@ fun MyMediaScreen(
                             showNewestAired = displayMode == "newest_aired",
                             onPin = { viewModel.pin(item) },
                             onLists = { viewModel.openLists(item) },
+                            onFoundOn = { viewModel.openFoundOn(item) },
                             onWatched = { viewModel.confirmWatch(item) },
                             onRate = { viewModel.openRate(item) },
                             onFavorite = { viewModel.favorite(item) },
@@ -189,6 +191,14 @@ fun MyMediaScreen(
             defaults = dialog.defaults,
             onApply = viewModel::applyLists,
             onDismiss = viewModel::dismissLists,
+        )
+    }
+    state.foundOnDialog?.let { dialog ->
+        FoundOnDialog(
+            selected = dialog.item.foundOn,
+            choices = dialog.choices,
+            onApply = viewModel::applyFoundOn,
+            onDismiss = viewModel::dismissFoundOn,
         )
     }
 }

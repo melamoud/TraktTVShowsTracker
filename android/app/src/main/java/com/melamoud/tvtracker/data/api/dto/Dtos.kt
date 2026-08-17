@@ -117,6 +117,7 @@ data class MyMediaResponse(
     val avail: String? = null,
     val display: String? = null,
     val title: String? = null,
+    @SerializedName("found_on_choices") val foundOnChoices: List<String> = emptyList(),
 )
 
 data class SearchResponse(
@@ -138,6 +139,7 @@ data class SearchResponse(
     @SerializedName("actor_q") val actorQ: String? = null,
     @SerializedName("actor_id") val actorId: Int? = null,
     @SerializedName("actor_name") val actorName: String? = null,
+    @SerializedName("found_on_choices") val foundOnChoices: List<String> = emptyList(),
 )
 
 data class EpisodeIdsDto(
@@ -315,6 +317,12 @@ data class FoundOnResponse(
     val success: Boolean,
     val message: String? = null,
     @SerializedName("found_on") val foundOn: List<String> = emptyList(),
+)
+
+data class FoundOnChoicesResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val choices: List<String> = emptyList(),
 )
 
 data class FeedbackResponse(

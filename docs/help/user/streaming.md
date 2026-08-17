@@ -16,7 +16,7 @@ Shown on **Latest** tiles (and detail pages) as **Streaming:**.
 Used on **My movies / My shows** (and detail).
 
 - Local only — never written to Trakt
-- Click **Found on…** and select **one or more** services (including your custom ones)
+- Click **Found on…** (website cards, Android ⋮ menu, or the title page) and select **one or more** services (including your custom ones)
 - Each service row has a **Search** link that opens that site for the current title (new tab) — no need to save first, and no need to wait for TMDB/streaming mapping
 - Services that TMDB lists for the title are **highlighted** as a hint; you still choose what you actually use
 - The tile shows only the services **you** saved

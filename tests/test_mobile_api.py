@@ -60,10 +60,12 @@ def test_my_movies_and_alerts_json(app, client, user):
     assert body['media_type'] == 'movie'
     assert 'items' in body
     assert 'filter_lists' in body
+    assert 'found_on_choices' in body
 
     shows = client.get('/api/v1/my/shows')
     assert shows.status_code == 200
     assert shows.get_json()['media_type'] == 'show'
+    assert 'found_on_choices' in shows.get_json()
 
     alerts = client.get('/api/v1/alerts')
     assert alerts.status_code == 200
@@ -187,6 +189,17 @@ def test_search_json_empty_query(app, client, user):
     assert 'year' in data
     assert 'genres' in data
     assert data['genre_choices']
+    assert 'found_on_choices' in data
+
+
+def test_found_on_choices_v1(app, client, user):
+    login_client(client, app, user)
+    resp = client.get('/api/v1/found-on/choices')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert data['success'] is True
+    assert isinstance(data['choices'], list)
+    assert data['choices']
 
 
 def test_search_json_year_and_genre_filter(app, client, user):

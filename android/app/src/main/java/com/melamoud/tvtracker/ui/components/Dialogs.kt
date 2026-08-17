@@ -136,7 +136,7 @@ fun FoundOnDialog(
     var other by remember { mutableStateOf(extraInitial) }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Found on") },
+        title = { Text("Where did you find it?") },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 choices.forEach { name ->

@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
+import com.melamoud.tvtracker.ui.media.FoundOnDialogState
 import com.melamoud.tvtracker.ui.media.ListsDialogState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,8 @@ data class SearchUiState(
     val pages: Int = 1,
     val total: Int = 0,
     val listsDialog: ListsDialogState? = null,
+    val foundOnDialog: FoundOnDialogState? = null,
+    val foundOnChoices: List<String> = emptyList(),
     val rateTarget: MediaItemDto? = null,
     val watchConfirm: MediaItemDto? = null,
     val actorId: Int? = null,
@@ -61,6 +64,7 @@ class SearchViewModel(
                     year = if (persistYear) cur.year else (it.year ?: cur.year),
                     genres = if (persistGenres) cur.genres else it.genres.toSet(),
                     genreChoices = it.genreChoices.ifEmpty { cur.genreChoices },
+                    foundOnChoices = it.foundOnChoices.ifEmpty { cur.foundOnChoices },
                 )
             }
         }
@@ -151,6 +155,7 @@ class SearchViewModel(
                     year = it.year ?: s.year,
                     genres = if (it.genres.isNotEmpty() || s.genres.isEmpty()) it.genres.toSet() else s.genres,
                     genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
+                    foundOnChoices = it.foundOnChoices.ifEmpty { s.foundOnChoices },
                     error = it.fetchError,
                     actorId = it.actorId ?: s.actorId,
                     actorName = it.actorName?.takeIf { name -> name.isNotBlank() } ?: s.actorName,
@@ -173,6 +178,31 @@ class SearchViewModel(
         _state.value = _state.value.copy(listsDialog = null)
         viewModelScope.launch {
             repo.listsSet(dialog.item.mediaType ?: "movie", dialog.item.traktId, selected)
+            search()
+        }
+    }
+
+    fun openFoundOn(item: MediaItemDto) {
+        val cached = _state.value.foundOnChoices
+        if (cached.isNotEmpty()) {
+            _state.value = _state.value.copy(foundOnDialog = FoundOnDialogState(item, cached))
+            return
+        }
+        viewModelScope.launch {
+            repo.foundOnChoices().onSuccess {
+                _state.value = _state.value.copy(
+                    foundOnChoices = it.choices,
+                    foundOnDialog = FoundOnDialogState(item, it.choices),
+                )
+            }
+        }
+    }
+    fun dismissFoundOn() { _state.value = _state.value.copy(foundOnDialog = null) }
+    fun applyFoundOn(labels: List<String>) {
+        val dialog = _state.value.foundOnDialog ?: return
+        _state.value = _state.value.copy(foundOnDialog = null)
+        viewModelScope.launch {
+            repo.foundOn(dialog.item.mediaType ?: "movie", dialog.item.traktId, labels)
             search()
         }
     }

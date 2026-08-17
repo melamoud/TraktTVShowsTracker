@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-16 — Set Found on from Android lists
+
+- My Shows, My Movies, and Search cards can set **Found on…** from the ⋮ menu (same picker as the website and the title page)
+- List and Search JSON include `found_on_choices`; the app can also load them from `GET /api/v1/found-on/choices`
+
 ## 2026-08-16 — Compact alert cards
 
 - Alerts put episode name and air date on the title line; movies show the release date (not “available on”)

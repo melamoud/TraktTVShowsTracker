@@ -8,6 +8,7 @@ import com.melamoud.tvtracker.data.api.dto.CommentResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteResponse
 import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
+import com.melamoud.tvtracker.data.api.dto.FoundOnChoicesResponse
 import com.melamoud.tvtracker.data.api.dto.FoundOnResponse
 import com.melamoud.tvtracker.data.api.dto.ListsResponse
 import com.melamoud.tvtracker.data.api.dto.MeResponse
@@ -147,6 +148,9 @@ interface TvTrackerApi {
         @Path("mediaType") mediaType: String,
         @Path("traktId") traktId: Int,
     ): MediaDetailResponse
+
+    @GET("/api/v1/found-on/choices")
+    suspend fun foundOnChoices(): FoundOnChoicesResponse
 
     @POST("/api/v1/found-on/{mediaType}/{traktId}")
     suspend fun foundOn(

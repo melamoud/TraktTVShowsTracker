@@ -25,6 +25,8 @@ data class MyMediaUiState(
     val total: Int = 0,
     val filterLists: List<FilterListDto> = emptyList(),
     val listsDialog: ListsDialogState? = null,
+    val foundOnDialog: FoundOnDialogState? = null,
+    val foundOnChoices: List<String> = emptyList(),
     val rateTarget: MediaItemDto? = null,
     val watchConfirm: MediaItemDto? = null,
 )
@@ -33,6 +35,11 @@ data class ListsDialogState(
     val item: MediaItemDto,
     val lists: List<ListMembershipDto>,
     val defaults: List<String>,
+)
+
+data class FoundOnDialogState(
+    val item: MediaItemDto,
+    val choices: List<String>,
 )
 
 class MyMediaViewModel(
@@ -77,6 +84,7 @@ class MyMediaViewModel(
                         pages = it.pages,
                         total = it.total,
                         filterLists = it.filterLists,
+                        foundOnChoices = it.foundOnChoices.ifEmpty { _state.value.foundOnChoices },
                     )
                 },
                 onFailure = { _state.value.copy(loading = false, error = it.message) },
@@ -162,6 +170,31 @@ class MyMediaViewModel(
         _state.value = _state.value.copy(listsDialog = null)
         viewModelScope.launch {
             repo.listsSet(mediaType, dialog.item.traktId, selected)
+            reload()
+        }
+    }
+
+    fun openFoundOn(item: MediaItemDto) {
+        val cached = _state.value.foundOnChoices
+        if (cached.isNotEmpty()) {
+            _state.value = _state.value.copy(foundOnDialog = FoundOnDialogState(item, cached))
+            return
+        }
+        viewModelScope.launch {
+            repo.foundOnChoices().onSuccess {
+                _state.value = _state.value.copy(
+                    foundOnChoices = it.choices,
+                    foundOnDialog = FoundOnDialogState(item, it.choices),
+                )
+            }
+        }
+    }
+    fun dismissFoundOn() { _state.value = _state.value.copy(foundOnDialog = null) }
+    fun applyFoundOn(labels: List<String>) {
+        val dialog = _state.value.foundOnDialog ?: return
+        _state.value = _state.value.copy(foundOnDialog = null)
+        viewModelScope.launch {
+            repo.foundOn(mediaType, dialog.item.traktId, labels)
             reload()
         }
     }

@@ -158,6 +158,7 @@ def api_my_media(media_type):
         'avail': ctx.get('avail') or '',
         'display': ctx.get('display_mode') or 'list',
         'title': ctx.get('title'),
+        'found_on_choices': found_on_service_choices(current_user),
     })
 
 
@@ -188,6 +189,7 @@ def api_search():
         'genres': ctx.get('filter_genres') or [],
         'genre_choices': ctx.get('genre_choices') or [],
         'fetch_error': ctx.get('fetch_error'),
+        'found_on_choices': found_on_service_choices(current_user),
     })
 
 
@@ -208,6 +210,15 @@ def api_catalog_detail(media_type, trakt_id):
         found_on_service_choices(current_user),
     )
     return jsonify({'success': True, **payload})
+
+
+@mobile_api_bp.route('/found-on/choices', methods=['GET'])
+@login_required
+def api_found_on_choices():
+    return jsonify({
+        'success': True,
+        'choices': found_on_service_choices(current_user),
+    })
 
 
 @mobile_api_bp.route('/found-on/<media_type>/<int:trakt_id>', methods=['POST'])

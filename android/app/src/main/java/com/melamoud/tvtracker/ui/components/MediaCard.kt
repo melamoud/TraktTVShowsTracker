@@ -51,6 +51,7 @@ fun MediaCard(
     showNewestAired: Boolean = false,
     onPin: () -> Unit,
     onLists: () -> Unit,
+    onFoundOn: () -> Unit,
     onWatched: () -> Unit,
     onRate: () -> Unit,
     onFavorite: () -> Unit,
@@ -176,6 +177,10 @@ fun MediaCard(
                         DropdownMenuItem(
                             text = { Text("Set lists…") },
                             onClick = { menuOpen = false; onLists() },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Found on…") },
+                            onClick = { menuOpen = false; onFoundOn() },
                         )
                         DropdownMenuItem(
                             text = { Text(if (item.rating != null) "Rate ${item.rating}/10" else "Rate…") },

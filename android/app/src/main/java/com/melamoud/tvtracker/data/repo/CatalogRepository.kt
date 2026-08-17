@@ -7,6 +7,7 @@ import com.melamoud.tvtracker.data.api.dto.AlertsResponse
 import com.melamoud.tvtracker.data.api.dto.CommentResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
 import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
+import com.melamoud.tvtracker.data.api.dto.FoundOnChoicesResponse
 import com.melamoud.tvtracker.data.api.dto.FoundOnResponse
 import com.melamoud.tvtracker.data.api.dto.ListsResponse
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
@@ -131,6 +132,10 @@ class CatalogRepository(private val api: TvTrackerApi) {
 
     suspend fun catalogDetail(mediaType: String, traktId: Int): Result<MediaDetailResponse> =
         runCatching { api.catalogDetail(mediaType, traktId) }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun foundOnChoices(): Result<FoundOnChoicesResponse> =
+        runCatching { api.foundOnChoices() }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
     suspend fun foundOn(mediaType: String, traktId: Int, labels: List<String>): Result<FoundOnResponse> =
