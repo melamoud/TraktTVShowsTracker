@@ -126,7 +126,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
                data-trakt-id="{{ m.trakt_id }}"
                data-title="{{ m.title|e }}">
         <div class="media-poster-col">
-          <a class="media-poster" href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">
+          <a class="media-poster" href="{{ media_detail_url(media_type, m.trakt_id) }}">
             {% if m.poster_url %}
               <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
             {% else %}
@@ -137,7 +137,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
         </div>
         <div class="media-body">
           <h2 class="media-title">
-            <a href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=m.trakt_id) }}">
+            <a href="{{ media_detail_url(media_type, m.trakt_id) }}">
               {{ m.title }}{% if m.year %} ({{ m.year }}){% endif %}
             </a>
             <span class="meta"> · {{ 'Movie' if media_type == 'movie' else 'Show' }}</span>

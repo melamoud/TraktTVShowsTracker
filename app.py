@@ -129,6 +129,8 @@ def create_app(config_object=Config):
 
     from services.found_on_links import found_on_open_url as _found_on_open_url
     app.add_template_global(_found_on_open_url, name='found_on_open_url')
+    from routes.catalog_routes import media_detail_url as _media_detail_url
+    app.add_template_global(_media_detail_url, name='media_detail_url')
 
     from routes import register_routes
     register_routes(app)

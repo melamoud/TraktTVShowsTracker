@@ -26,7 +26,7 @@ A batch of episodes airing the same day only counts as a **season** alert when t
 Each alert is a compact card: poster, then **title + date** on one line (with the type tag). Type tags: New episode, Season out, Released, Now streaming.
 
 - Episode alerts add **S#E# — episode title · aired date** on that title line. Movie **Released** / **Now streaming** alerts show the movie’s release date — not “Title is available on Service” (the service is the type tag plus streaming chips). **Also streaming** (other services) is its own row above **Found on** / **Plays on your services**, which share a line — **teal** = on one of your services, gray = elsewhere (kept current at view time).
-- Episode/season alerts have a **Progress** button that opens the progress **side panel** in place — mark episodes watched without leaving Alerts. **Details** goes to the full title page.
+- Episode/season alerts have a **Progress** button that opens the progress **side panel** in place — mark episodes watched without leaving Alerts. **Details** goes to the full title page; **← Back** there returns to Alerts.
 - **Mark read/unread** dims or brightens the card; the nav badge counts unread.
 - On the next **alert refresh**, movie release/streaming alerts auto-mark read when the movie is watched on Trakt, and episode/season alerts auto-mark read when that episode (or every episode in the season drop) is watched on Trakt.
 - **Immediately** when you click **Watch** / **Mark season watched** / **Mark watched** in this app (Progress or title cards), matching alerts for that episode/season/movie are marked read without waiting for the next refresh. On Android, the Alerts list also reloads when you return from Progress.

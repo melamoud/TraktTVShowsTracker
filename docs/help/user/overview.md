@@ -11,7 +11,7 @@ TraktTV Shows Tracker helps you review newly listed movies and shows on Trakt, h
 - **Search** — Trakt-wide title and/or actor search; actor / year / genres sit in **More filters**; defaults hide watched + already-listed titles; each list page also has in-list title search plus **Search actor** in More filters
 - **Availability** — under-poster chips + filters for Upcoming (>30d), Theater window (±30d), and Streaming
 - **Series progress** — mark seasons/episodes; **Rate / Review** dialog (rating + comment + optional watch); updates Trakt
-- **Title detail** — open a movie/show page for cast (favorite / search titles by actor), **Write review…**, rate / favorite / lists
+- **Title detail** — open a movie/show page for cast (favorite / search titles by actor), **Write review…**, rate / favorite / lists. **← Back** returns to the list you came from (Search, My, Latest, Recs, Alerts)
 - **Alerts** — automatic in-app alerts for collection titles (release date, new streaming, episodes/seasons); toggles in Preferences
 - **Android app** — My Shows / My Movies / Search / Alerts / Progress, plus movie/show **title pages** (tap a card). Latest and Recommended stay on the website for now. See [Android app](android).
 

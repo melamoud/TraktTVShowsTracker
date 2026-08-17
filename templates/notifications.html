@@ -40,7 +40,7 @@
       {% if m %}
         <div class="media-poster-col">
           <a class="media-poster"
-             href="{{ url_for('catalog.media_detail', media_type=m.media_type, trakt_id=m.trakt_id) }}">
+             href="{{ media_detail_url(m.media_type, m.trakt_id) }}">
             {% if m.poster_url %}
               <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
             {% else %}
@@ -53,7 +53,7 @@
         <h2 class="media-title alert-title">
           <span class="alert-title-main">
             {% if m %}
-              <a href="{{ url_for('catalog.media_detail', media_type=m.media_type, trakt_id=m.trakt_id) }}">{{ m.title }}</a>
+              <a href="{{ media_detail_url(m.media_type, m.trakt_id) }}">{{ m.title }}</a>
             {% else %}
               {{ n.title }}
             {% endif %}
@@ -100,7 +100,7 @@
           {% endif %}
           {% if m %}
             <a class="btn btn-small"
-               href="{{ url_for('catalog.media_detail', media_type=m.media_type, trakt_id=m.trakt_id) }}">Details</a>
+               href="{{ media_detail_url(m.media_type, m.trakt_id) }}">Details</a>
           {% elif n.link %}
             <a class="btn btn-small" href="{{ n.link }}">View</a>
           {% endif %}

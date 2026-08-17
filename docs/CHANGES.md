@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-17 — Title-page Back returns to Search (and other lists)
+
+- The in-app **← Back** on a movie/show title page goes to the page you opened it from (Search, My, Latest, Recs, Alerts), not always Latest movies/shows
+
 ## 2026-08-16 — Don’t put dropped shows back on Wishlist
 
 - My Shows/Movies always check Trakt `last_activities` (the 2h cache TTL no longer skips that). Moving Silo / Daredevil / etc. off Wishlist onto a “stop watching” list on trakt.tv was invisible for hours; opening **Set lists** and Save then wrote the old ticks back to Trakt

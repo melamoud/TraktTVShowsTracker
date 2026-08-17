@@ -3,6 +3,7 @@ Catalog routes: home, latest movies/shows, detail, review markers, Trakt actions
 """
 
 from datetime import datetime
+from urllib.parse import urlparse
 
 from flask import (
     Blueprint, abort, current_app, flash, jsonify, redirect, render_template,
@@ -33,6 +34,64 @@ from services.sync_jobs import (
 from services.user_media_sync import ensure_user_media_fresh
 
 catalog_bp = Blueprint('catalog', __name__)
+
+# In-app ← Back on the title page. Only same-origin listing URLs (not /catalog/).
+_DETAIL_BACK_PREFIXES = (
+    '/search',
+    '/latest/',
+    '/my/',
+    '/recommendations/',
+    '/notifications',
+)
+
+
+def safe_internal_back(raw: str | None) -> str | None:
+    """Return a same-origin listing path, or None if ``raw`` is not a safe back target."""
+    if not raw:
+        return None
+    parsed = urlparse(raw.strip())
+    if parsed.scheme or parsed.netloc:
+        host = (request.host or '').split(':')[0]
+        netloc_host = (parsed.hostname or '').split(':')[0]
+        if not netloc_host or netloc_host.lower() != host.lower():
+            return None
+    path = parsed.path or ''
+    if not path.startswith('/') or path.startswith('//'):
+        return None
+    allowed = path == '/' or any(
+        path == prefix.rstrip('/') or path.startswith(prefix)
+        for prefix in _DETAIL_BACK_PREFIXES
+    )
+    if not allowed:
+        return None
+    return path + (('?' + parsed.query) if parsed.query else '')
+
+
+def current_listing_path() -> str:
+    """Current request path + query, without a trailing empty ``?``."""
+    path = request.full_path or request.path or ''
+    return path[:-1] if path.endswith('?') else path
+
+
+def media_detail_url(media_type, trakt_id) -> str:
+    """Title-page URL that carries ``next`` so ← Back returns to this listing."""
+    kwargs = {'media_type': media_type, 'trakt_id': int(trakt_id)}
+    here = current_listing_path()
+    if safe_internal_back(here):
+        kwargs['next'] = here
+    return url_for('catalog.media_detail', **kwargs)
+
+
+def detail_back_url(media_type: str) -> str:
+    """Where the title-page ← Back link should go."""
+    fallback = url_for(
+        'catalog.latest_movies' if media_type == 'movie' else 'catalog.latest_shows'
+    )
+    return (
+        safe_internal_back(request.args.get('next'))
+        or safe_internal_back(request.referrer)
+        or fallback
+    )
 
 
 def _personal_lists(user) -> list[dict]:
@@ -1082,6 +1141,7 @@ def media_detail(media_type, trakt_id):
         genres=result.get('genres') or [],
         cast=result.get('cast') or [],
         main_cast_limit=MAIN_CAST_LIMIT,
+        back_url=detail_back_url(media_type),
     )
 
 

@@ -149,7 +149,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   <section class="cal-day-list">
     {% if day.events %}
       {% for ev in day.events %}
-        <a class="cal-event card" href="{{ url_for('catalog.media_detail', media_type=ev.media_type, trakt_id=ev.trakt_id) }}">
+        <a class="cal-event card" href="{{ media_detail_url(ev.media_type, ev.trakt_id) }}">
           {% if ev.poster_url %}
             <img class="cal-thumb" src="{{ ev.poster_url }}" alt="" width="40" height="60" loading="lazy">
           {% endif %}
@@ -171,7 +171,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
         <div class="cal-date">{{ day.date.day }}</div>
         <div class="cal-events">
           {% for ev in day.events %}
-            <a class="cal-event" href="{{ url_for('catalog.media_detail', media_type=ev.media_type, trakt_id=ev.trakt_id) }}"
+            <a class="cal-event" href="{{ media_detail_url(ev.media_type, ev.trakt_id) }}"
                title="{{ ev.title }}{% if ev.label %} — {{ ev.label }}{% endif %}">
               {% if ev.poster_url %}
                 <img class="cal-thumb" src="{{ ev.poster_url }}" alt="" width="28" height="42" loading="lazy">
@@ -210,7 +210,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
              data-title="{{ (m.title if m else st.trakt_id)|e }}"
              {% if m and m.year %}data-year="{{ m.year }}"{% endif %}>
       <div class="media-poster-col">
-        <a class="media-poster" href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=st.trakt_id) }}">
+        <a class="media-poster" href="{{ media_detail_url(media_type, st.trakt_id) }}">
           {% if m and m.poster_url %}
             <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
           {% else %}
@@ -222,7 +222,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <div class="media-body">
         <h2 class="media-title">
           {% if m %}
-            <a href="{{ url_for('catalog.media_detail', media_type=media_type, trakt_id=st.trakt_id) }}">
+            <a href="{{ media_detail_url(media_type, st.trakt_id) }}">
               {{ m.title }}{% if m.year %} ({{ m.year }}){% endif %}
             </a>
           {% else %}

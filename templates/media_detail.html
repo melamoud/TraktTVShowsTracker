@@ -2,7 +2,7 @@
 {% set m = row.media %}
 {% block title %}{{ m.title }} — {{ app_name }}{% endblock %}
 {% block content %}
-<p><a href="{{ url_for('catalog.latest_movies' if media_type == 'movie' else 'catalog.latest_shows') }}">← Back</a></p>
+<p><a href="{{ back_url }}">← Back</a></p>
 
 <div class="detail-layout">
   <div class="detail-poster">
