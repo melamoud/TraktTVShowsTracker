@@ -2,14 +2,16 @@
 {% block title %}Alerts — {{ app_name }}{% endblock %}
 {% block content %}
 <div class="toolbar">
-  <h1 style="margin:0;">Alerts</h1>
+  {% set heading = 'Alerts' %}
+  {% set help_topic = 'release_alerts' %}
+  {% include '_page_heading.html' %}
   <div class="pill-row">
     {% if hide_read %}
-      <span class="pill on">Hiding read</span>
-      <a class="pill" href="?hide_read=0">Show read</a>
+      <span class="pill on" title="Unread alerts stay brighter; read rows are hidden">Hiding read</span>
+      <a class="pill" href="?hide_read=0" title="Show already-read alerts (dimmed)">Show read</a>
     {% else %}
-      <a class="pill" href="?hide_read=1">Hide read</a>
-      <span class="pill on">Showing all</span>
+      <a class="pill" href="?hide_read=1" title="Hide already-read alerts">Hide read</a>
+      <span class="pill on" title="Unread alerts are brighter; dimmed rows are already read">Showing all</span>
     {% endif %}
   </div>
   <div class="actions" style="margin:0;">
@@ -27,10 +29,7 @@
       </form>
     {% endif %}
   </div>
-</div><p class="meta" style="margin-top:.35rem;">
-  Unread alerts are brighter. Dimmed rows are already read.
-  {% if hide_read %}Read alerts are hidden — toggle above to show them.{% endif %}
-</p>
+</div>
 
 <div class="media-list">
   {% for card in cards %}

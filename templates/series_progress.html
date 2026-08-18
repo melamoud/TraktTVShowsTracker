@@ -2,12 +2,8 @@
 {% block title %}Progress — {{ title }}{% endblock %}
 {% block content %}
 <p><a href="{{ url_for('user.my_shows') }}">← My shows</a></p>
-<h1>{{ title }}</h1>
-<p class="muted">
-  Watched marks come from your Trakt <strong>watch history</strong> (same source as the episode ✓ list),
-  not Trakt’s season “0 eps” progress bar — that bar is often wrong.
-  Counts above are regular seasons only; specials are listed separately at the bottom.
-  Updates write back to Trakt immediately.
-</p>
+{% set heading = title %}
+{% set help_topic = 'series_progress' %}
+{% include '_page_heading.html' %}
 {% include '_series_progress_body.html' %}
 {% endblock %}

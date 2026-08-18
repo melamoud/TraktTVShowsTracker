@@ -12,7 +12,7 @@ Filter choices (status, Lists…, titles per page) are remembered for your accou
 
 **View: List / Newest aired / Weekly / Daily / Monthly** — switch between the normal title rows, a **Newest aired** sort (shows sorted by the air date of their latest episode — including shows you’re caught up on — movies by release date; future titles hidden), and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** limited to your current **Lists…** selection and status filter; click an entry to open the title. View modes are remembered. **Newest aired** is a pure cache view: the background job keeps last-aired dates fresh (33 days back / 33 ahead via My calendar for watchlisted shows, plus per-show checks for list-only titles), so the page loads instantly even on big collections. Pins stay on top.
 
-**Search titles in this list…** filters by title across the full filtered set (query is not remembered). **More filters** adds year, actor (jumps to Search), and genres. Missing local titles are backfilled from Trakt before the filter runs. For titles not on your lists yet, use nav **Search**.
+**Filter this page…** filters by title across the full filtered set (query is not remembered). **More filters** adds year, actor (jumps to Search), and genres. Missing local titles are backfilled from Trakt before the filter runs. For titles not on your lists yet, use nav **Search**.
 
 **Upcoming / Theater window / Streaming** chips sit under the poster; the same names are filter pills (Theater = ±30 days, Upcoming = >30 days out). The availability filter is remembered like status and view.
 

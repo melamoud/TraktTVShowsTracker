@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Home — {{ app_name }}{% endblock %}
 {% block content %}
-<h1>Home</h1>
-<p class="muted">Review newly listed titles on Trakt, highlight matches to your tastes, and keep progress in sync.</p>
+{% set heading = 'Home' %}
+{% set help_topic = 'overview' %}
+{% include '_page_heading.html' %}
 
 <div class="media-list" style="margin-top:1.25rem;">
   <a class="media-row home-nav" href="{{ url_for('catalog.latest_movies') }}">

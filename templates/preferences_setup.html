@@ -1,11 +1,11 @@
 {% extends "base.html" %}
 {% block title %}Set up preferences — {{ app_name }}{% endblock %}
 {% block content %}
-<h1>What should Latest highlight?</h1>
+{% set heading = 'What should Latest highlight?' %}
+{% set help_topic = 'preferences' %}
+{% include '_page_heading.html' %}
 <p class="muted">
-  Trakt adds a lot of titles every day. Genres and keywords turn on the purple
-  <strong>preference match</strong> filter so Latest defaults to titles you might care about.
-  You can always switch to <strong>Show all</strong> later.
+  Genres and keywords turn on purple preference matches so Latest can hide noisy Trakt updates.
 </p>
 
 <form method="post" class="form-grid" style="margin-top:1.25rem;" novalidate>

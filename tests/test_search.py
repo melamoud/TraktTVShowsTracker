@@ -19,7 +19,8 @@ def test_search_page_prompts_without_query(app, client, user):
     assert '>Movies</' in html
     assert '>Shows</' in html
     assert 'class="active"' in html
-    assert 'aria-current="page">Search</a>' in html
+    assert 'aria-current="page"' in html
+    assert '>Search</a>' in html
     assert 'id="adv-year"' in html
     assert 'name="genre"' in html
     assert 'More filters' in html

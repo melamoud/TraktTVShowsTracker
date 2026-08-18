@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=19">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}?v=20">
   {% block head %}{% endblock %}
 </head>
 <body>
@@ -22,7 +22,8 @@
     <a href="{{ url_for('catalog.recommended_shows') }}" class="{% if ep == 'catalog.recommended_shows' %}active{% endif %}"{% if ep == 'catalog.recommended_shows' %} aria-current="page"{% endif %}>Rec shows</a>
     <a href="{{ url_for('user.my_movies') }}" class="{% if ep == 'user.my_movies' %}active{% endif %}"{% if ep == 'user.my_movies' %} aria-current="page"{% endif %}>My movies</a>
     <a href="{{ url_for('user.my_shows') }}" class="{% if ep in ('user.my_shows', 'user.series_progress') %}active{% endif %}"{% if ep in ('user.my_shows', 'user.series_progress') %} aria-current="page"{% endif %}>My shows</a>
-    <a href="{{ url_for('catalog.search') }}" class="{% if ep == 'catalog.search' %}active{% endif %}"{% if ep == 'catalog.search' %} aria-current="page"{% endif %}>Search</a>
+    <a href="{{ url_for('catalog.search') }}" class="{% if ep == 'catalog.search' %}active{% endif %}"{% if ep == 'catalog.search' %} aria-current="page"{% endif %}
+       title="Search Trakt for new titles (not your lists).">Search</a>
     <a href="{{ url_for('user.preferences') }}" class="{% if ep in ('user.preferences', 'user.preferences_setup') %}active{% endif %}"{% if ep in ('user.preferences', 'user.preferences_setup') %} aria-current="page"{% endif %}>Preferences</a>
     <a href="{{ url_for('user.notifications') }}" class="{% if ep == 'user.notifications' %}active{% endif %}"{% if ep == 'user.notifications' %} aria-current="page"{% endif %}>Alerts{% if unread_notifications %}<span class="badge">{{ unread_notifications }}</span>{% endif %}</a>
     <a href="{{ url_for('user.help_page') }}" class="{% if ep == 'user.help_page' %}active{% endif %}"{% if ep == 'user.help_page' %} aria-current="page"{% endif %}>Help</a>
@@ -159,9 +160,6 @@
         </div>
         <button class="btn btn-small" type="button" id="progress-drawer-close" aria-label="Close progress">Close</button>
       </header>
-      <p class="meta drawer-hint">
-        Watched marks come from Trakt watch history. Use <strong>Rate / Review</strong> to rate, comment, and optionally watch in one step.
-      </p>
       <p class="meta" id="progress-drawer-loading" hidden>Loading progress…</p>
       <div id="progress-drawer-error" hidden>
         <p class="meta" id="progress-drawer-error-text"></p>

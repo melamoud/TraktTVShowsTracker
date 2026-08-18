@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-18 — Shorter page copy; Help on each screen
+
+- Dropped the gray intro under each heading. A **?** next to the title opens that screen’s Help page
+- List pages use **Filter this page…** (not Search) so it is obvious they do not find new titles; nav **Search** is still Trakt-wide
+- Confusing pills and buttons have tooltips (Matches only, Lists…, Hide read, Search actor, and similar)
+
 ## 2026-08-17 — Title-page Back returns to Search (and other lists)
 
 - The in-app **← Back** on a movie/show title page goes to the page you opened it from (Search, My, Latest, Recs, Alerts), not always Latest movies/shows

@@ -17,7 +17,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **On my services** — only titles available on services you marked in Preferences  
 - **Matches only** — purple preference matches  
 - **10 / 50 / 100** per page  
-- **Search titles in this list…** — filter current results by title  
+- **Filter this page…** — filter current results by title  
 - **More filters** — year range, actor (jumps to Search), and genres (any selected)
 
 ## Highlights

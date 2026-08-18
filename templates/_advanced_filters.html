@@ -13,7 +13,7 @@
 {% set _open = has_advanced|default(false) or (_include_actor and (_actor_q or _actor_id or _actor_name)) %}
 {% if collapsed %}
 <details class="adv-filters"{% if _open %} open{% endif %}>
-  <summary>
+  <summary title="Year, actor, and genres. Actor search opens the nav Search page.">
     More filters
     {% if _open %}
       <span class="meta">
@@ -36,7 +36,8 @@
       {% if _include_actor %}
         {% include '_actor_search_fields.html' %}
         {% if actor_jump %}
-          <button class="btn btn-small" type="submit"{% if actor_form_id %} form="{{ actor_form_id }}"{% endif %}>Search actor</button>
+          <button class="btn btn-small" type="submit"{% if actor_form_id %} form="{{ actor_form_id }}"{% endif %}
+                  title="Opens Search in the top nav for this actor (not an in-page filter).">Search actor</button>
         {% endif %}
       {% endif %}
       <input type="hidden" name="genres_set" value="1">

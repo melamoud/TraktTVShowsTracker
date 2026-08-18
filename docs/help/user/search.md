@@ -35,13 +35,13 @@ Year and genres are remembered for your next Search visit (same as Latest / My f
 
 ## Search within a page
 
-My movies / My shows, Latest, and Recommended each have a **Search titles in this list…** box in the toolbar, plus **More filters** (year, actor, genres) that stay collapsed until you open them.
+My movies / My shows, Latest, and Recommended each have a **Filter this page…** box in the toolbar, plus **More filters** (year, actor, genres) that stay collapsed until you open them.
 
 - Filters the **current page’s filters** (lists, watched, matches, etc.) by title, year, and/or genres
 - Year/genres can stand alone on these pages (the list is already loaded)
 - Searches the **full filtered set**, then paginates — not only the current page
 - Title query is **not** remembered when you leave the page (clear with **Clear**, or drop `q` from the URL)
 
-**Search actor** in More filters jumps to the main Search page (so hide-watched, lists, year, and genres still apply).
+**Search actor** in More filters jumps to the main Search page (so hide-watched, lists, year, and genres still apply). It is not an in-page filter.
 
 To find something you do not already have on a list, use the nav **Search** page instead.

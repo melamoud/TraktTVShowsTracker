@@ -67,6 +67,22 @@ a:hover { text-decoration: underline; }
 
 .container { width: min(1200px, calc(100% - 2rem)); margin: 1.25rem auto 3rem; }
 h1, h2, h3 { font-family: var(--font-display); font-weight: 650; letter-spacing: .01em; }
+.page-heading {
+  display: flex; align-items: baseline; gap: .5rem;
+  margin: 0 0 .85rem;
+}
+.page-heading h1 { margin: 0; }
+.page-help {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 1.35rem; height: 1.35rem; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted);
+  font-size: .8rem; font-weight: 700; line-height: 1;
+  flex-shrink: 0; text-decoration: none;
+}
+.page-help:hover {
+  color: var(--accent); border-color: var(--accent); text-decoration: none;
+}
+.toolbar .page-heading { margin: 0; margin-right: auto; }
 .muted { color: var(--muted); }
 .flash-wrap { margin-bottom: 1rem; }
 .flash {
@@ -457,7 +473,6 @@ input[type=text], input[type=url], textarea, select {
 .drawer-heading-wrap { min-width: 0; flex: 1; }
 .drawer-heading-wrap h2 { margin: 0; font-size: 1.25rem; }
 #progress-drawer-title { margin: .25rem 0 0; }
-.drawer-hint { margin: .55rem 1.1rem 0; }
 .drawer-body {
   flex: 1; overflow: auto;
   padding: .65rem 1.1rem 1.5rem;
@@ -697,7 +712,6 @@ table.data th, table.data td { border-bottom: 1px solid var(--line); padding: .5
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.cast-hint { margin: .65rem 0 0; }
 #cast-expand { margin-top: .65rem; }
 @media (max-width: 700px) {
   .cast-list { grid-template-columns: 1fr; }

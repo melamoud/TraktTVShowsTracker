@@ -1075,15 +1075,6 @@ def _latest_page(media_type: str):
         tmdb_configured=tmdb_is_configured(),
         streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
         title='Latest Movies' if media_type == 'movie' else 'Latest Shows',
-        feed_blurb=(
-            'Ordered by when Trakt last added/changed the title in its database '
-            '(official /updates API). Trakt does not publish a separate “first inserted” '
-            'timestamp, so first inserts and later metadata edits both appear here. '
-            'This is NOT the public release calendar. '
-            'By default we hide older production years (metadata-edit noise). '
-            'Older Trakt update pages load only when you click Load older. '
-            '“Streaming” uses TMDB/JustWatch availability (Trakt does not expose that in its API).'
-        ),
     )
 
 def load_media_detail(media_type: str, trakt_id: int) -> dict:

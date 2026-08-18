@@ -36,20 +36,17 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
   </nav>
   {% endif %}
 {% endmacro %}
-<h1>{{ title }}</h1>
-<p class="muted">
-  Search Trakt’s movie and show database by <strong>title</strong> and/or <strong>actor</strong>.
-  Add hits to Wishlist / personal lists, or mark watched — same actions as Latest.
-  By default, watched titles and titles already on Wishlist / personal lists are hidden.
-  Actor, year, and genres live under <strong>More filters</strong> (actor uses Trakt cast filmography).
-  For titles already on your lists, use the search box on My / Latest / Rec pages instead.
-</p>
+{% set heading = title %}
+{% set help_topic = 'search' %}
+{% include '_page_heading.html' %}
 
 <form class="toolbar search-toolbar" method="get" action="{{ url_for('catalog.search') }}">
   <div class="search-fields">
     <label class="sr-only" for="search-q">Search titles</label>
     <input class="search-input" id="search-q" type="search" name="q" value="{{ q }}"
-           placeholder="Title (min. 2 characters)" autofocus>
+           placeholder="Title (min. 2 characters)"
+           title="Search Trakt for new titles (not your lists)."
+           autofocus>
     <input type="hidden" name="type" value="{{ search_type }}">
     <input type="hidden" name="hide_watched" value="{{ hw }}">
     <input type="hidden" name="hide_lists" value="{{ hl }}">
@@ -76,18 +73,18 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
       <span class="pill on" aria-current="true">Shows</span>
     {% endif %}
     {% if hide_watched %}
-      <a class="pill" href="?{{ qs(page_n=1, hw_v=0) }}">Show watched</a>
-      <span class="pill on">Not watched</span>
+      <a class="pill" href="?{{ qs(page_n=1, hw_v=0) }}" title="Include titles you already marked watched">Show watched</a>
+      <span class="pill on" title="Hide titles you already marked watched">Not watched</span>
     {% else %}
-      <span class="pill on">Showing watched</span>
-      <a class="pill" href="?{{ qs(page_n=1, hw_v=1) }}">Not watched</a>
+      <span class="pill on" title="Including titles you already marked watched">Showing watched</span>
+      <a class="pill" href="?{{ qs(page_n=1, hw_v=1) }}" title="Hide titles you already marked watched">Not watched</a>
     {% endif %}
     {% if hide_lists %}
-      <a class="pill" href="?{{ qs(page_n=1, hl_v=0) }}">In lists</a>
-      <span class="pill on">Not in lists</span>
+      <a class="pill" href="?{{ qs(page_n=1, hl_v=0) }}" title="Include titles already on Wishlist or a personal list">In lists</a>
+      <span class="pill on" title="Hide titles already on Wishlist or a personal list">Not in lists</span>
     {% else %}
-      <span class="pill on">Showing list titles</span>
-      <a class="pill" href="?{{ qs(page_n=1, hl_v=1) }}">Not in lists</a>
+      <span class="pill on" title="Including titles already on Wishlist or a personal list">Showing list titles</span>
+      <a class="pill" href="?{{ qs(page_n=1, hl_v=1) }}" title="Hide titles already on Wishlist or a personal list">Not in lists</a>
     {% endif %}
   </div>
   {% set collapsed = true %}

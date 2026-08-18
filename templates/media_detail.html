@@ -142,7 +142,7 @@
                   data-trakt-id="{{ actor.trakt_id }}"
                   data-media-type="person"
                   data-title="{{ actor.name|e }}"
-                  title="{{ 'Remove from favorite actors' if actor.favorited else 'Add to favorite actors' }}">
+                  title="{{ 'Remove from favorite actors (saved in Preferences, not Trakt favorites)' if actor.favorited else 'Add to favorite actors (saved in Preferences, not Trakt favorites)' }}">
             {{ '★ Favorite' if actor.favorited else '☆ Favorite' }}
           </button>
           <a class="btn btn-small" href="{{ url_for('catalog.search', actor=actor.trakt_id, actor_q=actor.name) }}"
@@ -158,7 +158,6 @@
       Show all {{ cast|length }} actors
     </button>
   {% endif %}
-  <p class="meta cast-hint">Favorite actors are saved in Preferences (local — not Trakt favorites). Headshots are cached once per actor under the actors folder.</p>
 </section>
 {% endif %}
 {% endblock %}

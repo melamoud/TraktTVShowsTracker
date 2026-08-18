@@ -37,14 +37,9 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   </nav>
   {% endif %}
 {% endmacro %}
-<h1>{{ title }}</h1>
-<p class="muted">
-  Titles on the Trakt lists you pick under <strong>Lists…</strong> (Wishlist + personal lists from Preferences).
-  <strong>Watched</strong> / <strong>Both</strong> / <strong>Unwatched</strong> only filter status inside those lists — watch history alone never adds a title here.
-  Sorted by in-progress first, then most recently watched; titles you haven’t started are last.
-  Wishlist / watched / list changes on Trakt are picked up automatically when this page opens (via Trakt activity timestamps). Use <strong>Refresh from Trakt</strong> only to force a full re-pull.
-  “Found on” is your local choice of where you actually have it — independent of the Streaming list from TMDB/JustWatch.
-</p>
+{% set heading = title %}
+{% set help_topic = 'my_movies' if media_type == 'movie' else 'my_shows' %}
+{% include '_page_heading.html' %}
 
 <div class="toolbar my-filters">
   <div class="pill-row" style="align-items:center;">
@@ -54,7 +49,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
             data-filter="{{ filt }}"
             data-per-page="{{ per_page }}"
             data-subtitle="{% if selected_names %}Currently: {{ selected_names|join(', ') }}{% else %}No lists selected{% endif %}"
-            data-filter-lists='{{ filter_lists_payload|tojson }}'>
+            data-filter-lists='{{ filter_lists_payload|tojson }}'
+            title="Choose which Trakt lists appear on this page (not the same as Set lists on a title)">
       Lists…
     </button>
     {% if selected_names %}
@@ -65,15 +61,19 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   </div>
   <div class="pill-row" style="margin-top:.55rem;">
     <a class="pill {% if filt == 'watched' %}on{% endif %}"
-       href="?{{ qs(page_n=1, filter_v='watched') }}">Watched</a>
+       href="?{{ qs(page_n=1, filter_v='watched') }}"
+       title="Only titles on the selected lists that you’ve marked watched">Watched</a>
     <a class="pill {% if filt == 'both' %}on{% endif %}"
-       href="?{{ qs(page_n=1, filter_v='both') }}">Both</a>
+       href="?{{ qs(page_n=1, filter_v='both') }}"
+       title="All titles on the selected lists">Both</a>
     {% if media_type == 'show' %}
       <a class="pill {% if filt == 'unwatched_episodes' %}on{% endif %}"
-         href="?{{ qs(page_n=1, filter_v='unwatched_episodes') }}">Unwatched episodes</a>
+         href="?{{ qs(page_n=1, filter_v='unwatched_episodes') }}"
+         title="Selected-list titles that are not finished">Unwatched episodes</a>
     {% else %}
       <a class="pill {% if filt == 'unwatched' %}on{% endif %}"
-         href="?{{ qs(page_n=1, filter_v='unwatched') }}">Unwatched</a>
+         href="?{{ qs(page_n=1, filter_v='unwatched') }}"
+         title="Selected-list titles that are not finished">Unwatched</a>
     {% endif %}
     {% for n in (10, 50, 100) %}
       <a class="pill {% if per_page == n %}on{% endif %}"
@@ -86,15 +86,20 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   <div class="pill-row" style="margin-top:.55rem; align-items:center;">
     <span class="meta">View:</span>
     <a class="pill {% if display_mode == 'list' %}on{% endif %}"
-       href="?{{ qs(page_n=1, mode_v='list') }}">List</a>
+       href="?{{ qs(page_n=1, mode_v='list') }}"
+       title="Normal title list">List</a>
     <a class="pill {% if display_mode == 'newest_aired' %}on{% endif %}"
-       href="?{{ qs(page_n=1, mode_v='newest_aired') }}">Newest aired</a>
+       href="?{{ qs(page_n=1, mode_v='newest_aired') }}"
+       title="Sort by latest episode air date (shows) or release date (movies)">Newest aired</a>
     <a class="pill {% if display_mode == 'weekly' %}on{% endif %}"
-       href="?{{ qs(page_n=1, mode_v='weekly') }}">Weekly</a>
+       href="?{{ qs(page_n=1, mode_v='weekly') }}"
+       title="Calendar of air dates for titles on your selected lists">Weekly</a>
     <a class="pill {% if display_mode == 'daily' %}on{% endif %}"
-       href="?{{ qs(page_n=1, mode_v='daily') }}">Daily</a>
+       href="?{{ qs(page_n=1, mode_v='daily') }}"
+       title="Calendar of air dates for titles on your selected lists">Daily</a>
     <a class="pill {% if display_mode == 'monthly' %}on{% endif %}"
-       href="?{{ qs(page_n=1, mode_v='monthly') }}">Monthly</a>
+       href="?{{ qs(page_n=1, mode_v='monthly') }}"
+       title="Calendar of air dates for titles on your selected lists">Monthly</a>
     {% if calendar %}
       <span class="meta">— air dates / first releases from Trakt’s My calendar</span>
     {% endif %}
@@ -112,10 +117,11 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <input type="hidden" name="display" value="{{ display_mode }}">
       {% if calendar %}<input type="hidden" name="cal_date" value="{{ calendar.anchor.isoformat() }}">{% endif %}
     {% endif %}
-    <label class="sr-only" for="my-search-q">Search in this list</label>
+    <label class="sr-only" for="my-search-q">Filter this page</label>
     <input class="search-input" id="my-search-q" type="search" name="q" value="{{ search_q }}"
-           placeholder="Search titles in this list…" minlength="2">
-    <button class="btn btn-small btn-primary" type="submit">Search</button>
+           placeholder="Filter this page…" minlength="2"
+           title="Filters titles already on this page. To find new movies or shows by name, use Search in the top nav.">
+    <button class="btn btn-small btn-primary" type="submit">Filter</button>
     {% if search_q %}
       <a class="btn btn-small" href="?{{ qs(page_n=1, q_v='') }}">Clear</a>
     {% endif %}

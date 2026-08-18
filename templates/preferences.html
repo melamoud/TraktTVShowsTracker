@@ -1,8 +1,9 @@
 {% extends "base.html" %}
 {% block title %}Preferences — {{ app_name }}{% endblock %}
 {% block content %}
-<h1>Preferences</h1>
-<p class="muted">Streaming services you use, plus genres/keywords used to highlight and filter catalog matches.</p>
+{% set heading = 'Preferences' %}
+{% set help_topic = 'preferences' %}
+{% include '_page_heading.html' %}
 
 {% if marker_prompt %}
 <div class="callout warn" id="marker-prompt">
@@ -95,8 +96,7 @@
   </section>
 
   <section>
-    <h2>Genres you care about</h2>
-    <p class="meta">Used for purple matches and the default Latest “Matches only” filter.</p>
+    <h2 title="Used for purple matches and Latest Matches only">Genres you care about</h2>
     <div class="checks">
       {% for g in common_genres %}
         <label>
@@ -111,18 +111,14 @@
   </section>
 
   <section>
-    <h2>Keywords</h2>
+    <h2 title="Used with genres for purple preference matches">Keywords</h2>
     <label>Keywords / themes (comma-separated)
       <textarea name="keywords" rows="3" placeholder="space, heist, time travel">{{ keywords_text }}</textarea>
     </label>
   </section>
 
   <section>
-    <h2>Favorite actors</h2>
-    <p class="meta">
-      Pick actors from a title’s Cast section (☆ Favorite). Click a name or <strong>Titles</strong>
-      to search their movies/shows on the Search page. Headshots are cached once per actor.
-    </p>
+    <h2 title="Local list — not Trakt favorites. Star actors on a title’s Cast.">Favorite actors</h2>
     {% if favorite_actors %}
       <ul class="favorite-actors-list">
         {% for actor in favorite_actors %}
@@ -153,12 +149,6 @@
 
   <section>
     <h2>Trakt lists in Set lists</h2>
-    <p class="meta">
-      Two settings per list (used by <em>Set lists…</em> and <em>My movies / My shows</em> filters):
-      <strong>Show in menu</strong> — appears as a filter/menu option (Wishlist is always shown).
-      <strong>Auto-select</strong> — used by <em>Apply my defaults</em> in Set lists… and pre-checked in My <em>Lists…</em> filters (you can still change before saving).
-      On Set lists…, checkboxes always show actual membership; after Remove from all they stay empty until you check lists or Apply my defaults.
-    </p>
     <input type="hidden" name="lists_prefs_present" value="1">
     {% if trakt_lists_error %}
       <p class="meta" style="color:var(--danger, #e85d5d);">Couldn’t load your Trakt lists: {{ trakt_lists_error }}</p>
@@ -166,8 +156,8 @@
     <div class="list-prefs">
       <div class="list-prefs-head">
         <span>List</span>
-        <span>Show in menu</span>
-        <span>Auto-select</span>
+        <span title="List appears in Set lists and in My Lists… filter">Show in menu</span>
+        <span title="Used by Apply my defaults in Set lists, and pre-checked in My Lists… until you change it">Auto-select</span>
       </div>
       <div class="list-prefs-row">
         <span class="list-prefs-name">Wishlist <span class="muted">(always in menu)</span></span>
@@ -206,11 +196,7 @@
   </section>
 
   <section>
-    <h2>Alerts</h2>
-    <p class="meta">
-      In-app only, for titles on your Wishlist and personal lists.
-      Stops after you finish a movie or fully watch a show.
-    </p>
+    <h2 title="In-app alerts for titles on your Wishlist and personal lists">Alerts</h2>
     <input type="hidden" name="alerts_prefs_present" value="1">
     <div class="alert-prefs">
       <label>
