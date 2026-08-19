@@ -1,6 +1,6 @@
 # Alerts
 
-In-app messages under **Alerts** in the nav (badge = unread). They cover titles on your **Wishlist** and **personal lists**.
+In-app messages under **Alerts** in the nav (badge = unread). By default they cover titles on your **Wishlist** only. Turn on **Alerts** for other lists under **Preferences → Trakt lists** if you want those too (park/archive lists can stay off).
 
 This is separate from **Streaming vs Found on** (where a title plays / where you found it).
 
@@ -9,7 +9,7 @@ This is separate from **Streaming vs Found on** (where a title plays / where you
 | Alert | Meaning |
 |-------|---------|
 | **Movie release date** | A listed movie’s release day arrives |
-| **Added to a streaming service** | Any service starts carrying that title (one alert per new service) |
+| **Added to a streaming service** | A **new** service brand starts carrying that title (one alert per brand). Channel/tier renames like “Paramount Plus Apple TV channel” after Premium do **not** re-alert |
 | **New episode or season** | An episode aired; if a full season drops the same day, one season alert instead. A show premiere is announced by its S01E01 episode alert — there is no separate show “release” alert |
 | **New user signed up** | Admins only — first login of a new account |
 
@@ -17,7 +17,7 @@ This is separate from **Streaming vs Found on** (where a title plays / where you
 
 - Movie marked watched  
 - Show **caught up** on aired episodes (Progress `watched / aired`, not a sticky “finished” flag). Streaming alerts pause when caught up; **new episode/season** alerts still use your calendar for watchlisted or in-progress shows so a new season is not missed  
-- Title no longer on Wishlist or any personal list  
+- Title no longer on any **alert-enabled** list (Preferences → Trakt lists → **Alerts**; default Wishlist) 
 
 A batch of episodes airing the same day only counts as a **season** alert when the **whole** season drops that day. If more episodes air later (weekly or a partial drop), you get **per-episode** alerts instead.
 
@@ -32,9 +32,11 @@ Each alert is a compact card: poster, then **title + date** on one line (with th
 - **Immediately** when you click **Watch** / **Mark season watched** / **Mark watched** in this app (Progress or title cards), matching alerts for that episode/season/movie are marked read without waiting for the next refresh. On Android, the Alerts list also reloads when you return from Progress.
 - **Hide read** (default on) — only unread alerts; toggle **Show read** to browse older ones. Choice is remembered.
 
-## Turning types off
+## Turning types / lists off
 
-**Preferences → Alerts** — uncheck any type. Defaults are on.
+**Preferences → Trakt lists → Alerts** — pick which lists generate alerts (default: Wishlist only).
+
+**Preferences → Alerts** — uncheck any alert **type**. Defaults are on.
 
 ## How they arrive
 

@@ -1,5 +1,5 @@
 """
-Auto in-app alerts for collection titles (Wishlist + personal lists).
+Auto in-app alerts for titles on alert-enabled lists (default: Wishlist only).
 
 Alert types:
   release_day      — release/first-aired date arrived
@@ -28,13 +28,13 @@ from models import (
     Notification,
     User,
     UserCalendarEvent,
-    UserListMembership,
     UserMediaState,
     db,
 )
 from services import trakt_client
 from services.calendar_view import ensure_user_calendar_fresh
-from services.sync_jobs import collection_trakt_ids, sync_providers_for_media
+from services.streaming_matcher import get_alert_enabled_list_ids
+from services.sync_jobs import alert_collection_trakt_ids, sync_providers_for_media
 from services.tmdb_client import is_configured as tmdb_configured
 
 logger = logging.getLogger('app')
@@ -48,8 +48,47 @@ ALERT_NEW_USER_LOGIN = 'new_user_login'
 STREAMING_OFFER_TYPES = ('flatrate', 'ads', 'free')
 RELEASE_GRACE_DAYS = 3
 
+# TMDB often lists the same service under channel / tier renames. Alerts key on
+# the brand, not the packaging string, so "Paramount Plus Apple TV channel"
+# does not re-fire after "Paramount Plus Premium" was already seen.
+_PROVIDER_CHANNEL_SUFFIXES = (
+    ' apple tv channel',
+    ' amazon channel',
+    ' roku premium channel',
+    ' roku channel',
+    ' prime video channel',
+)
+_PROVIDER_TIER_SUFFIXES = (
+    ' premium',
+    ' essential',
+    ' basic with ads',
+    ' with ads',
+    ' standard',
+    ' basic',
+)
+
 _EP_PAYLOAD_RE = re.compile(r'\bS(\d{1,2})E(\d{1,3})\b', re.IGNORECASE)
 _SEASON_PAYLOAD_RE = re.compile(r'Full season\s+(\d+)', re.IGNORECASE)
+
+
+def normalize_streaming_provider_key(name: str) -> str:
+    """Collapse TMDB provider label variants to one alert key."""
+    text = re.sub(r'\s+', ' ', (name or '').strip().lower())
+    if not text:
+        return ''
+    text = text.replace('paramount+', 'paramount plus')
+    text = text.replace('disney+', 'disney plus')
+    for suffix in _PROVIDER_CHANNEL_SUFFIXES:
+        if text.endswith(suffix):
+            text = text[: -len(suffix)].rstrip()
+            break
+    for suffix in _PROVIDER_TIER_SUFFIXES:
+        if text.endswith(suffix):
+            text = text[: -len(suffix)].rstrip()
+            break
+    if text in ('hbo max', 'max'):
+        return 'max'
+    return text
 
 
 def alert_pref_enabled(user: User, alert_type: str) -> bool:
@@ -536,7 +575,39 @@ def _streaming_provider_names(media: CachedMedia) -> list[str]:
         )
         .all()
     )
-    return sorted({r.provider_name for r in rows if r.provider_name})
+    return sorted({(r.provider_name or '').strip() for r in rows if (r.provider_name or '').strip()})
+
+
+def _provider_keys_by_display(names: Iterable[str]) -> dict[str, str]:
+    """Map normalized alert key → shortest display label among variants."""
+    by_key: dict[str, str] = {}
+    for raw in names:
+        name = (raw or '').strip()
+        key = normalize_streaming_provider_key(name)
+        if not key:
+            continue
+        prev = by_key.get(key)
+        if prev is None or len(name) < len(prev):
+            by_key[key] = name
+    return by_key
+
+
+def _seen_streaming_provider_keys(
+    user_id: int, media_type: str, trakt_id: int,
+) -> set[str]:
+    """Normalized provider keys already baselined or notified for this title."""
+    keys: set[str] = set()
+    rows = AlertEvent.query.filter_by(
+        user_id=user_id,
+        alert_type=ALERT_NEW_STREAMING,
+        media_type=media_type,
+        trakt_id=trakt_id,
+    ).all()
+    for row in rows:
+        payload = row.payload_key or ''
+        if payload.startswith('provider:'):
+            keys.add(normalize_streaming_provider_key(payload[len('provider:'):]))
+    return keys
 
 
 def _parse_air_date(value) -> date | None:
@@ -621,7 +692,7 @@ def _check_new_streaming(user: User, media_type: str, trakt_id: int, media: Cach
     if not tmdb_configured() or not media.tmdb_id:
         return 0
     sync_providers_for_media(media)
-    names = _streaming_provider_names(media)
+    by_key = _provider_keys_by_display(_streaming_provider_names(media))
     baseline_key = 'baseline:streaming'
     first_seen = not _event_exists(
         user.id, ALERT_NEW_STREAMING, media_type, trakt_id, baseline_key
@@ -630,20 +701,23 @@ def _check_new_streaming(user: User, media_type: str, trakt_id: int, media: Cach
         _record_event(
             user.id, ALERT_NEW_STREAMING, media_type, trakt_id, baseline_key
         )
-        for name in names:
+        for key in by_key:
             _record_event(
-                user.id, ALERT_NEW_STREAMING, media_type, trakt_id, f'provider:{name}'
+                user.id, ALERT_NEW_STREAMING, media_type, trakt_id, f'provider:{key}'
             )
         return 0
 
+    seen = _seen_streaming_provider_keys(user.id, media_type, trakt_id)
     created = 0
-    for name in names:
-        payload = f'provider:{name}'
+    for key, display in by_key.items():
+        if key in seen:
+            continue
+        payload = f'provider:{key}'
         if _notify(
             user.id,
             ALERT_NEW_STREAMING,
-            title=f'Now on {name}: {media.title}',
-            message=f'{media.title} is available on {name}.',
+            title=f'Now on {display}: {media.title}',
+            message=f'{media.title} is available on {display}.',
             link=f'/catalog/{media_type}/{trakt_id}',
             media_type=media_type,
             trakt_id=trakt_id,
@@ -932,7 +1006,8 @@ def _run_alerts_for_user(user: User) -> tuple[int, bool]:
         ).all():
             show_events.setdefault(int(e.trakt_id), []).append(e)
 
-    show_ids = sorted(collection_trakt_ids(user.id, 'show'))
+    enabled_lists = get_alert_enabled_list_ids(user)
+    show_ids = sorted(alert_collection_trakt_ids(user.id, 'show', enabled_lists))
     states = {
         int(st.trakt_id): st
         for st in UserMediaState.query.filter(
@@ -942,7 +1017,7 @@ def _run_alerts_for_user(user: User) -> tuple[int, bool]:
         ).all()
     }
 
-    for trakt_id in sorted(collection_trakt_ids(user.id, 'movie')):
+    for trakt_id in sorted(alert_collection_trakt_ids(user.id, 'movie', enabled_lists)):
         if is_finished(user.id, 'movie', trakt_id):
             continue
         media = CachedMedia.query.filter_by(

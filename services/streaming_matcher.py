@@ -74,6 +74,36 @@ def get_default_selected_list_ids(user: User) -> list[str]:
     return out
 
 
+def get_alert_enabled_list_ids(user: User) -> list[str]:
+    """
+    Return list ids that should generate in-app media alerts.
+
+    Missing/unset prefs default to Wishlist only so park/archive lists stay
+    quiet. An explicit empty JSON list means no list-based alerts.
+    """
+    prefs = user.preferences
+    if not prefs:
+        return [WATCHLIST_LIST_ID]
+    raw = getattr(prefs, 'alert_enabled_list_ids_json', None)
+    if raw is None or str(raw).strip() == '':
+        return [WATCHLIST_LIST_ID]
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return [WATCHLIST_LIST_ID]
+    if not isinstance(data, list):
+        return [WATCHLIST_LIST_ID]
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in data:
+        lid = str(item or '').strip()
+        if not lid or lid in seen:
+            continue
+        seen.add(lid)
+        out.append(lid)
+    return out
+
+
 def filter_visible_list_ids(user: User, list_ids: Iterable[str]) -> list[str]:
     """Keep Wishlist + personal ids that are not hidden in Preferences."""
     hidden = set(get_hidden_list_ids(user))

@@ -1,5 +1,16 @@
 # Changes log
 
+## 2026-08-19 — Streaming alerts ignore TMDB channel renames
+
+- **Now on …** alerts key on the service brand (e.g. Paramount Plus), not packaging strings like “Apple TV channel” / Premium / Essential
+- Stops false alerts when TMDB renames or adds another channel listing for a service you already saw (e.g. Red Alert)
+
+## 2026-08-19 — Choose which lists generate alerts
+
+- Preferences → **Trakt lists** has an **Alerts** column. Default is **Wishlist only**, so park/archive lists stay quiet
+- Check a personal list there if you still want release / streaming / episode alerts for those titles
+- Global alert-type toggles (release, streaming, episodes) still apply on top
+
 ## 2026-08-18 — Shorter page copy; Help on each screen
 
 - Dropped the gray intro under each heading. A **?** next to the title opens that screen’s Help page

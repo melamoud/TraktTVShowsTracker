@@ -69,6 +69,7 @@ from services.seed import COMMON_GENRES
 from services.streaming_matcher import (
     WATCHLIST_LIST_ID,
     filter_visible_list_ids,
+    get_alert_enabled_list_ids,
     get_default_selected_list_ids,
     get_hidden_list_ids,
     get_user_genres_keywords,
@@ -280,7 +281,7 @@ def preferences():
         prefs.genres_json = g_json
         prefs.keywords_json = k_json
 
-        # Two list prefs: show in menu (personal only) + default-checked (incl. Wishlist).
+        # List prefs: show in menu, auto-select, and which lists generate alerts.
         import json
         if request.form.get('lists_prefs_present') == '1':
             known_list_ids = {
@@ -298,20 +299,31 @@ def preferences():
                 for x in request.form.getlist('default_list_ids')
                 if str(x).strip()
             }
+            alert_raw = {
+                str(x).strip()
+                for x in request.form.getlist('alert_list_ids')
+                if str(x).strip()
+            }
             if known_list_ids:
                 hidden_ids = sorted(known_list_ids - shown_list_ids)
                 prefs.hidden_list_ids_json = json.dumps(hidden_ids)
-                # Auto-select only applies to Wishlist + lists still shown in the menu.
+                # Auto-select / Alerts only apply to Wishlist + lists still shown.
                 allowed_defaults = {WATCHLIST_LIST_ID} | shown_list_ids
             else:
                 allowed_defaults = {WATCHLIST_LIST_ID} | set(
-                    lid for lid in default_raw if lid != WATCHLIST_LIST_ID
+                    lid for lid in (default_raw | alert_raw)
+                    if lid != WATCHLIST_LIST_ID
                 )
             default_ids = sorted(
                 lid for lid in default_raw
                 if lid in allowed_defaults
             )
+            alert_ids = sorted(
+                lid for lid in alert_raw
+                if lid in allowed_defaults
+            )
             prefs.default_selected_list_ids_json = json.dumps(default_ids)
+            prefs.alert_enabled_list_ids_json = json.dumps(alert_ids)
 
         if request.form.get('alerts_prefs_present') == '1':
             prefs.alert_release_day = request.form.get('alert_release_day') == '1'
@@ -368,6 +380,7 @@ def preferences():
     user_keywords = json.loads(prefs.keywords_json or '[]')
     hidden_list_ids = set(get_hidden_list_ids(current_user))
     default_selected_list_ids = set(get_default_selected_list_ids(current_user))
+    alert_enabled_list_ids = set(get_alert_enabled_list_ids(current_user))
     trakt_lists = []
     trakt_lists_error = None
     try:
@@ -398,6 +411,7 @@ def preferences():
         trakt_lists=trakt_lists,
         hidden_list_ids=hidden_list_ids,
         default_selected_list_ids=default_selected_list_ids,
+        alert_enabled_list_ids=alert_enabled_list_ids,
         watchlist_list_id=WATCHLIST_LIST_ID,
         trakt_lists_error=trakt_lists_error,
         alert_release_day=bool(getattr(prefs, 'alert_release_day', True)),

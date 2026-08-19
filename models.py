@@ -72,6 +72,9 @@ class UserPreference(db.Model):
     # List ids for Apply my defaults / My list filters (includes "watchlist").
     # Default: Wishlist only. Empty array = nothing pre-checked.
     default_selected_list_ids_json = db.Column(db.Text, default='["watchlist"]')
+    # List ids that generate in-app alerts (includes "watchlist").
+    # Default: Wishlist only so park/archive lists stay quiet. Empty = no list alerts.
+    alert_enabled_list_ids_json = db.Column(db.Text, default='["watchlist"]')
     # Per-screen UI filters / page size (My, Latest, Recs), JSON object keyed by view.
     ui_view_settings_json = db.Column(db.Text, default='{}')
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -27,8 +27,9 @@ These settings apply to both **Set lists…** and **My movies / My shows** filte
 |--------|---------|
 | **Show in menu** | List appears in Set lists… and in the My-page **Lists…** filter menu (Wishlist cannot be hidden; default for personal lists = shown) |
 | **Auto-select** | Used by **Apply my defaults** in Set lists…; also pre-checked in My **Lists…** until you change the filter (default = Wishlist only) |
+| **Alerts** | In-app alerts (release, streaming, new episode/season) for titles on this list (default = **Wishlist only**). Use this to silence park/archive lists |
 
-Example: show three lists, but only Wishlist + List 1 auto-selected — Apply my defaults / My movies filter open with those two checked.
+Example: show three lists, but only Wishlist + List 1 auto-selected — Apply my defaults / My movies filter open with those two checked. Leave **Alerts** on Wishlist alone if List 2 is where you park shows you do not want notified about.
 
 On **Set lists…**:
 
@@ -42,12 +43,7 @@ These drive the purple **Preference match** highlight and the default Latest **M
 
 ## Alerts
 
-Toggle which in-app alerts you want for Wishlist / list titles:
-
-- **Release date**  
-- **Added to a streaming service**  
-- **New episode or season**  
-- **New user signed up** (admins)  
+Toggle which in-app alert **types** you want (release, streaming, episodes…). Which **lists** can produce them is set in the table above under **Alerts** (default Wishlist only).
 
 Details: [Alerts](release_alerts).
 

@@ -406,12 +406,12 @@ input[type=text], input[type=url], textarea, select {
   display: grid;
   gap: .4rem;
   margin-top: .75rem;
-  max-width: 36rem;
+  max-width: 44rem;
 }
 .list-prefs-head,
 .list-prefs-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 6.5rem 6.5rem;
+  grid-template-columns: minmax(0, 1fr) 6.5rem 6.5rem 5.5rem;
   gap: .5rem .75rem;
   align-items: center;
 }
@@ -439,7 +439,7 @@ input[type=text], input[type=url], textarea, select {
 @media (max-width: 560px) {
   .list-prefs-head,
   .list-prefs-row {
-    grid-template-columns: minmax(0, 1fr) 4.75rem 4.75rem;
+    grid-template-columns: minmax(0, 1fr) 4.25rem 4.25rem 3.75rem;
     gap: .35rem;
   }
   .list-prefs-head { font-size: .78rem; }

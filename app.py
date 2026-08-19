@@ -199,6 +199,11 @@ def _ensure_schema(app):
                     "ALTER TABLE user_preferences ADD COLUMN default_selected_list_ids_json "
                     "TEXT DEFAULT '[\"watchlist\"]'"
                 )
+            if 'alert_enabled_list_ids_json' not in cols:
+                alters.append(
+                    "ALTER TABLE user_preferences ADD COLUMN alert_enabled_list_ids_json "
+                    "TEXT DEFAULT '[\"watchlist\"]'"
+                )
             if 'ui_view_settings_json' not in cols:
                 alters.append(
                     "ALTER TABLE user_preferences ADD COLUMN ui_view_settings_json "

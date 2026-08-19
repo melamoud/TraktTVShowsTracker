@@ -158,6 +158,7 @@
         <span>List</span>
         <span title="List appears in Set lists and in My Lists… filter">Show in menu</span>
         <span title="Used by Apply my defaults in Set lists, and pre-checked in My Lists… until you change it">Auto-select</span>
+        <span title="In-app alerts (release, streaming, episodes) for titles on this list. Default: Wishlist only">Alerts</span>
       </div>
       <div class="list-prefs-row">
         <span class="list-prefs-name">Wishlist <span class="muted">(always in menu)</span></span>
@@ -165,6 +166,10 @@
         <label class="list-prefs-check">
           <input type="checkbox" name="default_list_ids" value="{{ watchlist_list_id }}"
             {% if watchlist_list_id in default_selected_list_ids %}checked{% endif %}>
+        </label>
+        <label class="list-prefs-check">
+          <input type="checkbox" name="alert_list_ids" value="{{ watchlist_list_id }}"
+            {% if watchlist_list_id in alert_enabled_list_ids %}checked{% endif %}>
         </label>
       </div>
       {% if trakt_lists %}
@@ -187,6 +192,12 @@
                 {% if lst.id in default_selected_list_ids and shown %}checked{% endif %}
                 {% if not shown %}disabled{% endif %}>
             </label>
+            <label class="list-prefs-check">
+              <input type="checkbox" name="alert_list_ids" value="{{ lst.id }}"
+                class="list-alert-toggle"
+                {% if lst.id in alert_enabled_list_ids and shown %}checked{% endif %}
+                {% if not shown %}disabled{% endif %}>
+            </label>
           </div>
         {% endfor %}
       {% elif not trakt_lists_error %}
@@ -196,7 +207,7 @@
   </section>
 
   <section>
-    <h2 title="In-app alerts for titles on your Wishlist and personal lists">Alerts</h2>
+    <h2 title="In-app alert types for titles on lists you enabled under Alerts above">Alerts</h2>
     <input type="hidden" name="alerts_prefs_present" value="1">
     <div class="alert-prefs">
       <label>
@@ -251,10 +262,14 @@
   document.querySelectorAll('.list-prefs-row[data-list-id]').forEach(function (row) {
     const show = row.querySelector('.list-show-toggle');
     const auto = row.querySelector('.list-default-toggle');
-    if (!show || !auto) return;
+    const alerts = row.querySelector('.list-alert-toggle');
+    if (!show) return;
     show.addEventListener('change', function () {
-      auto.disabled = !show.checked;
-      if (!show.checked) auto.checked = false;
+      [auto, alerts].forEach(function (box) {
+        if (!box) return;
+        box.disabled = !show.checked;
+        if (!show.checked) box.checked = false;
+      });
     });
   });
 })();

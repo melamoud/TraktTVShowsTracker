@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import date, datetime, timedelta
+from typing import Iterable
 
 from flask import Flask
 from sqlalchemy.exc import IntegrityError
@@ -23,7 +24,7 @@ from models import (
     db,
 )
 from services import trakt_client
-from services.streaming_matcher import get_hidden_list_ids
+from services.streaming_matcher import WATCHLIST_LIST_ID, get_hidden_list_ids
 from services.tmdb_client import get_watch_providers, is_configured as tmdb_configured
 
 logger = logging.getLogger('app')
@@ -1173,6 +1174,30 @@ def collection_trakt_ids(user_id: int, media_type: str) -> set[int]:
     return ids
 
 
+def alert_collection_trakt_ids(
+    user_id: int,
+    media_type: str,
+    enabled_list_ids: Iterable[str],
+) -> set[int]:
+    """Titles on alert-enabled lists only (Wishlist and/or selected personal lists)."""
+    enabled = {str(x).strip() for x in enabled_list_ids if str(x).strip()}
+    ids: set[int] = set()
+    if WATCHLIST_LIST_ID in enabled:
+        for tid, in UserMediaState.query.filter_by(
+            user_id=user_id, media_type=media_type, on_watchlist=True
+        ).with_entities(UserMediaState.trakt_id).all():
+            ids.add(int(tid))
+    personal = sorted(lid for lid in enabled if lid != WATCHLIST_LIST_ID)
+    if personal:
+        for tid, in UserListMembership.query.filter(
+            UserListMembership.user_id == user_id,
+            UserListMembership.media_type == media_type,
+            UserListMembership.list_id.in_(personal),
+        ).with_entities(UserListMembership.trakt_id).all():
+            ids.add(int(tid))
+    return ids
+
+
 def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
     """Fetch and store latest aired episode for a single show. Returns True if updated.
 
@@ -1212,7 +1237,7 @@ def sync_providers_for_media(media: CachedMedia) -> list[str]:
     MediaProviderAvailability.query.filter_by(cached_media_id=media.id).delete()
     names = []
     for p in providers:
-        name = p.get('provider_name')
+        name = (p.get('provider_name') or '').strip()
         if not name:
             continue
         db.session.add(MediaProviderAvailability(

@@ -20,6 +20,7 @@ from services.alerts import (
     ALERT_NEW_USER_LOGIN,
     ALERT_RELEASE_DAY,
     ALERT_SEASON_AIRED,
+    normalize_streaming_provider_key,
     notify_admins_new_user,
     run_media_alerts,
 )
@@ -140,7 +141,7 @@ def test_alert_refresh_marks_watched_episode_read(app, user):
         }
         with patch('services.alerts.ensure_user_calendar_fresh'), \
              patch('services.alerts.trakt_client.get_show_progress', return_value=progress), \
-             patch('services.alerts.collection_trakt_ids', return_value=set()):
+             patch('services.alerts.alert_collection_trakt_ids', return_value=set()):
             run_media_alerts(app)
 
         notes = {
@@ -240,7 +241,7 @@ def test_new_streaming_baselines_then_alerts_delta(app, user):
 
         assert Notification.query.filter_by(user_id=user, alert_type=ALERT_NEW_STREAMING).count() == 0
         assert AlertEvent.query.filter_by(
-            user_id=user, alert_type=ALERT_NEW_STREAMING, payload_key='provider:Netflix'
+            user_id=user, alert_type=ALERT_NEW_STREAMING, payload_key='provider:netflix'
         ).count() == 1
 
         with patch('services.alerts.tmdb_configured', return_value=True), patch(
@@ -252,6 +253,60 @@ def test_new_streaming_baselines_then_alerts_delta(app, user):
         notes = Notification.query.filter_by(user_id=user, alert_type=ALERT_NEW_STREAMING).all()
         assert len(notes) == 1
         assert 'Hulu' in notes[0].title
+
+
+def test_normalize_streaming_provider_key_collapses_channels():
+    assert normalize_streaming_provider_key('Paramount Plus Apple TV Channel ') == 'paramount plus'
+    assert normalize_streaming_provider_key('Paramount Plus Apple TV channel') == 'paramount plus'
+    assert normalize_streaming_provider_key('Paramount Plus Premium') == 'paramount plus'
+    assert normalize_streaming_provider_key('Paramount+ Roku Premium Channel') == 'paramount plus'
+    assert normalize_streaming_provider_key('Starz Apple TV channel') == 'starz'
+    assert normalize_streaming_provider_key('HBO Max Amazon Channel') == 'max'
+    assert normalize_streaming_provider_key('Netflix') == 'netflix'
+
+
+def test_streaming_channel_rename_does_not_realert(app, user):
+    """TMDB channel/tier renames must not fire another Now-on alert."""
+    with app.app_context():
+        media = CachedMedia(
+            media_type='show', trakt_id=300597, title='Red Alert',
+            tmdb_id=301809, trakt_listed_at=datetime.utcnow(),
+        )
+        db.session.add(media)
+        _watchlist(user, 'show', 300597)
+        db.session.commit()
+
+        first = [{
+            'provider_name': 'Paramount Plus Apple TV Channel ',
+            'tmdb_provider_id': 1853,
+            'offer_type': 'flatrate',
+            'region': 'US',
+        }]
+        renamed = [{
+            'provider_name': 'Paramount Plus Apple TV channel',
+            'tmdb_provider_id': 1853,
+            'offer_type': 'flatrate',
+            'region': 'US',
+        }, {
+            'provider_name': 'Paramount Plus Premium',
+            'tmdb_provider_id': 2303,
+            'offer_type': 'flatrate',
+            'region': 'US',
+        }]
+
+        with patch('services.alerts.tmdb_configured', return_value=True), patch(
+            'services.sync_jobs.tmdb_configured', return_value=True
+        ), patch('services.sync_jobs.get_watch_providers', return_value=first):
+            assert run_media_alerts(app) == 0
+
+        with patch('services.alerts.tmdb_configured', return_value=True), patch(
+            'services.sync_jobs.tmdb_configured', return_value=True
+        ), patch('services.sync_jobs.get_watch_providers', return_value=renamed):
+            assert run_media_alerts(app) == 0
+
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_NEW_STREAMING,
+        ).count() == 0
 
 
 def test_pref_off_records_event_without_notification(app, user):
@@ -283,6 +338,8 @@ def test_season_drop_one_alert(app, user):
         db.session.add(UserListMembership(
             user_id=user, list_id='55', media_type='show', trakt_id=9401,
         ))
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_enabled_list_ids_json = '["55"]'
         db.session.commit()
 
         drop_day = date.today().isoformat()
@@ -335,6 +392,8 @@ def test_episode_alert_weekly(app, user):
         db.session.add(UserListMembership(
             user_id=user, list_id='99', media_type='show', trakt_id=9501,
         ))
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_enabled_list_ids_json = '["99"]'
         db.session.commit()
 
         d1 = (date.today() - timedelta(days=7)).isoformat()
@@ -383,6 +442,8 @@ def test_first_pass_alerts_recent_episode(app, user):
         db.session.add(UserListMembership(
             user_id=user, list_id='55', media_type='show', trakt_id=9601,
         ))
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_enabled_list_ids_json = '["55"]'
         db.session.commit()
 
         today = date.today().isoformat()
@@ -683,6 +744,48 @@ def test_movie_release_and_streaming_alerts_both_fire(app, user):
         ).count() == 1
 
 
+def test_alerts_skip_titles_only_on_disabled_lists(app, user):
+    """Default alert lists = Wishlist only; park-list titles stay quiet."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=9201, title='Parked Film',
+            released_at=date.today(),
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=9202, title='Wishlist Film',
+            released_at=date.today(),
+        ))
+        db.session.add(UserListMembership(
+            user_id=user, list_id='99', media_type='movie', trakt_id=9201,
+        ))
+        _watchlist(user, 'movie', 9202)
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_enabled_list_ids_json = '["watchlist"]'
+        db.session.commit()
+
+        with patch('services.alerts.ensure_user_calendar_fresh'):
+            run_media_alerts(app)
+
+        titles = {
+            n.title for n in Notification.query.filter_by(
+                user_id=user, alert_type=ALERT_RELEASE_DAY,
+            ).all()
+        }
+        assert any('Wishlist Film' in t for t in titles)
+        assert not any('Parked Film' in t for t in titles)
+
+        prefs.alert_enabled_list_ids_json = '["watchlist", "99"]'
+        db.session.commit()
+        with patch('services.alerts.ensure_user_calendar_fresh'):
+            run_media_alerts(app)
+        titles = {
+            n.title for n in Notification.query.filter_by(
+                user_id=user, alert_type=ALERT_RELEASE_DAY,
+            ).all()
+        }
+        assert any('Parked Film' in t for t in titles)
+
+
 def test_calendar_upsert_does_not_stamp_episode_date_on_show(app):
     """Calendar entries carry the EPISODE first_aired at item level - the show
     row must keep its real premiere date, else release_day fires per episode."""
@@ -741,6 +844,8 @@ def test_rate_limited_calendar_skips_per_show_fallback(app, user):
         db.session.add(UserListMembership(
             user_id=user, list_id='55', media_type='show', trakt_id=9980,
         ))
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_enabled_list_ids_json = '["55"]'
         db.session.commit()
 
         with patch(
@@ -767,6 +872,8 @@ def test_rate_limit_mid_fallback_stops_remaining_scans(app, user):
             db.session.add(UserListMembership(
                 user_id=user, list_id='55', media_type='show', trakt_id=tid,
             ))
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_enabled_list_ids_json = '["55"]'
         db.session.commit()
 
         with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \

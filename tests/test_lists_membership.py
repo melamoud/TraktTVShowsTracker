@@ -367,7 +367,7 @@ def test_lists_membership_post_removes_unchecked_list_even_if_local_stale(
 
 
 def test_preferences_list_show_and_default(app, client, user):
-    """Preferences stores show/hide and auto-select independently."""
+    """Preferences stores show/hide, auto-select, and alert lists independently."""
     login_client(client, app, user)
     personal = [
         {'id': '10', 'slug': 'a', 'name': 'Alpha', 'item_count': 1},
@@ -380,6 +380,7 @@ def test_preferences_list_show_and_default(app, client, user):
             'known_list_ids': ['10', '20', '30'],
             'show_list_ids': ['10', '20'],  # 30 hidden
             'default_list_ids': ['watchlist', '10'],  # 20 shown but not auto
+            'alert_list_ids': ['watchlist', '20'],  # alerts on wishlist + beta
             'genres': '',
             'keywords': '',
         }, follow_redirects=True)
@@ -388,3 +389,4 @@ def test_preferences_list_show_and_default(app, client, user):
         prefs = UserPreference.query.filter_by(user_id=user).one()
         assert prefs.hidden_list_ids_json == '["30"]'
         assert prefs.default_selected_list_ids_json == '["10", "watchlist"]'
+        assert prefs.alert_enabled_list_ids_json == '["20", "watchlist"]'
