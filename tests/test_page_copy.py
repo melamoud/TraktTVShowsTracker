@@ -69,7 +69,7 @@ def test_page_help_topics_render(app, client, user):
         'search', 'latest_movies', 'latest_shows',
         'recommended_movies', 'recommended_shows',
         'my_movies', 'my_shows', 'release_alerts',
-        'preferences', 'series_progress', 'overview',
+        'preferences', 'series_progress', 'overview', 'wishlist',
     ):
         resp = client.get(f'/help/{topic}')
         assert resp.status_code == 200, topic

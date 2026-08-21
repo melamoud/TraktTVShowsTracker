@@ -50,6 +50,7 @@ def get_help_toc(role: str = 'user') -> list[dict]:
         {'title': 'Trakt 30-day limit', 'slug': 'trakt_sync_limit'},
         {'title': 'Review markers', 'slug': 'review_markers'},
         {'title': 'Preferences', 'slug': 'preferences'},
+        {'title': 'Wishlist vs lists', 'slug': 'wishlist'},
         {'title': 'My movies', 'slug': 'my_movies'},
         {'title': 'My shows', 'slug': 'my_shows'},
         {'title': 'Search', 'slug': 'search'},

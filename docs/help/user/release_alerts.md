@@ -16,7 +16,7 @@ This is separate from **Streaming vs Found on** (where a title plays / where you
 ## When they stop
 
 - Movie marked watched  
-- Show **caught up** on aired episodes (Progress `watched / aired`, not a sticky “finished” flag). Streaming alerts pause when caught up; **new episode/season** alerts still use your calendar for watchlisted or in-progress shows so a new season is not missed  
+- Show **caught up** on aired episodes (Progress `watched / aired`, not a sticky “finished” flag). Streaming alerts pause when caught up; **new episode/season** alerts still use your calendar for watchlisted or in-progress shows so a new season is not missed. An episode alert does **not** mean the show is still on Wishlist — Trakt may already have removed it after the first watch ([Wishlist vs lists](wishlist))  
 - Title no longer on any **alert-enabled** list (Preferences → Trakt lists → **Alerts**; default Wishlist) 
 
 A batch of episodes airing the same day only counts as a **season** alert when the **whole** season drops that day. If more episodes air later (weekly or a partial drop), you get **per-episode** alerts instead.

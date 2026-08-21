@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-20 — Wishlist vs personal lists (Help)
+
+- Help documents Trakt’s Watchlist rule: the first movie play or **any one episode** removes the title from Wishlist. Use a personal list (e.g. TV Show Favs) for titles you want to keep on My Shows/Movies
+- New Help topic **Wishlist vs lists**; linked from Getting started, Preferences, My movies/shows, Progress, and Alerts
+
 ## 2026-08-19 — Streaming alerts ignore TMDB channel renames
 
 - **Now on …** alerts key on the service brand (e.g. Paramount Plus), not packaging strings like “Apple TV channel” / Premium / Essential

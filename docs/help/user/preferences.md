@@ -21,6 +21,8 @@ On any title detail page, the **Cast** section lists main actors (expand for the
 
 Your Trakt **Wishlist** (watchlist) is always first. Personal lists follow.
 
+**When to use Wishlist:** titles you have **not started**. Trakt **removes a title from Wishlist as soon as you watch it** (one movie play, or **one episode** of a show). That is a Trakt rule, not a setting in this app. For shows you are watching or want to keep on My Shows after you finish, use a **personal list**. See [Wishlist vs lists](wishlist).
+
 These settings apply to both **Set lists…** and **My movies / My shows** filters:
 
 | Setting | Meaning |

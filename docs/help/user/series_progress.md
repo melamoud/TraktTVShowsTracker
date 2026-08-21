@@ -27,7 +27,7 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 
 ## Actions
 
-- **Watch** / next-up **Watch** — writes the episode to Trakt history (must succeed before the button flips)  
+- **Watch** / next-up **Watch** — writes the episode to Trakt history (must succeed before the button flips). Trakt then **drops the show from Wishlist**; a personal list is what keeps it on My Shows ([Wishlist vs lists](wishlist))  
 - **Watched** (click) — removes it from Trakt history  
 - **Rate / Review** — dialog: rating menu, review text (optional spoiler), **Mark watched**, then **Save to Trakt**  
 - **Mark season watched** — on each incomplete season row; marks all **aired** episodes in that season on Trakt (same as marking a season on Trakt.tv)  
