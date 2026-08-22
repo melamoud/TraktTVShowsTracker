@@ -63,7 +63,7 @@ def test_notifications_page_renders_episode_card(app, client, user):
     login_client(client, app, user)
     html = client.get('/notifications').get_data(as_text=True)
     assert 'Silo' in html
-    assert 'S03E01' in html and 'Into the Fire' in html
+    assert 'S3E1' in html and 'Into the Fire' in html
     assert 'Apple TV+' in html                       # streaming tag
     assert 'Streaming:' in html
     assert 'Found on:' in html and 'toFlx' in html
@@ -73,7 +73,9 @@ def test_notifications_page_renders_episode_card(app, client, user):
     assert 'New episode' in html                     # type tag label
     assert 'Hiding read' in html
     assert 'alert-title' in html and 'alert-ep' in html
-    assert html.find('S03E01') < html.find('Into the Fire')
+    assert 'alert-ep-code' in html
+    assert html.find('S3E1') < html.find('Into the Fire')
+    assert 'alert-kind-badge' in html and 'Episode' in html
     assert 'alert-also' in html or 'Streaming:' in html
     assert 'alert-services' in html
     # Also streaming / Streaming is its own row above Found on / Plays on.
@@ -101,8 +103,10 @@ def test_streaming_movie_alert_shows_release_date_not_blurb(app, client, user):
     html = client.get('/notifications').get_data(as_text=True)
     assert 'Altered' in html
     assert 'Now streaming' in html
+    assert 'Streaming' in html
     assert '2014-01-15' in html
     assert 'is available on' not in html
+    assert 'data-action="progress-open"' not in html
 
 
 def test_legacy_episode_alert_hides_available_on_suffix(app, client, user):
@@ -125,7 +129,7 @@ def test_legacy_episode_alert_hides_available_on_suffix(app, client, user):
     login_client(client, app, user)
     html = client.get('/notifications').get_data(as_text=True)
     assert 'Lucky' in html
-    assert 'S01E05' in html and 'Are We Bad People?' in html
+    assert 'S1E5' in html and 'Are We Bad People?' in html
     assert '2026-08-05' in html
     assert 'Available on:' not in html
     assert 'Apple TV Amazon Channel' not in html
@@ -199,4 +203,215 @@ def test_notifications_page_without_media_still_works(app, client, user):
     login_client(client, app, user)
     html = client.get('/notifications').get_data(as_text=True)
     assert 'New login' in html
-    assert 'no-poster' in html
+    assert 'Admin' in html
+    assert 'alert-kind-badge' in html
+
+
+def _two_episode_alerts(app, user, *, pinned=False):
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=501, title='The Agency', year=2024,
+        ))
+        st = UserMediaState(
+            user_id=user, media_type='show', trakt_id=501, on_watchlist=True,
+            alerts_pinned=pinned,
+        )
+        db.session.add(st)
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='New episode: The Agency',
+            message='S03E05 — Night Work · aired 2026-08-20',
+            media_type='show', trakt_id=501, payload_key='ep:3:5',
+            is_read=False, created_at=datetime(2026, 8, 20, 10, 0),
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='New episode: The Agency',
+            message='S03E06 — Aftermath · aired 2026-08-21',
+            media_type='show', trakt_id=501, payload_key='ep:3:6',
+            is_read=False, created_at=datetime(2026, 8, 21, 10, 0),
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='release_day',
+            title='Released: Other Film',
+            message='Movie release date was 2026-08-22.',
+            media_type='movie', trakt_id=88,
+            is_read=False, created_at=datetime(2026, 8, 22, 10, 0),
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=88, title='Other Film', year=2026,
+        ))
+        db.session.commit()
+
+
+def test_alerts_group_show_episodes(app, client, user):
+    """Two episode alerts for one show collapse; movie stays its own row."""
+    _two_episode_alerts(app, user)
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'alert-group' in html
+    assert 'The Agency' in html
+    assert 'S3E5' in html and 'S3E6' in html
+    assert 'Show 2 alerts' in html
+    assert 'data-action="alert-group-toggle"' in html
+    assert 'data-action="alerts-pin-add"' in html
+    assert 'Other Film' in html
+    assert 'Movie' in html
+    # Children stay in the expanded body for per-episode actions.
+    assert 'data-action="progress-open"' in html
+    assert 'Mark read' in html
+
+
+def test_alerts_ungroup_shows_each_row(app, client, user):
+    _two_episode_alerts(app, user)
+    login_client(client, app, user)
+    html = client.get('/notifications?group_shows=0').get_data(as_text=True)
+    assert 'alert-group' not in html
+    assert 'One row each' in html
+    assert html.count('alert-ep-code') >= 2
+
+
+def test_alerts_sort_oldest_first(app, client, user):
+    _two_episode_alerts(app, user)
+    login_client(client, app, user)
+    html = client.get('/notifications?group_shows=0&sort=asc').get_data(as_text=True)
+    assert 'Oldest first' in html
+    assert html.find('S3E5') < html.find('S3E6') < html.find('Other Film')
+
+
+def test_alerts_pin_floats_show_to_top(app, client, user):
+    """Pinned show stays above a newer unpinned movie."""
+    _two_episode_alerts(app, user, pinned=True)
+    login_client(client, app, user)
+    html = client.get('/notifications?group_shows=0&sort=desc').get_data(as_text=True)
+    assert html.find('The Agency') < html.find('Other Film')
+    assert 'is-pinned' in html
+
+    login_client(client, app, user)
+    resp = client.post('/api/alerts/pin/show/501', json={'action': 'unpin'})
+    assert resp.status_code == 200
+    assert resp.get_json()['alerts_pinned'] is False
+    html = client.get('/notifications?group_shows=0&sort=desc').get_data(as_text=True)
+    assert html.find('Other Film') < html.find('The Agency')
+
+
+def test_alerts_api_includes_pin_sort_group(app, client, user):
+    _two_episode_alerts(app, user, pinned=True)
+    login_client(client, app, user)
+    data = client.get('/api/v1/alerts?group_shows=1&sort=desc').get_json()
+    assert data['success'] is True
+    assert data['sort'] == 'desc'
+    assert data['group_shows'] is True
+    agency = next(row for row in data['items'] if row['trakt_id'] == 501)
+    assert agency['episode_code'] in ('S3E5', 'S3E6')
+    assert agency['alerts_pinned'] is True
+    assert agency['kind_label'] == 'Episode'
+    assert 'S3E' in agency['display_title']
+    groups = [e for e in data['entries'] if e.get('kind') == 'group']
+    assert groups and groups[0]['title'] == 'The Agency'
+    assert groups[0]['kind_label'] == 'Episode'
+    assert 'S3E5' in groups[0]['episode_codes']
+
+
+def test_season_alert_badge_and_code_from_title(app, client, user):
+    """Season-drop alerts are labeled Season and show S# even without payload_key."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=77, title='Outer Banks', year=2020,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='season_aired',
+            title='Season 4 out: Outer Banks',
+            message='Full season published on 2026-08-20.',
+            media_type='show', trakt_id=77, payload_key=None, is_read=False,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Outer Banks' in html
+    assert 'S4' in html
+    assert 'alert-kind-season' in html
+    assert 'Season' in html
+    assert 'Season out' in html
+
+
+def test_watched_episode_alert_cleared_on_page(app, client, user):
+    """Opening Alerts marks a watched episode read so it does not stay unread."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=88, title='Lucky', year=2025,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=88,
+            episodes_aired=8, episodes_completed=8,
+            progress_payload_json='{"watched_keys": [[1, 1]]}',
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='New episode: Lucky',
+            message='S01E01 — Pilot · aired 2026-08-01',
+            media_type='show', trakt_id=88, payload_key='ep:1:1',
+            is_read=False,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Lucky' not in html
+    with app.app_context():
+        note = Notification.query.filter_by(user_id=user, trakt_id=88).one()
+        assert note.is_read is True
+
+
+def test_legacy_lucky_without_trakt_id_cleared_when_show_finished(app, client, user):
+    """Old Lucky episode rows stored title only; still mark read if that show is caught up."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=265812, title='Lucky', year=2025,
+        ))
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=14758, title='Lucky', year=2013,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=265812,
+            episodes_aired=7, episodes_completed=7,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=14758,
+            episodes_aired=13, episodes_completed=0,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='New episode: Lucky',
+            message='S01E05 — Are We Bad People? aired 2026-08-05.',
+            media_type=None, trakt_id=None, payload_key=None, is_read=False,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Lucky' not in html
+    with app.app_context():
+        note = Notification.query.filter_by(user_id=user, alert_type='episode_aired').one()
+        assert note.is_read is True
+
+
+def test_streaming_show_alert_has_progress_and_streaming_badge(app, client, user):
+    """A 'now on service' show alert is Streaming, not Episode — Progress still opens the show."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=195577, title='Fire Country', year=2022,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='new_streaming',
+            title='Now on Paramount Plus Apple TV channel: Fire Country',
+            message='Fire Country is available on Paramount Plus Apple TV channel.',
+            media_type='show', trakt_id=195577, is_read=False,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Fire Country' in html
+    assert 'alert-kind-streaming' in html
+    assert 'Now streaming' in html
+    assert 'data-action="progress-open"' in html
+    assert 'data-trakt-id="195577"' in html
+    assert 'S1E' not in html and 'S01E' not in html

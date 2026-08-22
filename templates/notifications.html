@@ -1,6 +1,8 @@
 {% extends "base.html" %}
 {% block title %}Alerts — {{ app_name }}{% endblock %}
 {% block content %}
+{% set q_hide = 1 if hide_read else 0 %}
+{% set q_group = 1 if group_shows else 0 %}
 <div class="toolbar">
   {% set heading = 'Alerts' %}
   {% set help_topic = 'release_alerts' %}
@@ -8,10 +10,24 @@
   <div class="pill-row">
     {% if hide_read %}
       <span class="pill on" title="Unread alerts stay brighter; read rows are hidden">Hiding read</span>
-      <a class="pill" href="?hide_read=0" title="Show already-read alerts (dimmed)">Show read</a>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group) }}" title="Show already-read alerts (dimmed)">Show read</a>
     {% else %}
-      <a class="pill" href="?hide_read=1" title="Hide already-read alerts">Hide read</a>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=1, sort=sort, group_shows=q_group) }}" title="Hide already-read alerts">Hide read</a>
       <span class="pill on" title="Unread alerts are brighter; dimmed rows are already read">Showing all</span>
+    {% endif %}
+    {% if sort == 'asc' %}
+      <span class="pill on" title="Oldest alerts first (pinned titles still stay on top)">Oldest first</span>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort='desc', group_shows=q_group) }}" title="Newest alerts first">Newest first</a>
+    {% else %}
+      <span class="pill on" title="Newest alerts first (pinned titles still stay on top)">Newest first</span>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort='asc', group_shows=q_group) }}" title="Oldest alerts first">Oldest first</a>
+    {% endif %}
+    {% if group_shows %}
+      <span class="pill on" title="Multiple episode alerts for the same show are collapsed">Grouped by show</span>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=0) }}" title="Show every alert as its own row">Ungroup</a>
+    {% else %}
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=1) }}" title="Collapse a show’s episode alerts into one row">Group by show</a>
+      <span class="pill on">One row each</span>
     {% endif %}
   </div>
   <div class="actions" style="margin:0;">
@@ -32,94 +48,93 @@
 </div>
 
 <div class="media-list">
-  {% for card in cards %}
-    {% set n = card.n %}
-    {% set m = card.media %}
-    <article class="media-row alert-row {% if n.is_read %}dimmed{% endif %} {% if not m %}no-poster{% endif %}">
-      {% if m %}
-        <div class="media-poster-col">
-          <a class="media-poster"
-             href="{{ media_detail_url(m.media_type, m.trakt_id) }}">
-            {% if m.poster_url %}
-              <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
-            {% else %}
-              <div class="poster-missing-sm">No image</div>
-            {% endif %}
-          </a>
-        </div>
-      {% endif %}
-      <div class="media-body">
-        <h2 class="media-title alert-title">
-          <span class="alert-title-main">
-            {% if m %}
-              <a href="{{ media_detail_url(m.media_type, m.trakt_id) }}">{{ m.title }}</a>
-            {% else %}
-              {{ n.title }}
-            {% endif %}
-            <span class="tag alert-{{ n.alert_type or 'info' }}">{{ card.type_label }}</span>
-            {% if not n.is_read %}<span class="tag found">Unread</span>{% endif %}
-          </span>
-          {% if card.headline %}
-            <span class="alert-ep">{{ card.headline }}</span>
+  {% for entry in entries %}
+    {% if entry.kind == 'group' %}
+      <article class="alert-group {% if entry.alerts_pinned %}is-pinned{% endif %}"
+               data-group-key="show-{{ entry.trakt_id }}"
+               data-media-type="show"
+               data-trakt-id="{{ entry.trakt_id }}"
+               data-title="{{ entry.title|e }}">
+        <div class="media-row alert-row alert-group-head {% if entry.unread_count == 0 %}dimmed{% endif %}">
+          {% if entry.media %}
+            <div class="media-poster-col">
+              <span class="media-poster">
+                {% if entry.media.poster_url %}
+                  <img src="{{ entry.media.poster_url }}" alt="" width="120" height="180" loading="lazy">
+                {% else %}
+                  <div class="poster-missing-sm">No image</div>
+                {% endif %}
+                <span class="alert-kind-badge alert-kind-{{ entry.kind_label|lower }}">{{ entry.kind_label }}</span>
+              </span>
+            </div>
           {% endif %}
-        </h2>
-        {% set title = m.title if m else n.title %}
-        {% set year = m.year if m else none %}
-        {% if card.other_providers %}
-          <div class="streaming-line alert-also">
-            <span class="streaming-label">{% if card.my_providers %}Also streaming:{% else %}Streaming:{% endif %}</span>
-            {% set labels = card.other_providers %}
-            {% set tag_class = 'stream' %}
-            {% include '_service_link_tags.html' %}
+          <div class="media-body">
+            <h2 class="media-title alert-title">
+              <span class="alert-title-main">
+                {% if entry.media %}
+                  <a href="{{ media_detail_url('show', entry.trakt_id) }}">{{ entry.title }}</a>
+                {% else %}
+                  {{ entry.title }}
+                {% endif %}
+                {% if entry.episode_codes %}
+                  <span class="alert-ep-code">{{ entry.episode_codes|join(' · ') }}</span>
+                {% endif %}
+                {% if entry.unread_count %}
+                  <span class="tag found">{{ entry.unread_count }} unread</span>
+                {% endif %}
+              </span>
+            </h2>
+            <div class="actions">
+              <button class="btn btn-small alert-group-toggle" type="button"
+                      data-action="alert-group-toggle"
+                      data-count="{{ entry.cards|length }}"
+                      aria-expanded="false"
+                      title="Show or hide each episode alert">
+                <span class="alert-group-chevron" aria-hidden="true">▸</span>
+                <span class="alert-group-toggle-label">Show {{ entry.cards|length }} alerts</span>
+              </button>
+              <button class="btn btn-primary btn-small" type="button"
+                      data-action="progress-open"
+                      data-media-type="show"
+                      data-trakt-id="{{ entry.trakt_id }}"
+                      data-title="{{ entry.title|e }}">Progress</button>
+              {% if entry.media %}
+                <a class="btn btn-small"
+                   href="{{ media_detail_url('show', entry.trakt_id) }}">Details</a>
+              {% endif %}
+              {% if entry.alerts_pinned %}
+                <button class="btn btn-small" type="button"
+                        data-action="alerts-pin-remove"
+                        data-media-type="show"
+                        data-trakt-id="{{ entry.trakt_id }}"
+                        data-title="{{ entry.title|e }}"
+                        title="Stop pinning this show’s alerts">Unpin</button>
+              {% else %}
+                <button class="btn btn-small" type="button"
+                        data-action="alerts-pin-add"
+                        data-media-type="show"
+                        data-trakt-id="{{ entry.trakt_id }}"
+                        data-title="{{ entry.title|e }}"
+                        title="Keep this show’s alerts at the top">Pin</button>
+              {% endif %}
+            </div>
           </div>
-        {% endif %}
-        {% if card.my_providers or card.found_on %}
-          <div class="streaming-line alert-services{% if card.my_providers %} mine{% endif %}">
-            {% if card.my_providers %}
-              <span class="streaming-label mine">Plays on your services:</span>
-              {% set labels = card.my_providers %}
-              {% set tag_class = 'stream mine' %}
-              {% include '_service_link_tags.html' %}
-            {% endif %}
-            {% if card.found_on %}
-              <span class="streaming-label">Found on:</span>
-              {% set labels = card.found_on %}
-              {% set tag_class = 'found' %}
-              {% include '_service_link_tags.html' %}
-            {% endif %}
-          </div>
-        {% endif %}
-        <div class="actions">
-          {% if n.media_type == 'show' and n.trakt_id and n.alert_type in ('episode_aired', 'season_aired') %}
-            <button class="btn btn-primary btn-small" type="button"
-                    data-action="progress-open"
-                    data-media-type="show"
-                    data-trakt-id="{{ n.trakt_id }}"
-                    data-title="{{ (m.title if m else n.title)|e }}">Progress</button>
-          {% endif %}
-          {% if m %}
-            <a class="btn btn-small"
-               href="{{ media_detail_url(m.media_type, m.trakt_id) }}">Details</a>
-          {% elif n.link %}
-            <a class="btn btn-small" href="{{ n.link }}">View</a>
-          {% endif %}
-          {% if n.is_read %}
-            <form method="post" action="{{ url_for('user.notification_unread', notif_id=n.id) }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-small" type="submit">Mark unread</button>
-            </form>
-          {% else %}
-            <form method="post" action="{{ url_for('user.notification_read', notif_id=n.id) }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-small" type="submit">Mark read</button>
-            </form>
-          {% endif %}
         </div>
-      </div>
-    </article>
+        <div class="alert-group-body" hidden>
+          {% for card in entry.cards %}
+            {% set nested = true %}
+            {% include '_alert_card.html' %}
+          {% endfor %}
+        </div>
+      </article>
+    {% else %}
+      {% set card = entry.card %}
+      {% set nested = false %}
+      {% include '_alert_card.html' %}
+    {% endif %}
   {% else %}
     {% if hide_read %}
-      <p class="muted">No unread alerts.{% if unread_count == 0 %} <a href="?hide_read=0">Show read</a> to browse older ones.{% endif %}</p>
+      <p class="muted">No unread alerts.{% if unread_count == 0 %} <a href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group) }}">Show read</a> to browse older ones.{% endif %}</p>
     {% else %}
       <p class="muted">No alerts yet.</p>
     {% endif %}

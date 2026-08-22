@@ -16,6 +16,7 @@ from models import MobileLoginToken, Notification, User, UserSession, db
 from services.mobile_payloads import (
     found_on_service_choices,
     serialize_alert_card,
+    serialize_alert_entry,
     serialize_media_detail,
     serialize_media_item,
     serialize_progress,
@@ -272,7 +273,10 @@ def api_alerts():
         'success': True,
         'unread_count': ctx.get('unread_count') or 0,
         'hide_read': bool(ctx.get('hide_read')),
+        'sort': ctx.get('sort') or 'desc',
+        'group_shows': bool(ctx.get('group_shows')),
         'items': [serialize_alert_card(card) for card in (ctx.get('cards') or [])],
+        'entries': [serialize_alert_entry(e) for e in (ctx.get('entries') or [])],
     })
 
 
@@ -344,6 +348,13 @@ def api_season_unwatched(trakt_id, season_number):
 def api_pin(media_type, trakt_id):
     from routes.user_routes import api_pin_media
     return api_pin_media(media_type, trakt_id)
+
+
+@mobile_api_bp.route('/alerts/pin/<media_type>/<int:trakt_id>', methods=['POST'])
+@login_required
+def api_alerts_pin(media_type, trakt_id):
+    from routes.user_routes import api_alerts_pin as impl
+    return impl(media_type, trakt_id)
 
 
 @mobile_api_bp.route('/watched/<media_type>/<int:trakt_id>', methods=['POST'])

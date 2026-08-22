@@ -380,6 +380,72 @@ def mark_show_alerts_read(user: User, show_trakt_id: int) -> int:
     return len(notes)
 
 
+def mark_cached_watched_alerts_read(
+    user: User,
+    notes: list[Notification],
+    pair_by_notif: dict[int, tuple] | None = None,
+) -> int:
+    """
+    Mark unread episode/season alerts read using local progress only.
+
+    Used when opening Alerts so a watched episode does not stay unread until
+    the next scheduled run. Does not call Trakt. ``pair_by_notif`` supplies
+    resolved (media_type, trakt_id) for older rows that never stored them.
+    """
+    from services.trakt_cache import load_progress_payload, watched_keys_from_payload
+
+    show_notes: dict[int, list[Notification]] = {}
+    for note in notes:
+        if note.is_read or note.alert_type not in (ALERT_EPISODE_AIRED, ALERT_SEASON_AIRED):
+            continue
+        pair = (pair_by_notif or {}).get(note.id)
+        media_type = pair[0] if pair else note.media_type
+        trakt_id = pair[1] if pair else note.trakt_id
+        if media_type != 'show' or not trakt_id:
+            continue
+        show_notes.setdefault(int(trakt_id), []).append(note)
+    if not show_notes:
+        return 0
+
+    marked = 0
+    for trakt_id, group in show_notes.items():
+        finished = is_finished(user.id, 'show', trakt_id)
+        watched_keys = watched_keys_from_payload(load_progress_payload(user.id, trakt_id))
+        for note in group:
+            if finished:
+                note.is_read = True
+                marked += 1
+                continue
+            payload = _notification_payload_key(note)
+            if not payload:
+                continue
+            if note.alert_type == ALERT_EPISODE_AIRED and payload.startswith('ep:'):
+                try:
+                    _prefix, s_raw, e_raw = payload.split(':', 2)
+                    key = (int(s_raw), int(e_raw))
+                except (TypeError, ValueError):
+                    continue
+                if key in watched_keys:
+                    note.is_read = True
+                    marked += 1
+            elif note.alert_type == ALERT_SEASON_AIRED and payload.startswith('season:'):
+                try:
+                    s_num = int(payload.split(':', 1)[1])
+                except (TypeError, ValueError):
+                    continue
+                if _season_drop_watched(user.id, trakt_id, s_num, watched_keys):
+                    note.is_read = True
+                    marked += 1
+    if marked:
+        try:
+            db.session.commit()
+        except Exception as exc:
+            logger.warning('Could not commit cached watched-alert cleanup: %s', exc)
+            db.session.rollback()
+            return 0
+    return marked
+
+
 def mark_movie_alerts_read(user: User, movie_trakt_id: int) -> int:
     """Mark unread movie release/streaming alerts after Mark watched."""
     movie_trakt_id = int(movie_trakt_id)

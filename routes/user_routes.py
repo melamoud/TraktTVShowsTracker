@@ -2,6 +2,7 @@
 User routes: preferences, my movies/shows, series progress, notifications, help.
 """
 
+import re
 from datetime import date, datetime, timedelta
 
 from flask import (
@@ -1219,6 +1220,31 @@ def api_pin_media(media_type, trakt_id):
     return jsonify({'success': True, 'pinned': bool(st.pinned)})
 
 
+@user_bp.route('/api/alerts/pin/<media_type>/<int:trakt_id>', methods=['POST'])
+@login_required
+def api_alerts_pin(media_type, trakt_id):
+    """Pin or unpin a title at the top of Alerts (all of that show/movie)."""
+    if media_type not in ('movie', 'show'):
+        return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    action = (request.json or {}).get('action') or 'pin'
+    st = UserMediaState.query.filter_by(
+        user_id=current_user.id, media_type=media_type, trakt_id=trakt_id,
+    ).first()
+    if not st:
+        st = UserMediaState(
+            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id,
+        )
+        db.session.add(st)
+    if action == 'unpin':
+        st.alerts_pinned = False
+        st.alerts_pinned_at = None
+    else:
+        st.alerts_pinned = True
+        st.alerts_pinned_at = datetime.utcnow()
+    db.session.commit()
+    return jsonify({'success': True, 'alerts_pinned': bool(st.alerts_pinned)})
+
+
 @user_bp.route('/api/episode/watched', methods=['POST'])
 @login_required
 def api_episode_watched():
@@ -1339,6 +1365,10 @@ ALERT_TYPE_LABELS = {
     'new_user_login': 'New login',
 }
 
+_EP_CODE_RE = re.compile(r'\bS(\d{1,2})E(\d{1,3})\b', re.IGNORECASE)
+_SEASON_CODE_RE = re.compile(r'(?:Full season|Season)\s+(\d+)', re.IGNORECASE)
+_TITLE_SEASON_RE = re.compile(r'^Season\s+(\d+)\s+out\b', re.IGNORECASE)
+
 
 def _strip_available_on_blurb(text: str) -> str:
     """Drop legacy 'Available on: …' / 'is available on …' suffixes from alert copy."""
@@ -1354,21 +1384,103 @@ def _strip_available_on_blurb(text: str) -> str:
     return raw[:cut].rstrip(' .')
 
 
-def _alert_headline(n, media) -> str:
-    """First-line extra next to the title.
+def _parse_season_episode(n) -> tuple[int | None, int | None]:
+    """Season/episode from payload_key, then message, then title."""
+    key = (getattr(n, 'payload_key', None) or '').strip()
+    if key.startswith('ep:'):
+        parts = key.split(':')
+        if len(parts) >= 3:
+            try:
+                return int(parts[1]), int(parts[2])
+            except (TypeError, ValueError):
+                pass
+    if key.startswith('season:'):
+        try:
+            return int(key.split(':', 1)[1]), None
+        except (TypeError, ValueError):
+            pass
+    for text in (getattr(n, 'message', None) or '', getattr(n, 'title', None) or ''):
+        m = _EP_CODE_RE.search(text)
+        if m:
+            return int(m.group(1)), int(m.group(2))
+        m = _SEASON_CODE_RE.search(text)
+        if m:
+            return int(m.group(1)), None
+        m = _TITLE_SEASON_RE.search(text)
+        if m:
+            return int(m.group(1)), None
+    return None, None
 
-    Episode/season alerts keep S#E# + aired date. Movies get a date — never
-    the 'Title is available on Service' blurb (that's the type tag + chips).
-    Older episode rows still store 'Available on: …' in message; strip it here.
-    """
+
+def _episode_code(n) -> str:
+    """Compact S3E5 / S3 for the title line (unpadded, as requested)."""
+    season, episode = _parse_season_episode(n)
+    if season is None:
+        return ''
+    if episode is None:
+        return f'S{season}'
+    return f'S{season}E{episode}'
+
+
+def _alert_kind_label(media_type: str | None, alert_type: str | None) -> str:
+    """Poster badge: Episode / Season / Streaming / Movie / Admin."""
+    if alert_type == 'new_user_login':
+        return 'Admin'
+    if alert_type == 'season_aired':
+        return 'Season'
+    if alert_type == 'episode_aired':
+        return 'Episode'
+    if alert_type == 'new_streaming':
+        return 'Streaming'
+    if media_type == 'movie':
+        return 'Movie'
+    if media_type == 'show':
+        return 'Show'
+    return 'Alert'
+
+
+def _group_kind_label(cards: list[dict]) -> str:
+    types = {(c['n'].alert_type or '') for c in cards}
+    if 'episode_aired' in types:
+        return 'Episode'
+    if 'season_aired' in types:
+        return 'Season'
+    if types == {'new_streaming'}:
+        return 'Streaming'
+    return 'Show'
+
+
+def _alert_headline(n, media, episode_code: str = '') -> str:
+    """Subtitle: episode name + date, or a movie date — not S#E# (that's in the title)."""
     kind = n.alert_type or ''
     if kind in ('episode_aired', 'season_aired', 'new_user_login'):
-        return _strip_available_on_blurb(n.message or '')
+        text = _strip_available_on_blurb(n.message or '')
+        if episode_code:
+            text = re.sub(
+                rf'^{re.escape(episode_code)}\s*[—\-·.]*\s*',
+                '', text, count=1, flags=re.IGNORECASE,
+            )
+            text = re.sub(
+                r'^S\d{1,2}E\d{1,3}\s*[—\-·.]*\s*',
+                '', text, count=1, flags=re.IGNORECASE,
+            )
+            text = re.sub(
+                r'^Full season\s+\d+\s*[—\-·.]*\s*',
+                '', text, count=1, flags=re.IGNORECASE,
+            )
+        return text.strip()
     if media is not None and media.released_at:
         return media.released_at.isoformat()
     if n.created_at:
         return n.created_at.strftime('%Y-%m-%d')
     return ''
+
+
+def _alert_display_title(media, n, episode_code: str) -> str:
+    name = media.title if media else (n.title or '')
+    if episode_code and name:
+        return f'{name} {episode_code}'
+    return name or (n.title or '')
 
 
 def _media_name_from_alert_title(title: str) -> str | None:
@@ -1393,6 +1505,113 @@ def _alert_media_pair(n, title_to_pair: dict) -> tuple | None:
     return None
 
 
+def _title_pairs_for_user(user, names: list[str]) -> dict[str, tuple]:
+    """Map show/movie name → (media_type, trakt_id), preferring the user's title."""
+    if not names:
+        return {}
+    found = CachedMedia.query.filter(CachedMedia.title.in_(names)).all()
+    if not found:
+        return {}
+    states = {
+        (st.media_type, int(st.trakt_id)): st
+        for st in UserMediaState.query.filter_by(user_id=user.id).all()
+    }
+
+    def _score(m) -> tuple:
+        pair = (m.media_type, int(m.trakt_id))
+        st = states.get(pair)
+        completed = int(st.episodes_completed or 0) if st else -1
+        tracked = 1 if st else 0
+        is_show = 1 if m.media_type == 'show' else 0
+        return (tracked, is_show, completed)
+
+    best: dict[str, object] = {}
+    for m in found:
+        key = m.title.casefold()
+        prev = best.get(key)
+        if prev is None or _score(m) > _score(prev):
+            best[key] = m
+    return {k: (m.media_type, int(m.trakt_id)) for k, m in best.items()}
+
+
+def _alert_sort_key(card: dict, sort: str):
+    n = card['n']
+    ts = n.created_at or datetime.min
+    pinned_rank = 0 if card.get('alerts_pinned') else 1
+    if sort == 'asc':
+        return (pinned_rank, ts)
+    return (pinned_rank, datetime.max - ts)
+
+
+def _unread_episode_codes(cards: list[dict]) -> list[str]:
+    """Unread S#E# codes, oldest first; fall back to all codes if none unread."""
+    unread = []
+    all_codes = []
+    for card in sorted(cards, key=lambda c: c['n'].created_at or datetime.min):
+        code = card.get('episode_code') or ''
+        if not code:
+            continue
+        all_codes.append(code)
+        if not card['n'].is_read:
+            unread.append(code)
+    return unread or all_codes
+
+
+def _group_alert_cards(cards: list[dict], *, group_shows: bool, sort: str) -> list[dict]:
+    """Collapse 2+ show alerts into one expandable entry; movies/admin stay single."""
+    if not group_shows:
+        return [{'kind': 'single', 'card': c} for c in cards]
+
+    buckets: dict[tuple, list[dict]] = {}
+    order: list[tuple] = []
+    for card in cards:
+        pair = card.get('media_pair')
+        if pair and pair[0] == 'show':
+            key = ('show', int(pair[1]))
+        else:
+            key = ('single', card['n'].id)
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(card)
+
+    entries = []
+    for key in order:
+        items = buckets[key]
+        if key[0] == 'show' and len(items) > 1:
+            first = items[0]
+            media = first.get('media')
+            title = media.title if media else (first['n'].title or 'Show')
+            entries.append({
+                'kind': 'group',
+                'media_type': 'show',
+                'trakt_id': key[1],
+                'media': media,
+                'title': title,
+                'kind_label': _group_kind_label(items),
+                'alerts_pinned': bool(first.get('alerts_pinned')),
+                'episode_codes': _unread_episode_codes(items),
+                'unread_count': sum(1 for c in items if not c['n'].is_read),
+                'cards': items,
+            })
+        else:
+            for card in items:
+                entries.append({'kind': 'single', 'card': card})
+
+    def _entry_sort_key(entry: dict):
+        if entry['kind'] == 'group':
+            times = [c['n'].created_at or datetime.min for c in entry['cards']]
+            lead = max(times) if sort == 'desc' else min(times)
+            pinned_rank = 0 if entry.get('alerts_pinned') else 1
+            if sort == 'asc':
+                return (pinned_rank, lead)
+            return (pinned_rank, datetime.max - lead)
+        return _alert_sort_key(entry['card'], sort)
+
+    entries.sort(key=_entry_sort_key)
+    return entries
+
+
 def _collect_alert_cards() -> dict:
     """Build Alerts page/API payload for the current user."""
     from services import view_prefs
@@ -1400,11 +1619,22 @@ def _collect_alert_cards() -> dict:
     hide_read = view_prefs.resolve_bool(
         current_user, 'alerts', 'hide_read', 'hide_read', default=True,
     )
+    sort = view_prefs.resolve_choice(
+        current_user, 'alerts', 'sort', 'sort',
+        allowed=('asc', 'desc'), default='desc',
+    )
+    group_shows = view_prefs.resolve_bool(
+        current_user, 'alerts', 'group_shows', 'group_shows', default=True,
+    )
     q = Notification.query.filter_by(user_id=current_user.id)
     unread_count = q.filter_by(is_read=False).count()
     if hide_read:
         q = q.filter_by(is_read=False)
-    rows = q.order_by(Notification.created_at.desc()).limit(200).all()
+    time_order = (
+        Notification.created_at.asc() if sort == 'asc'
+        else Notification.created_at.desc()
+    )
+    rows = q.order_by(time_order).limit(200).all()
 
     need_names = []
     for n in rows:
@@ -1412,13 +1642,7 @@ def _collect_alert_cards() -> dict:
             name = _media_name_from_alert_title(n.title or '')
             if name:
                 need_names.append(name)
-    title_to_pair: dict[str, tuple] = {}
-    if need_names:
-        found_by_title = CachedMedia.query.filter(CachedMedia.title.in_(need_names)).all()
-        title_to_pair = {
-            m.title.casefold(): (m.media_type, int(m.trakt_id))
-            for m in found_by_title
-        }
+    title_to_pair = _title_pairs_for_user(current_user, need_names)
 
     pairs = set()
     pair_by_notif: dict[int, tuple] = {}
@@ -1427,6 +1651,16 @@ def _collect_alert_cards() -> dict:
         if pair:
             pairs.add(pair)
             pair_by_notif[n.id] = pair
+
+    from services.alerts import mark_cached_watched_alerts_read
+    if mark_cached_watched_alerts_read(current_user, rows, pair_by_notif):
+        unread_count = Notification.query.filter_by(
+            user_id=current_user.id, is_read=False,
+        ).count()
+        if hide_read:
+            rows = [n for n in rows if not n.is_read]
+            pair_by_notif = {n.id: pair_by_notif[n.id] for n in rows if n.id in pair_by_notif}
+            pairs = set(pair_by_notif.values())
     media_map = {}
     if pairs:
         show_ids = [tid for mt, tid in pairs if mt == 'show']
@@ -1444,16 +1678,29 @@ def _collect_alert_cards() -> dict:
             ).all())
         media_map = {(m.media_type, int(m.trakt_id)): m for m in found}
     show_ids = [int(mt_id[1]) for mt_id in pairs if mt_id[0] == 'show']
-    state_map = {}
+    movie_ids = [int(mt_id[1]) for mt_id in pairs if mt_id[0] == 'movie']
+    state_map: dict[tuple, object] = {}
+    state_filters = []
     if show_ids:
-        state_map = {
-            int(st.trakt_id): st
-            for st in UserMediaState.query.filter(
-                UserMediaState.user_id == current_user.id,
+        state_filters.append(
+            and_(
                 UserMediaState.media_type == 'show',
                 UserMediaState.trakt_id.in_(show_ids),
-            ).all()
-        }
+            )
+        )
+    if movie_ids:
+        state_filters.append(
+            and_(
+                UserMediaState.media_type == 'movie',
+                UserMediaState.trakt_id.in_(movie_ids),
+            )
+        )
+    if state_filters:
+        for st in UserMediaState.query.filter(
+            UserMediaState.user_id == current_user.id,
+            or_(*state_filters),
+        ).all():
+            state_map[(st.media_type, int(st.trakt_id))] = st
 
     from services.streaming_matcher import split_providers_for_user
     found_map: dict[tuple, list[str]] = {}
@@ -1487,7 +1734,9 @@ def _collect_alert_cards() -> dict:
                 sorted(set(names)), current_user,
             )
         found_on = found_map.get(pair, []) if pair else []
-        st = state_map.get(pair[1]) if pair and pair[0] == 'show' else None
+        st = state_map.get(pair) if pair else None
+        episode_code = _episode_code(n)
+        media_type = pair[0] if pair else n.media_type
         cards.append({
             'n': n,
             'media': media,
@@ -1499,12 +1748,21 @@ def _collect_alert_cards() -> dict:
             'type_label': ALERT_TYPE_LABELS.get(
                 n.alert_type, (n.alert_type or '').replace('_', ' '),
             ),
-            'headline': _alert_headline(n, media),
+            'kind_label': _alert_kind_label(media_type, n.alert_type),
+            'episode_code': episode_code,
+            'display_title': _alert_display_title(media, n, episode_code),
+            'headline': _alert_headline(n, media, episode_code),
+            'alerts_pinned': bool(st and getattr(st, 'alerts_pinned', False)),
         })
+    cards.sort(key=lambda c: _alert_sort_key(c, sort))
+    entries = _group_alert_cards(cards, group_shows=group_shows, sort=sort)
     return {
         'cards': cards,
+        'entries': entries,
         'unread_count': unread_count,
         'hide_read': hide_read,
+        'sort': sort,
+        'group_shows': group_shows,
     }
 
 

@@ -288,4 +288,33 @@ def serialize_alert_card(card: dict) -> dict:
         'other_provider_links': service_link_entries(other_providers, title, year),
         'last_episode_aired_at': _iso(st.last_episode_aired_at) if st else None,
         'last_episode_label': st.last_episode_label if st else None,
+        'kind_label': card.get('kind_label') or '',
+        'episode_code': card.get('episode_code') or '',
+        'display_title': card.get('display_title') or title,
+        'alerts_pinned': bool(card.get('alerts_pinned')),
+    }
+
+
+def serialize_alert_entry(entry: dict) -> dict:
+    """JSON for a single alert or a collapsible show group."""
+    if entry.get('kind') == 'group':
+        trakt_id = entry.get('trakt_id')
+        poster_url = None
+        if trakt_id:
+            poster_url = f'/cache/posters/show/{int(trakt_id)}'
+        return {
+            'kind': 'group',
+            'media_type': 'show',
+            'trakt_id': trakt_id,
+            'title': entry.get('title') or '',
+            'poster_url': poster_url,
+            'kind_label': entry.get('kind_label') or 'Show',
+            'alerts_pinned': bool(entry.get('alerts_pinned')),
+            'episode_codes': list(entry.get('episode_codes') or []),
+            'unread_count': int(entry.get('unread_count') or 0),
+            'items': [serialize_alert_card(c) for c in (entry.get('cards') or [])],
+        }
+    return {
+        'kind': 'single',
+        'item': serialize_alert_card(entry['card']),
     }

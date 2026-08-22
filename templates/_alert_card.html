@@ -1,0 +1,111 @@
+{# Single alert row. Set nested=true inside a show group. #}
+{% set n = card.n %}
+{% set m = card.media %}
+{% set nested = nested|default(false) %}
+<article class="media-row alert-row {% if n.is_read %}dimmed{% endif %} {% if card.alerts_pinned %}is-pinned{% endif %} {% if nested %}alert-nested{% endif %}">
+  {% if m and not nested %}
+    <div class="media-poster-col">
+      <a class="media-poster"
+         href="{{ media_detail_url(m.media_type, m.trakt_id) }}">
+        {% if m.poster_url %}
+          <img src="{{ m.poster_url }}" alt="" width="120" height="180" loading="lazy">
+        {% else %}
+          <div class="poster-missing-sm">No image</div>
+        {% endif %}
+        <span class="alert-kind-badge alert-kind-{{ card.kind_label|lower }}">{{ card.kind_label }}</span>
+      </a>
+    </div>
+  {% elif not m %}
+    <div class="media-poster-col alert-kind-only">
+      <span class="alert-kind-badge alert-kind-{{ card.kind_label|lower }}">{{ card.kind_label }}</span>
+    </div>
+  {% endif %}
+  <div class="media-body">
+    <h2 class="media-title alert-title">
+      <span class="alert-title-main">
+        {% if m %}
+          <a href="{{ media_detail_url(m.media_type, m.trakt_id) }}">{{ m.title }}</a>
+        {% else %}
+          {{ n.title }}
+        {% endif %}
+        {% if card.episode_code %}
+          <span class="alert-ep-code">{{ card.episode_code }}</span>
+        {% endif %}
+        <span class="tag alert-{{ n.alert_type or 'info' }}">{{ card.type_label }}</span>
+        {% if not n.is_read %}<span class="tag found">Unread</span>{% endif %}
+      </span>
+      {% if card.headline %}
+        <span class="alert-ep">{{ card.headline }}</span>
+      {% endif %}
+    </h2>
+    {% set title = m.title if m else n.title %}
+    {% set year = m.year if m else none %}
+    {% if card.other_providers %}
+      <div class="streaming-line alert-also">
+        <span class="streaming-label">{% if card.my_providers %}Also streaming:{% else %}Streaming:{% endif %}</span>
+        {% set labels = card.other_providers %}
+        {% set tag_class = 'stream' %}
+        {% include '_service_link_tags.html' %}
+      </div>
+    {% endif %}
+    {% if card.my_providers or card.found_on %}
+      <div class="streaming-line alert-services{% if card.my_providers %} mine{% endif %}">
+        {% if card.my_providers %}
+          <span class="streaming-label mine">Plays on your services:</span>
+          {% set labels = card.my_providers %}
+          {% set tag_class = 'stream mine' %}
+          {% include '_service_link_tags.html' %}
+        {% endif %}
+        {% if card.found_on %}
+          <span class="streaming-label">Found on:</span>
+          {% set labels = card.found_on %}
+          {% set tag_class = 'found' %}
+          {% include '_service_link_tags.html' %}
+        {% endif %}
+      </div>
+    {% endif %}
+    <div class="actions">
+      {% if card.media_pair and card.media_pair[0] == 'show' %}
+        <button class="btn btn-primary btn-small" type="button"
+                data-action="progress-open"
+                data-media-type="show"
+                data-trakt-id="{{ card.media_pair[1] }}"
+                data-title="{{ (m.title if m else n.title)|e }}">Progress</button>
+      {% endif %}
+      {% if m %}
+        <a class="btn btn-small"
+           href="{{ media_detail_url(m.media_type, m.trakt_id) }}">Details</a>
+      {% elif n.link %}
+        <a class="btn btn-small" href="{{ n.link }}">View</a>
+      {% endif %}
+      {% if card.media_pair %}
+        {% if card.alerts_pinned %}
+          <button class="btn btn-small" type="button"
+                  data-action="alerts-pin-remove"
+                  data-media-type="{{ card.media_pair[0] }}"
+                  data-trakt-id="{{ card.media_pair[1] }}"
+                  data-title="{{ (m.title if m else n.title)|e }}"
+                  title="Stop pinning this title’s alerts">Unpin</button>
+        {% else %}
+          <button class="btn btn-small" type="button"
+                  data-action="alerts-pin-add"
+                  data-media-type="{{ card.media_pair[0] }}"
+                  data-trakt-id="{{ card.media_pair[1] }}"
+                  data-title="{{ (m.title if m else n.title)|e }}"
+                  title="Keep this title’s alerts at the top">Pin</button>
+        {% endif %}
+      {% endif %}
+      {% if n.is_read %}
+        <form method="post" action="{{ url_for('user.notification_unread', notif_id=n.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-small" type="submit">Mark unread</button>
+        </form>
+      {% else %}
+        <form method="post" action="{{ url_for('user.notification_read', notif_id=n.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-small" type="submit">Mark read</button>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</article>

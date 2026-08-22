@@ -213,6 +213,24 @@ data class AlertItemDto(
     val year: Int? = null,
     @SerializedName("last_episode_aired_at") val lastEpisodeAiredAt: String? = null,
     @SerializedName("last_episode_label") val lastEpisodeLabel: String? = null,
+    @SerializedName("kind_label") val kindLabel: String? = null,
+    @SerializedName("episode_code") val episodeCode: String? = null,
+    @SerializedName("display_title") val displayTitle: String? = null,
+    @SerializedName("alerts_pinned") val alertsPinned: Boolean = false,
+)
+
+data class AlertEntryDto(
+    val kind: String = "single",
+    @SerializedName("media_type") val mediaType: String? = null,
+    @SerializedName("trakt_id") val traktId: Int? = null,
+    val title: String? = null,
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    @SerializedName("kind_label") val kindLabel: String? = null,
+    @SerializedName("alerts_pinned") val alertsPinned: Boolean = false,
+    @SerializedName("episode_codes") val episodeCodes: List<String> = emptyList(),
+    @SerializedName("unread_count") val unreadCount: Int = 0,
+    val items: List<AlertItemDto> = emptyList(),
+    val item: AlertItemDto? = null,
 )
 
 data class AlertsResponse(
@@ -220,7 +238,10 @@ data class AlertsResponse(
     val message: String? = null,
     @SerializedName("unread_count") val unreadCount: Int = 0,
     @SerializedName("hide_read") val hideRead: Boolean = true,
+    val sort: String = "desc",
+    @SerializedName("group_shows") val groupShows: Boolean = true,
     val items: List<AlertItemDto> = emptyList(),
+    val entries: List<AlertEntryDto> = emptyList(),
 )
 
 data class ActionRequest(

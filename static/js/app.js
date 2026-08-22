@@ -987,6 +987,7 @@ document.addEventListener('click', async function (ev) {
     'season-watched',
     'season-unwatched',
     'series-watched',
+    'alert-group-toggle',
   ];
   if (!noOverlayActions.includes(action)) {
     showPageLoading(btn.getAttribute('data-loading-message') || 'Working…');
@@ -1234,6 +1235,33 @@ document.addEventListener('click', async function (ev) {
         action: action === 'pin-remove' ? 'unpin' : 'pin',
       });
       requestReload();
+    } else if (action === 'alert-group-toggle') {
+      const group = btn.closest('.alert-group');
+      const body = group && group.querySelector('.alert-group-body');
+      if (!group || !body) return;
+      const open = body.hasAttribute('hidden');
+      if (open) body.removeAttribute('hidden');
+      else body.setAttribute('hidden', '');
+      group.classList.toggle('is-open', open);
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const chevron = btn.querySelector('.alert-group-chevron');
+      const label = btn.querySelector('.alert-group-toggle-label');
+      const count = btn.getAttribute('data-count') || String((body.children || []).length);
+      if (chevron) chevron.textContent = open ? '▾' : '▸';
+      if (label) label.textContent = open ? 'Hide alerts' : ('Show ' + count + ' alerts');
+      const key = group.getAttribute('data-group-key');
+      if (key) {
+        let stored = {};
+        try { stored = JSON.parse(sessionStorage.getItem('alertGroupsOpen') || '{}') || {}; } catch (err) { stored = {}; }
+        stored[key] = open;
+        sessionStorage.setItem('alertGroupsOpen', JSON.stringify(stored));
+      }
+      return;
+    } else if (action === 'alerts-pin-add' || action === 'alerts-pin-remove') {
+      await apiPost('/api/alerts/pin/' + mediaType + '/' + traktId, {
+        action: action === 'alerts-pin-remove' ? 'unpin' : 'pin',
+      });
+      requestReload();
     } else if (action === 'favorite-add' || action === 'favorite-remove') {
       await apiPost('/api/favorite/' + mediaType + '/' + traktId, {
         action: action === 'favorite-remove' ? 'remove' : 'add',
@@ -1367,6 +1395,23 @@ document.addEventListener('click', async function (ev) {
     }
   }
 });
+
+(function initAlertGroups() {
+  const groups = document.querySelectorAll('.alert-group');
+  if (!groups.length) return;
+  let stored = {};
+  try {
+    stored = JSON.parse(sessionStorage.getItem('alertGroupsOpen') || '{}') || {};
+  } catch (err) {
+    stored = {};
+  }
+  groups.forEach(function (el) {
+    const key = el.getAttribute('data-group-key');
+    if (!key || !stored[key]) return;
+    const btn = el.querySelector('[data-action="alert-group-toggle"]');
+    if (btn) btn.click();
+  });
+})();
 
 document.addEventListener('change', function (ev) {
   const sel = ev.target.closest('select[name="actor"]');

@@ -1,5 +1,13 @@
 # Changes log
 
+## 2026-08-22 — Alerts pin, sort, type, and show groups
+
+- **Pin** a show or movie on Alerts (website and Android) so all of that title’s alerts — including future episodes — stay above unpinned ones (the show, not one episode)
+- **Newest first** / **Oldest first** time sort is remembered (app + web); pins still float to the top
+- Poster badge is **Episode / Season / Streaming / Movie / Admin**; episode titles include **S3E5**
+- **Grouped by show** (default) collapses a show’s episode alerts; **Show N alerts** expands them to indent and handle one by one
+- **Progress** is on every show-linked alert (including Streaming). Watched episode alerts clear when you open Alerts
+
 ## 2026-08-20 — Wishlist vs personal lists (Help)
 
 - Help documents Trakt’s Watchlist rule: the first movie play or **any one episode** removes the title from Wishlist. Use a personal list (e.g. TV Show Favs) for titles you want to keep on My Shows/Movies

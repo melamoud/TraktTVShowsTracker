@@ -23,9 +23,22 @@ A batch of episodes airing the same day only counts as a **season** alert when t
 
 ## Reading an alert card
 
-Each alert is a compact card: poster, then **title + date** on one line (with the type tag). Type tags: New episode, Season out, Released, Now streaming.
+Each alert is a compact card: poster with a badge for **what happened**, then the title.
 
-- Episode alerts add **S#E# — episode title · aired date** on that title line. Movie **Released** / **Now streaming** alerts show the movie’s release date — not “Title is available on Service” (the service is the type tag plus streaming chips). **Also streaming** (other services) is its own row above **Found on** / **Plays on your services**, which share a line — **teal** = on one of your services, gray = elsewhere (kept current at view time).
+| Badge | Meaning |
+|-------|---------|
+| **Episode** | One new episode (`S3E5`) — has **Progress** |
+| **Season** | A full season dropped the same day (one alert, not one per episode) — has **Progress** |
+| **Streaming** | The title appeared on a new service (not a new episode) — **Progress** still opens the show |
+| **Movie** | Movie release or streaming |
+| **Admin** | New user login |
+
+Episode titles put the number in the name itself — **The Agency S3E5**. Type tags (New episode, Season out, Released, Now streaming) still sit on that line.
+
+- Episode subtitle is the episode name and aired date. Movie **Released** / **Now streaming** alerts show the movie’s release date — not “Title is available on Service” (the service is the type tag plus streaming chips). **Also streaming** (other services) is its own row above **Found on** / **Plays on your services**, which share a line — **teal** = on one of your services, gray = elsewhere (kept current at view time).
+- **Pin** a show or movie to keep *all* of its alerts at the top (including future episodes of that show). This is separate from pinning on My Shows / My Movies. Pinned titles stay time-ordered among themselves, then unpinned alerts follow.
+- **Newest first** / **Oldest first** sorts by time. Choice is remembered. Pins still win over the clock.
+- **Grouped by show** (default on) collapses several episode alerts for the same show into one row: poster, show title, and the unread **S#E#** list (oldest first). **Show N alerts** (▸) marks the row as expandable — tap it to indent each episode and **Progress** / **Mark read** / **Pin** them. Pin always applies to the **show**, not one episode. **Ungroup** shows every alert as its own row. Movies and admin alerts stay individual.
 - Episode/season alerts have a **Progress** button that opens the progress **side panel** in place — mark episodes watched without leaving Alerts. **Details** goes to the full title page; **← Back** there returns to Alerts.
 - **Mark read/unread** dims or brightens the card; the nav badge counts unread.
 - On the next **alert refresh**, movie release/streaming alerts auto-mark read when the movie is watched on Trakt, and episode/season alerts auto-mark read when that episode (or every episode in the season drop) is watched on Trakt.

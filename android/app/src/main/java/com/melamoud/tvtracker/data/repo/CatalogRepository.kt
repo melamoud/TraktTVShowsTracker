@@ -76,8 +76,18 @@ class CatalogRepository(private val api: TvTrackerApi) {
     suspend fun unreadAlerts(): Int =
         runCatching { api.me().user?.unreadAlerts ?: 0 }.getOrDefault(0)
 
-    suspend fun alerts(hideRead: Boolean? = null): Result<AlertsResponse> =
-        runCatching { api.alerts(hideRead?.let { if (it) 1 else 0 }) }
+    suspend fun alerts(
+        hideRead: Boolean? = null,
+        sort: String? = null,
+        groupShows: Boolean? = null,
+    ): Result<AlertsResponse> =
+        runCatching {
+            api.alerts(
+                hideRead?.let { if (it) 1 else 0 },
+                sort,
+                groupShows?.let { if (it) 1 else 0 },
+            )
+        }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
     suspend fun alertRead(id: Int, read: Boolean) = runCatching {
@@ -88,6 +98,10 @@ class CatalogRepository(private val api: TvTrackerApi) {
 
     suspend fun pin(mediaType: String, traktId: Int, pin: Boolean) = runCatching {
         api.pin(mediaType, traktId, ActionRequest(action = if (pin) "pin" else "unpin"))
+    }
+
+    suspend fun alertsPin(mediaType: String, traktId: Int, pin: Boolean) = runCatching {
+        api.alertsPin(mediaType, traktId, ActionRequest(action = if (pin) "pin" else "unpin"))
     }
 
     suspend fun watched(mediaType: String, traktId: Int, watched: Boolean) = runCatching {

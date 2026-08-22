@@ -76,6 +76,8 @@ interface TvTrackerApi {
     @GET("/api/v1/alerts")
     suspend fun alerts(
         @Query("hide_read") hideRead: Int? = null,
+        @Query("sort") sort: String? = null,
+        @Query("group_shows") groupShows: Int? = null,
     ): AlertsResponse
 
     @POST("/api/v1/alerts/read-all")
@@ -86,6 +88,13 @@ interface TvTrackerApi {
 
     @POST("/api/v1/alerts/{id}/unread")
     suspend fun alertUnread(@Path("id") id: Int): SimpleResponse
+
+    @POST("/api/v1/alerts/pin/{mediaType}/{traktId}")
+    suspend fun alertsPin(
+        @Path("mediaType") mediaType: String,
+        @Path("traktId") traktId: Int,
+        @Body body: ActionRequest,
+    ): PinResponse
 
     @POST("/api/v1/pin/{mediaType}/{traktId}")
     suspend fun pin(
