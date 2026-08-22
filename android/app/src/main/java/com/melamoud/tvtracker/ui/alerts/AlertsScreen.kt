@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -45,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -58,6 +60,8 @@ import com.melamoud.tvtracker.ui.components.ServiceLinksLine
 import com.melamoud.tvtracker.ui.theme.AccentGold
 import com.melamoud.tvtracker.ui.theme.SurfaceAlt
 import com.melamoud.tvtracker.ui.theme.TextMuted
+
+private val AlertActionHeight = 40.dp
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -173,6 +177,7 @@ fun AlertsScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AlertGroupCard(
     entry: AlertEntryDto,
@@ -224,22 +229,46 @@ private fun AlertGroupCard(
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedButton(onClick = onToggle) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    OutlinedButton(
+                        onClick = onToggle,
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        modifier = Modifier.height(AlertActionHeight),
+                    ) {
                         Icon(
                             if (expanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                             contentDescription = null,
+                            modifier = Modifier.size(18.dp),
                         )
-                        Text(if (expanded) "Hide alerts" else "Show ${entry.items.size} alerts")
+                        Text(
+                            if (expanded) "Hide alerts" else "Show ${entry.items.size} alerts",
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                        )
                     }
-                    OutlinedButton(onClick = onProgress) { Text("Progress") }
-                    TextButton(onClick = onPin) {
+                    OutlinedButton(
+                        onClick = onProgress,
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        modifier = Modifier.height(AlertActionHeight),
+                    ) {
+                        Text("Progress", maxLines = 1, softWrap = false)
+                    }
+                    TextButton(
+                        onClick = onPin,
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.height(AlertActionHeight),
+                    ) {
                         Icon(
                             if (entry.alertsPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                             contentDescription = if (entry.alertsPinned) "Unpin" else "Pin",
-                            modifier = Modifier.padding(end = 4.dp),
+                            modifier = Modifier
+                                .padding(end = 4.dp)
+                                .size(18.dp),
                         )
-                        Text(if (entry.alertsPinned) "Unpin" else "Pin")
+                        Text(if (entry.alertsPinned) "Unpin" else "Pin", maxLines = 1, softWrap = false)
                     }
                 }
             }
@@ -325,21 +354,40 @@ private fun AlertItemCard(
                         }
                     }
                 }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = onToggleRead) {
-                        Text(if (item.isRead) "Mark unread" else "Mark read")
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    TextButton(
+                        onClick = onToggleRead,
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.height(AlertActionHeight),
+                    ) {
+                        Text(if (item.isRead) "Mark unread" else "Mark read", maxLines = 1, softWrap = false)
                     }
                     if (item.mediaType == "show" && item.traktId != null) {
-                        OutlinedButton(onClick = { onProgress(item.traktId) }) { Text("Progress") }
+                        OutlinedButton(
+                            onClick = { onProgress(item.traktId) },
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) {
+                            Text("Progress", maxLines = 1, softWrap = false)
+                        }
                     }
                     if (item.mediaType != null && item.traktId != null) {
-                        TextButton(onClick = onPin) {
+                        TextButton(
+                            onClick = onPin,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) {
                             Icon(
                                 if (item.alertsPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                                 contentDescription = if (item.alertsPinned) "Unpin" else "Pin",
-                                modifier = Modifier.padding(end = 4.dp),
+                                modifier = Modifier
+                                    .padding(end = 4.dp)
+                                    .size(18.dp),
                             )
-                            Text(if (item.alertsPinned) "Unpin" else "Pin")
+                            Text(if (item.alertsPinned) "Unpin" else "Pin", maxLines = 1, softWrap = false)
                         }
                     }
                 }

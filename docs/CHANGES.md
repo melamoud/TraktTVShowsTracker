@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-22 — Android alert Progress stays one line
+
+- Grouped **Show N alerts** no longer squeezes **Progress** onto two lines (`progre` / `ss`)
+- **Progress** matches the height of **Mark read** and **Pin** on episode rows
+
 ## 2026-08-22 — Create and delete Trakt lists from Preferences
 
 - Preferences → **Trakt lists** can **Create on Trakt** (private personal list) and **Delete** a list
