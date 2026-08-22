@@ -1078,6 +1078,44 @@ def get_personal_lists(user: User) -> list[dict]:
     return out
 
 
+def create_personal_list(user: User, name: str, *, privacy: str = 'private') -> dict:
+    """Create a personal list on Trakt. Returns ``{id, slug, name, item_count}``."""
+    name = ' '.join((name or '').split())
+    if not name:
+        raise ValueError('List name required')
+    if privacy not in ('private', 'friends', 'public'):
+        privacy = 'private'
+    data = api_request(
+        'POST',
+        '/users/me/lists',
+        user=user,
+        json_body={
+            'name': name[:100],
+            'privacy': privacy,
+            'display_numbers': False,
+            'allow_comments': False,
+        },
+    ) or {}
+    ids = data.get('ids') or {}
+    list_id = ids.get('trakt')
+    if list_id is None:
+        raise TraktError('Trakt did not return a list id', 502, str(data))
+    return {
+        'id': str(int(list_id)),
+        'slug': (ids.get('slug') or '') or '',
+        'name': (data.get('name') or name).strip() or name,
+        'item_count': int(data.get('item_count') or 0),
+    }
+
+
+def delete_personal_list(user: User, list_id: str) -> None:
+    """Delete a personal list on Trakt (not the watchlist)."""
+    lid = str(list_id).strip()
+    if not lid or lid == 'watchlist':
+        raise ValueError('Invalid list')
+    api_request('DELETE', f'/users/me/lists/{lid}', user=user)
+
+
 def _list_item_trakt_id(item: dict, media_type: str) -> int | None:
     """Extract the movie/show Trakt id from a list-items row."""
     entity = item.get(media_type) or {}

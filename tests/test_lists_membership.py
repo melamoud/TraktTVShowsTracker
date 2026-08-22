@@ -390,3 +390,57 @@ def test_preferences_list_show_and_default(app, client, user):
         assert prefs.hidden_list_ids_json == '["30"]'
         assert prefs.default_selected_list_ids_json == '["10", "watchlist"]'
         assert prefs.alert_enabled_list_ids_json == '["20", "watchlist"]'
+
+
+def test_create_trakt_list_writes_to_trakt(app, client, user):
+    login_client(client, app, user)
+    created = {'id': '99', 'slug': 'park', 'name': 'Park', 'item_count': 0}
+    with patch(
+        'routes.user_routes.trakt_client.create_personal_list', return_value=created,
+    ) as create, patch(
+        'routes.user_routes.trakt_client.get_personal_lists', return_value=[created],
+    ):
+        resp = client.post('/api/lists/create', json={'name': '  Park  '})
+    assert resp.status_code == 200
+    assert resp.get_json()['success'] is True
+    assert resp.get_json()['list']['id'] == '99'
+    create.assert_called_once()
+    assert create.call_args.args[1] == 'Park'
+
+
+def test_create_trakt_list_requires_name(app, client, user):
+    login_client(client, app, user)
+    resp = client.post('/api/lists/create', json={'name': '   '})
+    assert resp.status_code == 400
+
+
+def test_delete_trakt_list_writes_to_trakt_and_clears_local(app, client, user):
+    login_client(client, app, user)
+    with app.app_context():
+        db.session.add(UserListMembership(
+            user_id=user, list_id='20', media_type='show', trakt_id=7,
+        ))
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_enabled_list_ids_json = '["20", "watchlist"]'
+        prefs.default_selected_list_ids_json = '["20"]'
+        prefs.hidden_list_ids_json = '[]'
+        db.session.commit()
+    with patch(
+        'routes.user_routes.trakt_client.delete_personal_list', return_value=None,
+    ) as delete, patch(
+        'routes.user_routes.trakt_client.get_personal_lists', return_value=[],
+    ):
+        resp = client.post('/api/lists/20/delete')
+    assert resp.status_code == 200
+    delete.assert_called_once()
+    with app.app_context():
+        assert UserListMembership.query.filter_by(user_id=user, list_id='20').count() == 0
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        assert '20' not in (prefs.alert_enabled_list_ids_json or '')
+        assert '20' not in (prefs.default_selected_list_ids_json or '')
+
+
+def test_delete_watchlist_is_rejected(app, client, user):
+    login_client(client, app, user)
+    resp = client.post('/api/lists/watchlist/delete')
+    assert resp.status_code == 400

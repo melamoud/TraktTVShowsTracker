@@ -426,7 +426,31 @@ input[type=text], input[type=url], textarea, select {
   padding: .45rem .15rem;
   border-bottom: 1px solid rgba(42, 51, 69, 0.55);
 }
-.list-prefs-name { font-weight: 600; }
+.list-prefs-name {
+  font-weight: 600;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .35rem .55rem;
+}
+.list-prefs-delete { margin-left: auto; }
+.list-prefs-create {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+  align-items: center;
+  margin-top: .65rem;
+}
+.list-prefs-create input[type="text"] {
+  flex: 1 1 12rem;
+  min-width: 10rem;
+  padding: .4rem .55rem;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg2);
+  color: inherit;
+  font: inherit;
+}
 .list-prefs-check,
 .list-prefs-fixed {
   display: flex;

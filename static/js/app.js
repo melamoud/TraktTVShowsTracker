@@ -988,9 +988,55 @@ document.addEventListener('click', async function (ev) {
     'season-unwatched',
     'series-watched',
     'alert-group-toggle',
+    'trakt-list-delete',
   ];
   if (!noOverlayActions.includes(action)) {
     showPageLoading(btn.getAttribute('data-loading-message') || 'Working…');
+  }
+
+  if (action === 'trakt-list-create') {
+    const input = document.getElementById('new-trakt-list-name');
+    const name = ((input && input.value) || '').trim();
+    if (!name) {
+      hidePageLoading();
+      alert('Enter a list name.');
+      return;
+    }
+    btn.disabled = true;
+    try {
+      showPageLoading('Creating list on Trakt…');
+      await apiPost('/api/lists/create', { name: name });
+      requestReload();
+    } catch (err) {
+      alert(err.message || String(err));
+      btn.disabled = false;
+      hidePageLoading();
+    }
+    return;
+  }
+  if (action === 'trakt-list-delete') {
+    const listId = btn.getAttribute('data-list-id');
+    const title = btn.getAttribute('data-title') || 'this list';
+    if (!listId) return;
+    if (!window.confirm(
+      'Delete "' + title + '" on Trakt?\n\n'
+      + 'The list and the titles on it are removed from this Trakt list. '
+      + 'Watch history is not deleted.'
+    )) {
+      hidePageLoading();
+      return;
+    }
+    btn.disabled = true;
+    try {
+      showPageLoading('Deleting list on Trakt…');
+      await apiPost('/api/lists/' + encodeURIComponent(listId) + '/delete', {});
+      requestReload();
+    } catch (err) {
+      alert(err.message || String(err));
+      btn.disabled = false;
+      hidePageLoading();
+    }
+    return;
   }
 
   if (action === 'marker-prompt-keep') {

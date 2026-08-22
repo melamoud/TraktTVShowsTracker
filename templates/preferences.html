@@ -180,6 +180,11 @@
             <span class="list-prefs-name">
               {{ lst.name }}
               {% if lst.item_count %}<span class="muted">({{ lst.item_count }})</span>{% endif %}
+              <button class="btn btn-small list-prefs-delete" type="button"
+                      data-action="trakt-list-delete"
+                      data-list-id="{{ lst.id }}"
+                      data-title="{{ lst.name|e }}"
+                      title="Delete this list on Trakt">Delete</button>
             </span>
             <label class="list-prefs-check">
               <input type="checkbox" name="show_list_ids" value="{{ lst.id }}"
@@ -201,8 +206,17 @@
           </div>
         {% endfor %}
       {% elif not trakt_lists_error %}
-        <p class="meta">No personal Trakt lists yet. Create lists on Trakt.tv, then refresh this page.</p>
+        <p class="meta">No personal Trakt lists yet. Create one below — it is saved on trakt.tv.</p>
       {% endif %}
+      <div class="list-prefs-create">
+        <input type="text" id="new-trakt-list-name" maxlength="100"
+               placeholder="New list name" autocomplete="off"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();var b=document.querySelector('[data-action=trakt-list-create]');if(b)b.click();}">
+        <button class="btn btn-small btn-primary" type="button" data-action="trakt-list-create">
+          Create on Trakt
+        </button>
+      </div>
+      <p class="meta">Creates a <strong>private</strong> list on trakt.tv. Check <strong>Alerts</strong> after creating if you want notifications for titles you add to it. Delete removes the list (and its items) on Trakt — watch history is kept.</p>
     </div>
   </section>
 

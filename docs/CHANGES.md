@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-22 — Create and delete Trakt lists from Preferences
+
+- Preferences → **Trakt lists** can **Create on Trakt** (private personal list) and **Delete** a list
+- Both write to trakt.tv; Delete also clears local membership and Alerts/auto-select checkmarks for that list
+
 ## 2026-08-22 — Alerts pin, sort, type, and show groups
 
 - **Pin** a show or movie on Alerts (website and Android) so all of that title’s alerts — including future episodes — stay above unpinned ones (the show, not one episode)

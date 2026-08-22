@@ -31,6 +31,11 @@ These settings apply to both **Set lists…** and **My movies / My shows** filte
 | **Auto-select** | Used by **Apply my defaults** in Set lists…; also pre-checked in My **Lists…** until you change the filter (default = Wishlist only) |
 | **Alerts** | In-app alerts (release, streaming, new episode/season) for titles on this list (default = **Wishlist only**). Use this to silence park/archive lists |
 
+**Create / delete lists** (writes to trakt.tv):
+
+- Type a name and **Create on Trakt** — adds a **private** personal list on your Trakt account, then it appears in this table. Check **Alerts** (and Save) if you want notifications for titles you put on it.
+- **Delete** on a personal list removes that list and its items **on Trakt**. Wishlist cannot be deleted. Watch history is not touched.
+
 Example: show three lists, but only Wishlist + List 1 auto-selected — Apply my defaults / My movies filter open with those two checked. Leave **Alerts** on Wishlist alone if List 2 is where you park shows you do not want notified about.
 
 On **Set lists…**:

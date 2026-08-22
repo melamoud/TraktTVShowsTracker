@@ -1245,6 +1245,87 @@ def api_alerts_pin(media_type, trakt_id):
     return jsonify({'success': True, 'alerts_pinned': bool(st.alerts_pinned)})
 
 
+def _strip_list_id_from_prefs(user, list_id: str) -> None:
+    """Drop a deleted Trakt list id from hide / default / alert prefs."""
+    import json
+    prefs = getattr(user, 'preferences', None)
+    if prefs is None:
+        return
+    lid = str(list_id)
+    for field in (
+        'hidden_list_ids_json',
+        'default_selected_list_ids_json',
+        'alert_enabled_list_ids_json',
+    ):
+        raw = getattr(prefs, field, None) or '[]'
+        try:
+            ids = [str(x) for x in json.loads(raw) if str(x) != lid]
+        except (TypeError, json.JSONDecodeError):
+            continue
+        setattr(prefs, field, json.dumps(ids))
+
+
+def _refresh_personal_lists_cache(user) -> list[dict]:
+    from services.trakt_cache import replace_cached_personal_lists
+    lists = trakt_client.get_personal_lists(user)
+    replace_cached_personal_lists(user.id, lists)
+    return lists
+
+
+@user_bp.route('/api/lists/create', methods=['POST'])
+@login_required
+def api_create_trakt_list():
+    """Create a private personal list on Trakt and refresh the local cache."""
+    name = ((request.json or {}).get('name') or '').strip()
+    if not name:
+        return jsonify({'success': False, 'message': 'Enter a list name'}), 400
+    try:
+        created = trakt_client.create_personal_list(current_user, name)
+    except Exception as exc:
+        current_app.logger.warning('Create Trakt list failed: %s', exc)
+        return jsonify({
+            'success': False,
+            'message': 'Could not create the list on Trakt. Try again.',
+        }), 400
+    try:
+        _refresh_personal_lists_cache(current_user)
+    except Exception as exc:
+        current_app.logger.warning('Could not refresh lists after create: %s', exc)
+    db.session.commit()
+    return jsonify({'success': True, 'list': created})
+
+
+@user_bp.route('/api/lists/<list_id>/delete', methods=['POST'])
+@login_required
+def api_delete_trakt_list(list_id):
+    """Delete a personal list on Trakt and drop local membership / prefs."""
+    lid = str(list_id or '').strip()
+    if not lid or lid == 'watchlist':
+        return jsonify({'success': False, 'message': 'Wishlist cannot be deleted'}), 400
+    try:
+        trakt_client.delete_personal_list(current_user, lid)
+    except Exception as exc:
+        current_app.logger.warning('Delete Trakt list %s failed: %s', lid, exc)
+        return jsonify({
+            'success': False,
+            'message': 'Could not delete the list on Trakt. Try again.',
+        }), 400
+    UserListMembership.query.filter_by(
+        user_id=current_user.id, list_id=lid,
+    ).delete(synchronize_session=False)
+    _strip_list_id_from_prefs(current_user, lid)
+    try:
+        _refresh_personal_lists_cache(current_user)
+    except Exception as exc:
+        current_app.logger.warning('Could not refresh lists after delete: %s', exc)
+        from models import UserTraktList
+        UserTraktList.query.filter_by(
+            user_id=current_user.id, list_id=lid,
+        ).delete(synchronize_session=False)
+    db.session.commit()
+    return jsonify({'success': True})
+
+
 @user_bp.route('/api/episode/watched', methods=['POST'])
 @login_required
 def api_episode_watched():
