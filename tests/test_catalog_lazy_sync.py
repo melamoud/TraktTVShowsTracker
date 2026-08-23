@@ -29,8 +29,8 @@ def test_bootstrap_initial_fetches_newest_pages_only(app):
         def fake_probe(media_type, start_date):
             return {
                 'page_count': 10,
-                'item_count': 10,
-                'limit': 1,
+                'item_count': 1000,
+                'limit': 100,
                 'page1': None,
             }
 
@@ -87,6 +87,71 @@ def test_reconcile_feed_cursor_reopens_lazy_older_path(app):
         assert cur.page_count == 100
         assert cur.oldest_fetched_page == 100
         assert sync_jobs.catalog_has_more_older('movie') is True
+
+
+def test_ensure_through_marker_refreshes_inflated_page_count(app, user):
+    """limit=1 leftover page_count must not skip Newest (TTL would hide it)."""
+    with app.app_context():
+        u = db.session.get(User, user)
+        db.session.add(CachedMedia(
+            media_type='movie',
+            trakt_id=1,
+            title='Cached',
+            feed_source='trakt_db_updates',
+            trakt_listed_at=datetime(2026, 8, 1, 12, 0, 0),
+        ))
+        db.session.add(CatalogFeedSync(
+            media_type='movie',
+            start_date=sync_jobs._updates_start_date(),
+            page_count=137011,
+            oldest_fetched_page=135985,
+            newest_fetched_page=137011,
+            bootstrapped_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        ))
+        db.session.commit()
+
+        with patch(
+            'services.sync_jobs.trakt_client.probe_updates_pagination',
+            return_value={'page_count': 1371, 'item_count': 137011, 'limit': 100, 'page1': None},
+        ), patch(
+            'services.sync_jobs.refresh_catalog_newest', return_value=7,
+        ) as refresh:
+            added = sync_jobs.ensure_catalog_through_marker('movie', u)
+        assert added == 7
+        refresh.assert_called_once()
+
+
+def test_sync_catalog_clamps_inflated_newest_page(app):
+    """limit=1 leftover newest=137011 must not be kept after a real limit=100 fetch."""
+    with app.app_context():
+        start = sync_jobs._updates_start_date()
+        db.session.add(CatalogFeedSync(
+            media_type='movie',
+            start_date=start,
+            page_count=137011,
+            oldest_fetched_page=135985,
+            newest_fetched_page=137011,
+            bootstrapped_at=datetime.utcnow(),
+            updated_at=datetime.utcnow(),
+        ))
+        db.session.commit()
+
+        with patch(
+            'services.sync_jobs.trakt_client.probe_updates_pagination',
+            return_value={'page_count': 1371, 'item_count': 137011, 'limit': 100, 'page1': None},
+        ), patch(
+            'services.sync_jobs.trakt_client.fetch_updates_pages',
+            return_value=[_update_item(9, 'Newest Real', '2026-08-23T12:00:00.000Z')],
+        ) as mocked_pages, patch('services.sync_jobs.enrich_media_details', return_value=0):
+            sync_jobs.refresh_catalog_newest('movie')
+
+        mocked_pages.assert_called_once()
+        assert mocked_pages.call_args.args[2:4] == (1371, 1371)
+        cursor = db.session.get(CatalogFeedSync, 'movie')
+        assert cursor.page_count == 1371
+        assert cursor.newest_fetched_page == 1371
+        assert cursor.oldest_fetched_page == 1371
 
 
 def test_ensure_through_marker_does_not_walk_older_pages(app, user):

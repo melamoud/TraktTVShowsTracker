@@ -260,14 +260,38 @@ def upsert_cached_media(
         else:
             row.released_at = released
 
+    incoming_catalog = feed_source == 'trakt_db_updates'
+    existing_catalog = row.feed_source == 'trakt_db_updates'
+    is_catalog = incoming_catalog or existing_catalog
+    is_updates_payload = bool(item.get('updated_at'))
+
     candidate_listed = listed_at
-    if not candidate_listed and released:
+    # Theatrical / premiere dates are NOT Latest sort keys. Using them pins
+    # unreleased 2026 titles at the top and hides real Trakt DB updates.
+    if not candidate_listed and not is_catalog and released:
         candidate_listed = datetime.combine(released, datetime.min.time())
     if not candidate_listed:
         candidate_listed = _parse_trakt_dt(item.get('updated_at')) or _parse_trakt_dt(
             entity.get('updated_at')
         )
-    if candidate_listed and (
+    now_cap = datetime.utcnow() + timedelta(hours=12)
+    if incoming_catalog:
+        if listed_at is not None and listed_at <= now_cap:
+            row.trakt_listed_at = listed_at
+        elif listed_at is not None and listed_at > now_cap:
+            parsed = _parse_trakt_dt(item.get('updated_at')) or _parse_trakt_dt(
+                entity.get('updated_at')
+            )
+            if parsed and parsed <= now_cap:
+                row.trakt_listed_at = parsed
+        elif candidate_listed and candidate_listed <= now_cap and (
+            not row.trakt_listed_at or candidate_listed > row.trakt_listed_at
+        ):
+            row.trakt_listed_at = candidate_listed
+    elif existing_catalog:
+        # Watchlist / list / summary upserts must not rewrite Latest's sort key.
+        pass
+    elif candidate_listed and (
         not row.trakt_listed_at or candidate_listed > row.trakt_listed_at
     ):
         row.trakt_listed_at = candidate_listed
@@ -278,13 +302,20 @@ def upsert_cached_media(
     if feed_source:
         row.feed_source = feed_source
 
-    row.raw_json = json.dumps(item)[:20000]
+    # Keep /updates JSON (has updated_at) so later repairs and syncs can use it.
+    if is_updates_payload or not existing_catalog:
+        row.raw_json = json.dumps(item)[:20000]
     row.updated_at = datetime.utcnow()
     return row
 
 
 # Trakt /updates rejects dates older than ~30 days; stay inside with margin.
 UPDATES_WINDOW_DAYS = 28
+# Same page size as fetch_updates_pages. Probe used to use limit=1, which made
+# page_count ≈ item count and Newest refresh asked for a page that does not exist.
+UPDATES_FETCH_LIMIT = 100
+# ~100× inflated page_count from the old limit=1 probe (e.g. 137k "pages").
+MAX_UPDATES_PAGES = 5000
 # One newest page only — older pages load when the user pages back.
 INITIAL_BOOTSTRAP_PAGES = 1
 NEWEST_REFRESH_MIN_INTERVAL = timedelta(minutes=15)
@@ -294,6 +325,20 @@ def _updates_start_date(days_back: int = UPDATES_WINDOW_DAYS) -> str:
     """ISO date for Trakt /updates window (clamped to a safe ~28-day max)."""
     days_back = max(1, min(int(days_back), UPDATES_WINDOW_DAYS))
     return (date.today() - timedelta(days=days_back)).isoformat()
+
+
+def _updates_page_count(meta: dict) -> int:
+    """Page count for limit=100 fetches, even if the probe used another limit."""
+    item_count = int(meta.get('item_count') or 0)
+    fetch_limit = UPDATES_FETCH_LIMIT
+    if item_count > 0:
+        pages = max(1, (item_count + fetch_limit - 1) // fetch_limit)
+    else:
+        pages = max(1, int(meta.get('page_count') or 1))
+        probe_limit = int(meta.get('limit') or fetch_limit)
+        if probe_limit != fetch_limit:
+            pages = max(1, (pages * probe_limit + fetch_limit - 1) // fetch_limit)
+    return min(pages, MAX_UPDATES_PAGES)
 
 
 def _item_trakt_id(item: dict, media_type: str) -> int | None:
@@ -344,6 +389,11 @@ def _save_feed_sync(
         row = CatalogFeedSync(media_type=media_type, start_date=start_date)
         db.session.add(row)
     row.start_date = start_date
+    page_count = max(1, int(page_count or 1))
+    if newest_fetched_page is not None:
+        newest_fetched_page = max(1, min(int(newest_fetched_page), page_count))
+    if oldest_fetched_page is not None:
+        oldest_fetched_page = max(1, min(int(oldest_fetched_page), page_count))
     row.page_count = page_count
     row.oldest_fetched_page = oldest_fetched_page
     row.newest_fetched_page = newest_fetched_page
@@ -387,12 +437,14 @@ def reconcile_feed_cursor(media_type: str, days_back: int = UPDATES_WINDOW_DAYS)
     start = _updates_start_date(days_back)
     cursor = _get_feed_sync(media_type)
     # Fast path: cursor already looks like an in-progress / valid lazy window.
+    # Skip if page_count is the old limit=1 probe leftover (~item count).
     if (
         cursor
         and cursor.bootstrapped_at
         and cursor.start_date == start
-        and int(cursor.page_count or 0) > 10
+        and 10 < int(cursor.page_count or 0) <= MAX_UPDATES_PAGES
         and int(cursor.oldest_fetched_page or 0) > 1
+        and int(cursor.newest_fetched_page or 0) <= int(cursor.page_count or 0)
     ):
         return cursor
 
@@ -402,7 +454,7 @@ def reconcile_feed_cursor(media_type: str, days_back: int = UPDATES_WINDOW_DAYS)
         logger.warning('Feed cursor probe failed for %s: %s', media_type, exc)
         return cursor
 
-    real_pages = max(1, int(meta['page_count']))
+    real_pages = _updates_page_count(meta)
     if not cursor:
         row = _save_feed_sync(
             media_type,
@@ -417,6 +469,8 @@ def reconcile_feed_cursor(media_type: str, days_back: int = UPDATES_WINDOW_DAYS)
 
     broken = (
         cursor.start_date != start
+        or int(cursor.page_count or 0) > MAX_UPDATES_PAGES
+        or int(cursor.newest_fetched_page or 0) > int(cursor.page_count or 0)
         or int(cursor.page_count or 0) < max(2, min(real_pages, 50))
         or (
             int(cursor.oldest_fetched_page or 0) <= 1
@@ -467,7 +521,7 @@ def sync_catalog(
     ``enrich`` is off by default — visible-page enrich handles display; bulk enrich
     was the main cause of 30s+ Refresh times.
 
-    Uses a *light* pagination probe (limit=1, no extended), then fetches only the
+    Uses a *light* pagination probe (limit=100, no extended), then fetches only the
     newest page(s) with extended=full — never the oldest page.
     """
     import time
@@ -475,7 +529,7 @@ def sync_catalog(
     t0 = time.perf_counter()
     start = _updates_start_date(days_back)
     meta = trakt_client.probe_updates_pagination(media_type, start)
-    page_count = meta['page_count']
+    page_count = _updates_page_count(meta)
     t_probe = time.perf_counter()
 
     if full_window and pages is None:
@@ -500,9 +554,14 @@ def sync_catalog(
     existing = _get_feed_sync(media_type)
     oldest = from_page
     newest = page_count
-    if existing and existing.start_date == start and existing.oldest_fetched_page:
-        oldest = min(int(existing.oldest_fetched_page), from_page)
-        newest = max(int(existing.newest_fetched_page or 0), page_count)
+    if existing and existing.start_date == start:
+        old_oldest = int(existing.oldest_fetched_page or 0)
+        old_newest = int(existing.newest_fetched_page or 0)
+        # Ignore leftover limit=1 page numbers (they are item indexes, not pages).
+        if 1 < old_oldest <= page_count:
+            oldest = min(old_oldest, from_page)
+        if old_newest <= page_count:
+            newest = max(old_newest, page_count)
     _save_feed_sync(
         media_type,
         start,
@@ -569,12 +628,16 @@ def ensure_catalog_through_marker(
     if count == 0:
         return bootstrap_catalog_initial(media_type, days_back=days_back)
 
+    existing = _get_feed_sync(media_type)
+    bogus_page_count = bool(
+        existing and int(existing.page_count or 0) > MAX_UPDATES_PAGES
+    )
     cursor = reconcile_feed_cursor(media_type, days_back=days_back)
     if not cursor or not cursor.bootstrapped_at:
         return bootstrap_catalog_initial(media_type, days_back=days_back)
 
     start = _updates_start_date(days_back)
-    if cursor.start_date != start:
+    if bogus_page_count or cursor.start_date != start:
         return refresh_catalog_newest(media_type, days_back=days_back, pages=1)
 
     if _should_refresh_newest(media_type):

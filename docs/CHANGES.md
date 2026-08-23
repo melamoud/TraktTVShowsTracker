@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-23 — Latest was stuck: wrong Trakt page + future sort dates
+
+- Newest catalog refresh used a `limit=1` pagination probe, so it asked Trakt for page ~137000 (item count) instead of the real newest page of 100. No new titles landed for days
+- Theatrical dates (e.g. Avengers: Doomsday in December) were overwriting Latest’s sort key, pinning unreleased 2026 titles at the top. Sort is Trakt DB `updated_at` again
+- Watchlist/list sync no longer rewrites that sort key or replaces catalog JSON with a list payload
+
 ## 2026-08-22 — Alert when you add a title to a list
 
 - Adding a movie or show to Wishlist or a personal list (Set lists or Wishlist) creates an in-app **Added to a list** alert immediately

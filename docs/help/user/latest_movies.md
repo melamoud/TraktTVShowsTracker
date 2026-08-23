@@ -27,13 +27,13 @@ Uses Trakt’s official `/movies/updates` API — the closest public feed to “
 - brand-new titles entering Trakt’s DB, and  
 - older titles when Trakt later edits their metadata  
 
-Your **review marker** uses this Trakt DB activity time (not theatrical release date).
+Your **review marker** uses this Trakt DB activity time (not theatrical release date). Unreleased titles must not jump to the top of Latest just because their cinema date is in the future.
 
 This is **not** the public release / “coming soon” calendar.
 
 ## How sync works
 
-1. **First time** / **Refresh**: light pagination probe (`limit=1`), then **one newest** Trakt `/updates` page with `extended=full` (genres/overview for Matches-only).  
+1. **First time** / **Refresh**: light pagination probe (`limit=100`, no extended), then **one newest** Trakt `/updates` page with `extended=full` (genres/overview for Matches-only).  
 2. **Later visits**: uses your local catalog cache; at most a throttled 1-page newest refresh (admin **Trakt read cache** TTL, default 2 hours).  
 3. **Older pages**: loaded **only** when you click **Load older Trakt page** — never invent empty UI pages.  
 4. **Hide watched**: uses the same local watched/wishlist cache as My pages (refreshed on that TTL, not on every click).  

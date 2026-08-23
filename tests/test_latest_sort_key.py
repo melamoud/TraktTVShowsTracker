@@ -84,3 +84,92 @@ def test_upsert_update_preserves_updated_at_on_repeated_sync(app, user):
         )
         row = CachedMedia.query.filter_by(trakt_id=1002, media_type='movie').first()
         assert row.trakt_listed_at == second.replace(microsecond=0)
+
+
+def test_catalog_listed_at_not_bumped_by_future_release(app, user):
+    """Watchlist/summary upserts must not pin Latest with a theatrical date."""
+    with app.app_context():
+        updated_at = _dt(-1)
+        future_release = _dt(90)
+        _upsert_update_items(
+            'movie',
+            [
+                {
+                    'updated_at': updated_at.isoformat() + 'Z',
+                    'movie': {
+                        'title': 'Doomsday',
+                        'year': 2026,
+                        'ids': {'trakt': 1003},
+                        'released': future_release.date().isoformat(),
+                    },
+                }
+            ],
+        )
+        row = CachedMedia.query.filter_by(trakt_id=1003, media_type='movie').first()
+        assert row.trakt_listed_at == updated_at.replace(microsecond=0)
+
+        upsert_cached_media(
+            'movie',
+            {
+                'title': 'Doomsday',
+                'year': 2026,
+                'ids': {'trakt': 1003},
+                'released': future_release.date().isoformat(),
+            },
+            listed_at=None,
+            feed_source='trakt_db_updates',
+        )
+        row = CachedMedia.query.filter_by(trakt_id=1003, media_type='movie').first()
+        assert row.trakt_listed_at == updated_at.replace(microsecond=0)
+        assert row.released_at == future_release.date()
+
+
+def test_list_upsert_does_not_rewrite_catalog_sort_or_raw(app, user):
+    """Watchlist payloads must not pin Latest or wipe /updates JSON."""
+    with app.app_context():
+        updated_at = _dt(-2)
+        _upsert_update_items(
+            'movie',
+            [
+                {
+                    'updated_at': updated_at.isoformat() + 'Z',
+                    'movie': {
+                        'title': 'Doomsday',
+                        'year': 2026,
+                        'ids': {'trakt': 1004},
+                        'released': _dt(90).date().isoformat(),
+                    },
+                }
+            ],
+        )
+        upsert_cached_media(
+            'movie',
+            {
+                'type': 'movie',
+                'listed_at': _dt(-1).isoformat() + 'Z',
+                'rank': 1,
+                'movie': {
+                    'title': 'Doomsday',
+                    'year': 2026,
+                    'ids': {'trakt': 1004},
+                    'released': _dt(90).date().isoformat(),
+                },
+            },
+        )
+        row = CachedMedia.query.filter_by(trakt_id=1004, media_type='movie').first()
+        assert row.trakt_listed_at == updated_at.replace(microsecond=0)
+        raw = json.loads(row.raw_json or '{}')
+        assert raw.get('updated_at')
+        assert 'rank' not in raw
+
+
+def test_updates_page_count_converts_limit_1_probe(app):
+    """Old limit=1 probes reported page_count ≈ item count; fetch uses 100/page."""
+    from services.sync_jobs import _updates_page_count
+
+    assert _updates_page_count({
+        'page_count': 137011, 'item_count': 137011, 'limit': 1,
+    }) == 1371
+    assert _updates_page_count({
+        'page_count': 100, 'item_count': 10000, 'limit': 100,
+    }) == 100

@@ -324,7 +324,10 @@ def probe_updates_pagination(
     base = current_app.config['TRAKT_API_BASE'].rstrip('/')
     headers = _headers()
     # Tiny page-1 request just to read X-Pagination-Page-Count.
-    params: dict = {'limit': 1, 'page': 1}
+    # Must use the same limit as fetch_updates_pages (100). limit=1 made
+    # page_count equal the item count (~100× too high), so Newest refresh
+    # requested a page that does not exist and Latest stopped getting titles.
+    params: dict = {'limit': 100, 'page': 1}
     if extended:
         params['extended'] = extended
     resp = requests.get(
@@ -344,7 +347,7 @@ def probe_updates_pagination(
         'page_count': max(1, int(resp.headers.get('X-Pagination-Page-Count') or 1)),
         'item_count': int(resp.headers.get('X-Pagination-Item-Count') or 0),
         'limit': int(resp.headers.get('X-Pagination-Limit') or 100),
-        # Do not reuse as a full page cache — probe used limit=1.
+        # Do not reuse as a full page cache — probe is headers-only / incomplete.
         'page1': None,
     }
 
