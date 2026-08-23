@@ -85,6 +85,7 @@ fun AppNav(
         currentRoute?.startsWith("detail/") != true
     val unreadAlerts by container.unreadAlerts.collectAsStateWithLifecycle()
     val pendingActor by container.pendingActorSearch.collectAsStateWithLifecycle()
+    val pendingOpen by container.pendingOpen.collectAsStateWithLifecycle()
     val onUnread = container::setUnreadAlerts
 
     fun openDetail(mediaType: String, traktId: Int) {
@@ -100,6 +101,26 @@ fun AppNav(
             launchSingleTop = true
             restoreState = true
         }
+    }
+
+    LaunchedEffect(pendingOpen, loggedIn) {
+        val open = pendingOpen ?: return@LaunchedEffect
+        when (open.dest) {
+            "detail" -> {
+                val mt = open.mediaType
+                val id = open.traktId
+                if (mt != null && id != null) navController.navigate("detail/$mt/$id")
+            }
+            "progress" -> open.traktId?.let { navController.navigate("progress/$it") }
+            "shows", "movies", "alerts", "search" -> {
+                navController.navigate(open.dest) {
+                    popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                    launchSingleTop = true
+                    restoreState = true
+                }
+            }
+        }
+        container.consumePendingOpen()
     }
 
     Scaffold(

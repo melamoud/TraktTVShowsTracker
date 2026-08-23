@@ -363,6 +363,41 @@ data class CommentResponse(
     val review: Boolean = false,
 )
 
+data class WidgetEpisodeIdsDto(
+    val trakt: Int? = null,
+    val tvdb: Int? = null,
+    val tmdb: Int? = null,
+    val imdb: String? = null,
+)
+
+data class WidgetItemDto(
+    val id: String = "",
+    val kind: String = "",
+    @SerializedName("media_type") val mediaType: String? = null,
+    @SerializedName("trakt_id") val traktId: Int? = null,
+    val title: String = "",
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    val subtitle: String? = null,
+    @SerializedName("remaining_label") val remainingLabel: String? = null,
+    @SerializedName("can_watch") val canWatch: Boolean = false,
+    val season: Int? = null,
+    val episode: Int? = null,
+    @SerializedName("episode_ids") val episodeIds: WidgetEpisodeIdsDto? = null,
+    @SerializedName("alert_id") val alertId: Int? = null,
+    @SerializedName("group_key") val groupKey: String? = null,
+    val expandable: Boolean = false,
+    @SerializedName("child_count") val childCount: Int = 0,
+    @SerializedName("unread_count") val unreadCount: Int = 0,
+    val items: List<WidgetItemDto> = emptyList(),
+)
+
+data class WidgetResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val mode: String = "shows",
+    val items: List<WidgetItemDto> = emptyList(),
+)
+
 data class FavoriteActorResponse(
     val success: Boolean,
     val message: String? = null,

@@ -1,5 +1,13 @@
 # Changes log
 
+## 2026-08-23 — Android home-screen widget
+
+- Add a resizable **TV Tracker** widget with **Shows Progress**, **Movies**, and **Alerts** (switch on the widget). Header shows the app icon and **TV Tracker ·** mode
+- Shows: newest aired, one line per show with a next episode to watch (caught-up shows are hidden); remaining count; checkmark marks that episode after confirm
+- Movies: newest aired; checkmark marks the movie watched after confirm
+- Alerts: grouped by show; tap the arrow to expand. Title/poster opens the app on that title
+- List scrolls. Does not change the website’s List vs Newest aired setting
+
 ## 2026-08-23 — Latest was stuck: wrong Trakt page + future sort dates
 
 - Newest catalog refresh used a `limit=1` pagination probe, so it asked Trakt for page ~137000 (item count) instead of the real newest page of 100. No new titles landed for days

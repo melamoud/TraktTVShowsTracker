@@ -14,6 +14,7 @@ import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
+import com.melamoud.tvtracker.data.api.dto.WidgetResponse
 
 class CatalogRepository(private val api: TvTrackerApi) {
     suspend fun myMedia(
@@ -71,6 +72,10 @@ class CatalogRepository(private val api: TvTrackerApi) {
 
     suspend fun progress(traktId: Int, refresh: Boolean = false): Result<ProgressResponse> =
         runCatching { api.progress(traktId, if (refresh) 1 else null) }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun widget(mode: String): Result<WidgetResponse> =
+        runCatching { api.widget(mode) }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
     suspend fun unreadAlerts(): Int =

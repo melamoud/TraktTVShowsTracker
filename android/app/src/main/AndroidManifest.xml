@@ -37,6 +37,36 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="tvtracker" android:host="oauth" />
             </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="tvtracker" android:host="open" />
+            </intent-filter>
         </activity>
+
+        <activity
+            android:name=".widget.WidgetConfirmActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.TVTracker.Translucent" />
+
+        <receiver
+            android:name=".widget.TrackerWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/tracker_widget_info" />
+        </receiver>
+
+        <service
+            android:name=".widget.TrackerWidgetService"
+            android:exported="false"
+            android:permission="android.permission.BIND_REMOTEVIEWS" />
     </application>
 </manifest>

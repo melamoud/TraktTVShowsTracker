@@ -185,6 +185,32 @@ def _keys_to_tuples(raw) -> set[tuple[int, int]]:
     return out
 
 
+def episode_ids_from_progress(
+    user_id: int, trakt_id: int, season: int, episode: int,
+) -> dict:
+    """Episode ids stored in the progress cache for one S/E, or {}."""
+    from services.trakt_client import sanitize_episode_ids
+
+    payload = load_progress_payload(user_id, trakt_id)
+    if not payload:
+        return {}
+    want_s, want_e = int(season), int(episode)
+    for season_row in payload.get('seasons_meta') or []:
+        try:
+            if int(season_row.get('number')) != want_s:
+                continue
+        except (TypeError, ValueError):
+            continue
+        for ep in season_row.get('episodes') or []:
+            try:
+                if int(ep.get('number')) != want_e:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            return sanitize_episode_ids(ep.get('ids') or {})
+    return {}
+
+
 def load_progress_payload(user_id: int, trakt_id: int) -> dict | None:
     """Return stored progress JSON for a show, or None."""
     row = UserMediaState.query.filter_by(

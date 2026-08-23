@@ -240,3 +240,88 @@ def test_search_json_year_and_genre_filter(app, client, user):
     ids = [item['trakt_id'] for item in data['items']]
     assert 23 in ids
     assert 21 not in ids
+
+
+def test_widget_requires_login(client):
+    resp = client.get('/api/v1/widget?mode=shows')
+    assert resp.status_code == 401
+
+
+def test_widget_shows_movies_alerts_and_does_not_persist_display(app, client, user):
+    login_client(client, app, user)
+    with app.app_context():
+        from services import view_prefs
+        from models import User
+        user_obj = db.session.get(User, user)
+        view_prefs.update_view(user_obj, 'my_shows', display='list')
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=42, title='The Bear', year=2022,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=42, on_watchlist=True,
+            episodes_aired=10, episodes_completed=8,
+            next_episode_season=3, next_episode_number=2,
+            next_episode_title='Forks',
+            last_episode_aired_at=datetime.utcnow() - timedelta(days=1),
+        ))
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=99, title='All Caught Up', year=2020,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=99, on_watchlist=True,
+            episodes_aired=8, episodes_completed=8,
+            last_episode_aired_at=datetime.utcnow() - timedelta(days=2),
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=9, title='Old Film', year=2020,
+            released_at=datetime.utcnow().date() - timedelta(days=10),
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=9, on_watchlist=True,
+            watched=False,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired', title='The Bear S3E1',
+            message='S03E01 aired', media_type='show', trakt_id=42,
+            payload_key='ep:3:1',
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired', title='The Bear S3E2',
+            message='S03E02 aired', media_type='show', trakt_id=42,
+            payload_key='ep:3:2',
+        ))
+        db.session.commit()
+
+    shows = client.get('/api/v1/widget?mode=shows')
+    assert shows.status_code == 200
+    show_body = shows.get_json()
+    assert show_body['mode'] == 'shows'
+    assert show_body['items']
+    row = show_body['items'][0]
+    assert row['title'] == 'The Bear'
+    assert row['can_watch'] is True
+    assert row['season'] == 3
+    assert 'more to watch' in (row.get('remaining_label') or '')
+    assert all(item['title'] != 'All Caught Up' for item in show_body['items'])
+
+    movies = client.get('/api/v1/widget?mode=movies')
+    assert movies.status_code == 200
+    movie_body = movies.get_json()
+    assert movie_body['mode'] == 'movies'
+    assert movie_body['items'][0]['title'] == 'Old Film'
+    assert movie_body['items'][0]['can_watch'] is True
+
+    alerts = client.get('/api/v1/widget?mode=alerts')
+    assert alerts.status_code == 200
+    alert_body = alerts.get_json()
+    assert alert_body['mode'] == 'alerts'
+    group = next(item for item in alert_body['items'] if item['kind'] == 'group')
+    assert group['expandable'] is True
+    assert group['child_count'] == 2
+    assert group['items']
+
+    with app.app_context():
+        from services import view_prefs
+        from models import User
+        user_obj = db.session.get(User, user)
+        assert view_prefs.get_view(user_obj, 'my_shows').get('display') == 'list'

@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import com.melamoud.tvtracker.ui.nav.AppNav
 import com.melamoud.tvtracker.ui.theme.TvTrackerTheme
+import com.melamoud.tvtracker.widget.TrackerWidgetProvider
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -23,7 +24,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         WindowCompat.setDecorFitsSystemWindows(window, false)
-        handleOauthIntent(intent)
+        handleDeepLink(intent)
         val container = TvTrackerApp.from(this).container
 
         setContent {
@@ -39,6 +40,7 @@ class MainActivity : ComponentActivity() {
                     loggedIn = user != null
                     username = user?.username
                     container.setUnreadAlerts(user?.unreadAlerts ?: 0)
+                    if (user != null) TrackerWidgetProvider.requestRefresh(this@MainActivity)
                     checking = false
                 }
 
@@ -54,6 +56,7 @@ class MainActivity : ComponentActivity() {
                             loggedIn = true
                             username = name
                             container.setUnreadAlerts(unreadCount)
+                            TrackerWidgetProvider.requestRefresh(this@MainActivity)
                         },
                         onLogout = {
                             scope.launch {
@@ -71,16 +74,36 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        handleOauthIntent(intent)
+        handleDeepLink(intent)
     }
 
-    private fun handleOauthIntent(intent: Intent?) {
+    private fun handleDeepLink(intent: Intent?) {
         val data = intent?.data ?: return
-        if (data.scheme == "tvtracker" && data.host == "oauth") {
+        if (data.scheme != "tvtracker") return
+        if (data.host == "oauth") {
             val token = data.getQueryParameter("token")
             if (!token.isNullOrBlank()) {
                 oauthTokenState.value = token
             }
+            return
+        }
+        if (data.host != "open") return
+        val parts = data.pathSegments
+        val dest = parts.getOrNull(0) ?: return
+        val container = TvTrackerApp.from(this).container
+        when (dest) {
+            "detail" -> {
+                val mediaType = parts.getOrNull(1)
+                val traktId = parts.getOrNull(2)?.toIntOrNull()
+                if (mediaType != null && traktId != null) {
+                    container.requestOpen("detail", mediaType, traktId)
+                }
+            }
+            "progress" -> {
+                val traktId = parts.getOrNull(1)?.toIntOrNull()
+                if (traktId != null) container.requestOpen("progress", "show", traktId)
+            }
+            "shows", "movies", "alerts", "search" -> container.requestOpen(dest)
         }
     }
 

@@ -213,6 +213,13 @@ def api_catalog_detail(media_type, trakt_id):
     return jsonify({'success': True, **payload})
 
 
+@mobile_api_bp.route('/widget', methods=['GET'])
+@login_required
+def api_widget():
+    from services.widget_feed import build_widget_feed
+    return jsonify(build_widget_feed(current_user, request.args.get('mode') or 'shows'))
+
+
 @mobile_api_bp.route('/found-on/choices', methods=['GET'])
 @login_required
 def api_found_on_choices():

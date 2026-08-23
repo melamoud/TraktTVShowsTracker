@@ -15,6 +15,7 @@ Login diagnostics: Android logcat tags `TVTrackerAuth` and `TVTrackerHttp`; serv
 - **Alerts** — unread badge, mark read, Progress on episode/season alerts; **Found on** chips open the service; tap a card for the title page
 - **Title page** — same actions as the website (lists, rate, favorite, review, watched, Found on, links, cast)
 - **Progress** — watch / unwatch episodes and seasons
+- **Home-screen widget** — Shows / Movies / Alerts (switch in the header). Scrollable list, mark watched with confirm, tap a row to open the title in the app. Resize for more rows.
 
 Latest and Recommended screens are not in this build.
 

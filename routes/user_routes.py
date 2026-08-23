@@ -1336,6 +1336,18 @@ def api_episode_watched():
     ids = trakt_client.sanitize_episode_ids(payload.get('ids') or {})
     action = payload.get('action') or 'add'
     if not ids:
+        try:
+            show_id = int(payload.get('show_trakt_id') or 0)
+            season = payload.get('season')
+            episode = payload.get('episode')
+            if show_id and season is not None and episode is not None:
+                from services.trakt_cache import episode_ids_from_progress
+                ids = episode_ids_from_progress(
+                    current_user.id, show_id, int(season), int(episode),
+                )
+        except (TypeError, ValueError):
+            ids = {}
+    if not ids:
         return jsonify({'success': False, 'message': 'ids required'}), 400
     try:
         if action == 'remove':

@@ -24,6 +24,12 @@ import java.util.concurrent.TimeUnit
 
 data class ActorSearchRequest(val traktId: Int, val name: String)
 
+data class PendingOpen(
+    val dest: String,
+    val mediaType: String? = null,
+    val traktId: Int? = null,
+)
+
 class AppContainer(context: Context) {
     val baseUrl: String = BuildConfig.BASE_URL.trimEnd('/')
     val sessionStore = SessionStore(context)
@@ -85,5 +91,16 @@ class AppContainer(context: Context) {
 
     fun consumePendingActorSearch() {
         _pendingActorSearch.value = null
+    }
+
+    private val _pendingOpen = MutableStateFlow<PendingOpen?>(null)
+    val pendingOpen: StateFlow<PendingOpen?> = _pendingOpen.asStateFlow()
+
+    fun requestOpen(dest: String, mediaType: String? = null, traktId: Int? = null) {
+        _pendingOpen.value = PendingOpen(dest, mediaType, traktId)
+    }
+
+    fun consumePendingOpen() {
+        _pendingOpen.value = null
     }
 }

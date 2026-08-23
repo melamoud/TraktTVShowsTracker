@@ -20,6 +20,7 @@ import com.melamoud.tvtracker.data.api.dto.RatingResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
 import com.melamoud.tvtracker.data.api.dto.SimpleResponse
 import com.melamoud.tvtracker.data.api.dto.WatchedResponse
+import com.melamoud.tvtracker.data.api.dto.WidgetResponse
 import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.POST
@@ -38,6 +39,9 @@ interface TvTrackerApi {
 
     @GET("/api/v1/me")
     suspend fun me(): MeResponse
+
+    @GET("/api/v1/widget")
+    suspend fun widget(@Query("mode") mode: String): WidgetResponse
 
     @GET("/api/v1/my/{kind}")
     suspend fun myMedia(

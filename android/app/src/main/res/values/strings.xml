@@ -26,4 +26,14 @@
     <string name="unfavorite">Unfavorite</string>
     <string name="hide_password">Hide password</string>
     <string name="show_password">Show password</string>
+    <string name="widget_name">TV Tracker</string>
+    <string name="widget_description">Shows, movies, or alerts. Mark watched or open the title.</string>
+    <string name="widget_title_shows">Shows Progress</string>
+    <string name="widget_header_title">%1$s · %2$s</string>
+    <string name="widget_switch_mode">Switch Shows, Movies, or Alerts</string>
+    <string name="widget_empty">Nothing to show.</string>
+    <string name="widget_expand">Show alerts</string>
+    <string name="widget_collapse">Hide alerts</string>
+    <string name="widget_mark_episode">Mark %1$s watched?</string>
+    <string name="widget_mark_movie">Mark %1$s watched on Trakt?</string>
 </resources>
