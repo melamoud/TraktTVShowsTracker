@@ -11,6 +11,7 @@ This is separate from **Streaming vs Found on** (where a title plays / where you
 | **Movie release date** | A listed movie’s release day arrives |
 | **Added to a streaming service** | A **new** service brand starts carrying that title (one alert per brand). Channel/tier renames like “Paramount Plus Apple TV channel” after Premium do **not** re-alert |
 | **New episode or season** | An episode aired; if a full season drops the same day, one season alert instead. A show premiere is announced by its S01E01 episode alert — there is no separate show “release” alert |
+| **Added to a list** | You add a movie or show to Wishlist or a personal list in this app (Set lists or Wishlist). Immediate — not the 4-hour schedule. Uncheck this type in Preferences to opt out |
 | **New user signed up** | Admins only — first login of a new account |
 
 ## When they stop
@@ -31,14 +32,15 @@ Each alert is a compact card: poster with a badge for **what happened**, then th
 | **Season** | A full season dropped the same day (one alert, not one per episode) — has **Progress** |
 | **Streaming** | The title appeared on a new service (not a new episode) — **Progress** still opens the show |
 | **Movie** | Movie release or streaming |
+| **List** | You added the title to a list |
 | **Admin** | New user login |
 
-Episode titles put the number in the name itself — **The Agency S3E5**. Type tags (New episode, Season out, Released, Now streaming) still sit on that line.
+Episode titles put the number in the name itself — **The Agency S3E5**. Type tags (New episode, Season out, Released, Now streaming, Added to list) still sit on that line.
 
 - Episode subtitle is the episode name and aired date. Movie **Released** / **Now streaming** alerts show the movie’s release date — not “Title is available on Service” (the service is the type tag plus streaming chips). **Also streaming** (other services) is its own row above **Found on** / **Plays on your services**, which share a line — **teal** = on one of your services, gray = elsewhere (kept current at view time).
 - **Pin** a show or movie to keep *all* of its alerts at the top (including future episodes of that show). This is separate from pinning on My Shows / My Movies. Pinned titles stay time-ordered among themselves, then unpinned alerts follow.
 - **Newest first** / **Oldest first** sorts by time. Choice is remembered. Pins still win over the clock.
-- **Grouped by show** (default on) collapses several episode alerts for the same show into one row: poster, show title, and the unread **S#E#** list (oldest first). **Show N alerts** (▸) marks the row as expandable — tap it to indent each episode and **Progress** / **Mark read** / **Pin** them. Pin always applies to the **show**, not one episode. **Ungroup** shows every alert as its own row. Movies and admin alerts stay individual.
+- **Grouped by show** (default on) collapses several episode alerts for the same show into one row: poster, show title, and the unread **S#E#** list (oldest first). **Show N alerts** (▸) marks the row as expandable — tap it to indent each episode and **Progress** / **Mark read** / **Pin** them. Pin always applies to the **show**, not one episode. **Ungroup** shows every alert as its own row. Movies, admin, and **Added to a list** alerts stay individual.
 - Episode/season alerts have a **Progress** button that opens the progress **side panel** in place — mark episodes watched without leaving Alerts. **Details** goes to the full title page; **← Back** there returns to Alerts.
 - **Mark read/unread** dims or brightens the card; the nav badge counts unread.
 - On the next **alert refresh**, movie release/streaming alerts auto-mark read when the movie is watched on Trakt, and episode/season alerts auto-mark read when that episode (or every episode in the season drop) is watched on Trakt.
@@ -53,7 +55,7 @@ Episode titles put the number in the name itself — **The Agency S3E5**. Type t
 
 ## How they arrive
 
-Written in the background on the schedule under **Admin → Scheduler** (default: every 4 hours at :00 **America/New_York** — 12am / 4am / 8am / 12pm / 4pm / 8pm). You see them next login or page refresh. Admins can **Run alert check now** from Admin, Scheduler, or the Alerts page.
+**Added to a list** is written as soon as you save Set lists or add to Wishlist. Other types are written in the background on the schedule under **Admin → Scheduler** (default: every 4 hours at :00 **America/New_York** — 12am / 4am / 8am / 12pm / 4pm / 8pm). You see them next login or page refresh. Admins can **Run alert check now** from Admin, Scheduler, or the Alerts page.
 
 - Episode detection uses Trakt's **My calendar** bulk feed — one call per run covers every watchlisted or in-progress show, so a show you **just added** alerts on the very next run. List-only shows (never watched, not watchlisted) get a per-show fallback check.
 - If Trakt is rate-limiting (HTTP 429), the run backs off instead of scanning shows one by one — nothing is lost; the next run catches up within the 3-day window.

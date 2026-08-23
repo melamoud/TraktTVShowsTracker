@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-22 — Alert when you add a title to a list
+
+- Adding a movie or show to Wishlist or a personal list (Set lists or Wishlist) creates an in-app **Added to a list** alert immediately
+- Opt out under Preferences → Alerts → **Added to a list** (default on)
+
 ## 2026-08-22 — Android alert Progress stays one line
 
 - Grouped **Show N alerts** no longer squeezes **Progress** onto two lines (`progre` / `ss`)

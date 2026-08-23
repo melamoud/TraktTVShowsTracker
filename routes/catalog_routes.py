@@ -1142,19 +1142,30 @@ def api_watchlist(media_type, trakt_id):
     """Add or remove watchlist entry on Trakt and update local cache."""
     action = (request.json or {}).get('action') or request.form.get('action') or 'add'
     try:
+        st = UserMediaState.query.filter_by(
+            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
+        ).first()
+        was_on = bool(st and st.on_watchlist)
         if action == 'remove':
             trakt_client.remove_from_watchlist(current_user, media_type, trakt_id)
             on = False
         else:
             trakt_client.add_to_watchlist(current_user, media_type, trakt_id)
             on = True
-        st = UserMediaState.query.filter_by(
-            user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
-        ).first()
         if not st:
             st = UserMediaState(user_id=current_user.id, media_type=media_type, trakt_id=trakt_id)
             db.session.add(st)
         st.on_watchlist = on
+        if on and not was_on:
+            from services.alerts import notify_lists_added
+            media = CachedMedia.query.filter_by(
+                media_type=media_type, trakt_id=trakt_id,
+            ).first()
+            notify_lists_added(
+                current_user, media_type, trakt_id, ['Wishlist'],
+                title=media.title if media else None,
+                list_ids=[WATCHLIST_LIST_ID],
+            )
         db.session.commit()
         try:
             from services.user_media_sync import note_user_media_write
@@ -1443,6 +1454,8 @@ def api_lists_membership(media_type, trakt_id):
     clear_all = not want_watchlist and not wanted_lists
 
     try:
+        added_names: list[str] = []
+        added_ids: list[str] = []
         # Diff against local membership cache only (no list_contains_item).
         # Unchecked Wishlist always removes on Trakt — skipping when the local
         # row already said off left a stale Trakt watchlist in place, and a
@@ -1450,6 +1463,8 @@ def api_lists_membership(media_type, trakt_id):
         if want_watchlist:
             if not (st and st.on_watchlist):
                 trakt_client.add_to_watchlist(current_user, media_type, trakt_id)
+                added_names.append('Wishlist')
+                added_ids.append(WATCHLIST_LIST_ID)
             on_watchlist = True
         else:
             trakt_client.remove_from_watchlist(current_user, media_type, trakt_id)
@@ -1495,6 +1510,8 @@ def api_lists_membership(media_type, trakt_id):
                     set_list_membership(
                         current_user.id, lid, media_type, trakt_id, on_list=True
                     )
+                    added_names.append(lst.get('name') or f'List {lid}')
+                    added_ids.append(lid)
                 elif not want:
                     # Unchecked lists always remove on Trakt — same leftover
                     # problem as Wishlist (TV Show Favs coming back on My Shows).
@@ -1517,6 +1534,12 @@ def api_lists_membership(media_type, trakt_id):
             )
             db.session.add(st)
         st.on_watchlist = on_watchlist
+        if added_names:
+            from services.alerts import notify_lists_added
+            notify_lists_added(
+                current_user, media_type, trakt_id, added_names,
+                title=title, list_ids=added_ids,
+            )
         db.session.commit()
         try:
             from services.user_media_sync import note_user_media_write

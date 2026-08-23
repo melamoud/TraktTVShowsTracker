@@ -330,6 +330,7 @@ def preferences():
             prefs.alert_release_day = request.form.get('alert_release_day') == '1'
             prefs.alert_new_streaming = request.form.get('alert_new_streaming') == '1'
             prefs.alert_episode_aired = request.form.get('alert_episode_aired') == '1'
+            prefs.alert_list_add = request.form.get('alert_list_add') == '1'
             if current_user.is_admin:
                 prefs.alert_new_user_login = request.form.get('alert_new_user_login') == '1'
 
@@ -418,6 +419,7 @@ def preferences():
         alert_release_day=bool(getattr(prefs, 'alert_release_day', True)),
         alert_new_streaming=bool(getattr(prefs, 'alert_new_streaming', True)),
         alert_episode_aired=bool(getattr(prefs, 'alert_episode_aired', True)),
+        alert_list_add=bool(getattr(prefs, 'alert_list_add', True)),
         alert_new_user_login=bool(getattr(prefs, 'alert_new_user_login', True)),
         favorite_actors=favorite_actors,
     )
@@ -1443,6 +1445,7 @@ ALERT_TYPE_LABELS = {
     'new_streaming': 'Now streaming',
     'episode_aired': 'New episode',
     'season_aired': 'Season out',
+    'list_add': 'Added to list',
     'new_user_login': 'New login',
 }
 
@@ -1504,9 +1507,11 @@ def _episode_code(n) -> str:
 
 
 def _alert_kind_label(media_type: str | None, alert_type: str | None) -> str:
-    """Poster badge: Episode / Season / Streaming / Movie / Admin."""
+    """Poster badge: Episode / Season / Streaming / Movie / List / Admin."""
     if alert_type == 'new_user_login':
         return 'Admin'
+    if alert_type == 'list_add':
+        return 'List'
     if alert_type == 'season_aired':
         return 'Season'
     if alert_type == 'episode_aired':
@@ -1534,7 +1539,7 @@ def _group_kind_label(cards: list[dict]) -> str:
 def _alert_headline(n, media, episode_code: str = '') -> str:
     """Subtitle: episode name + date, or a movie date — not S#E# (that's in the title)."""
     kind = n.alert_type or ''
-    if kind in ('episode_aired', 'season_aired', 'new_user_login'):
+    if kind in ('episode_aired', 'season_aired', 'list_add', 'new_user_login'):
         text = _strip_available_on_blurb(n.message or '')
         if episode_code:
             text = re.sub(
@@ -1647,7 +1652,8 @@ def _group_alert_cards(cards: list[dict], *, group_shows: bool, sort: str) -> li
     order: list[tuple] = []
     for card in cards:
         pair = card.get('media_pair')
-        if pair and pair[0] == 'show':
+        note_type = getattr(card.get('n'), 'alert_type', None)
+        if pair and pair[0] == 'show' and note_type != 'list_add':
             key = ('show', int(pair[1]))
         else:
             key = ('single', card['n'].id)

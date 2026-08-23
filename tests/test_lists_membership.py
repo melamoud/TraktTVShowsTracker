@@ -4,7 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
-from models import UserListMembership, UserMediaState, UserPreference, db
+from models import (
+    CachedMedia, Notification, UserListMembership, UserMediaState, UserPreference, db,
+)
 from tests.conftest import login_client
 
 
@@ -444,3 +446,74 @@ def test_delete_watchlist_is_rejected(app, client, user):
     login_client(client, app, user)
     resp = client.post('/api/lists/watchlist/delete')
     assert resp.status_code == 400
+
+
+def test_lists_membership_post_creates_list_add_alert(app, client, user):
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=42, title='The Agency',
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    personal = [{'id': '55', 'slug': 'keepers', 'name': 'Keepers', 'item_count': 1}]
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
+         patch('routes.catalog_routes.trakt_client.add_to_watchlist'), \
+         patch('routes.catalog_routes.trakt_client.add_to_list'), \
+         patch('routes.catalog_routes.trakt_client.remove_from_watchlist'), \
+         patch('routes.catalog_routes.trakt_client.remove_from_list'), \
+         patch('services.user_media_sync.note_user_media_write'):
+        resp = client.post(
+            '/api/lists/membership/show/42',
+            json={'selected': ['watchlist', '55']},
+        )
+    assert resp.status_code == 200
+    with app.app_context():
+        notes = Notification.query.filter_by(user_id=user, alert_type='list_add').all()
+        assert len(notes) == 1
+        assert notes[0].title == 'The Agency'
+        assert 'Wishlist' in notes[0].message
+        assert 'Keepers' in notes[0].message
+
+
+def test_lists_membership_post_no_alert_when_already_on_lists(app, client, user):
+    with app.app_context():
+        db.session.add(CachedMedia(media_type='show', trakt_id=42, title='The Agency'))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=42, on_watchlist=True,
+        ))
+        db.session.add(UserListMembership(
+            user_id=user, list_id='55', media_type='show', trakt_id=42,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    personal = [{'id': '55', 'slug': 'keepers', 'name': 'Keepers', 'item_count': 1}]
+    with patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=personal), \
+         patch('routes.catalog_routes.trakt_client.add_to_watchlist') as add_wl, \
+         patch('routes.catalog_routes.trakt_client.add_to_list') as add_list, \
+         patch('routes.catalog_routes.trakt_client.remove_from_watchlist'), \
+         patch('routes.catalog_routes.trakt_client.remove_from_list'), \
+         patch('services.user_media_sync.note_user_media_write'):
+        resp = client.post(
+            '/api/lists/membership/show/42',
+            json={'selected': ['watchlist', '55']},
+        )
+    assert resp.status_code == 200
+    add_wl.assert_not_called()
+    add_list.assert_not_called()
+    with app.app_context():
+        assert Notification.query.filter_by(user_id=user, alert_type='list_add').count() == 0
+
+
+def test_watchlist_add_creates_list_add_alert(app, client, user):
+    with app.app_context():
+        db.session.add(CachedMedia(media_type='movie', trakt_id=9, title='Heat'))
+        db.session.commit()
+    login_client(client, app, user)
+    with patch('routes.catalog_routes.trakt_client.add_to_watchlist'), \
+         patch('services.user_media_sync.note_user_media_write'):
+        resp = client.post('/api/watchlist/movie/9', json={'action': 'add'})
+    assert resp.status_code == 200
+    with app.app_context():
+        note = Notification.query.filter_by(user_id=user, alert_type='list_add').one()
+        assert note.title == 'Heat'
+        assert 'Wishlist' in note.message

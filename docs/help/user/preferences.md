@@ -50,7 +50,7 @@ These drive the purple **Preference match** highlight and the default Latest **M
 
 ## Alerts
 
-Toggle which in-app alert **types** you want (release, streaming, episodes…). Which **lists** can produce them is set in the table above under **Alerts** (default Wishlist only).
+Toggle which in-app alert **types** you want (release, streaming, episodes, added-to-a-list…). Which **lists** can produce release / streaming / episode alerts is set in the table above under **Alerts** (default Wishlist only). **Added to a list** fires for any list you add a title to in this app; uncheck that type to opt out.
 
 Details: [Alerts](release_alerts).
 

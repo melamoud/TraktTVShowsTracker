@@ -16,12 +16,14 @@ from models import (
 )
 from services.alerts import (
     ALERT_EPISODE_AIRED,
+    ALERT_LIST_ADD,
     ALERT_NEW_STREAMING,
     ALERT_NEW_USER_LOGIN,
     ALERT_RELEASE_DAY,
     ALERT_SEASON_AIRED,
     normalize_streaming_provider_key,
     notify_admins_new_user,
+    notify_lists_added,
     run_media_alerts,
 )
 from tests.conftest import login_client
@@ -667,6 +669,7 @@ def test_preferences_alert_toggles(app, client, user):
     get = client.get('/preferences')
     assert get.status_code == 200
     assert b'Added to a streaming service' in get.data
+    assert b'Added to a list' in get.data
 
     resp = client.post('/preferences', data={
         'alerts_prefs_present': '1',
@@ -679,6 +682,41 @@ def test_preferences_alert_toggles(app, client, user):
         assert prefs.alert_release_day is False
         assert prefs.alert_new_streaming is False
         assert prefs.alert_episode_aired is False
+        assert prefs.alert_list_add is False
+
+
+def test_notify_lists_added_creates_alert(app, user):
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=8801, title='Lanterns',
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        db.session.commit()
+        u = db.session.get(User, user)
+        assert notify_lists_added(
+            u, 'show', 8801, ['Wishlist', 'Keepers'],
+            list_ids=['watchlist', '55'],
+        ) is True
+        db.session.commit()
+        note = Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_LIST_ADD,
+        ).one()
+        assert note.title == 'Lanterns'
+        assert 'Wishlist' in note.message and 'Keepers' in note.message
+        assert note.media_type == 'show'
+        assert note.trakt_id == 8801
+
+
+def test_notify_lists_added_respects_pref_off(app, user):
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_list_add = False
+        db.session.commit()
+        u = db.session.get(User, user)
+        assert notify_lists_added(u, 'movie', 12, ['Wishlist']) is False
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_LIST_ADD,
+        ).count() == 0
 
 
 def test_show_premiere_gets_episode_alert_not_release_day(app, user):

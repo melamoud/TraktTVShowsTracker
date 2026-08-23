@@ -415,3 +415,25 @@ def test_streaming_show_alert_has_progress_and_streaming_badge(app, client, user
     assert 'data-action="progress-open"' in html
     assert 'data-trakt-id="195577"' in html
     assert 'S1E' not in html and 'S01E' not in html
+
+
+def test_notifications_page_renders_list_add_card(app, client, user):
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=202341, title='The Agency', year=2024,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='list_add',
+            title='The Agency',
+            message='Added to Wishlist',
+            media_type='show', trakt_id=202341, is_read=False,
+            payload_key='listadd:test:watchlist',
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'The Agency' in html
+    assert 'alert-kind-list' in html
+    assert 'Added to list' in html
+    assert 'Added to Wishlist' in html
+    assert 'data-trakt-id="202341"' in html

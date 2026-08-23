@@ -221,7 +221,7 @@
   </section>
 
   <section>
-    <h2 title="In-app alert types for titles on lists you enabled under Alerts above">Alerts</h2>
+    <h2 title="In-app alert types. List-add fires when you add a title; the others use lists checked under Alerts above">Alerts</h2>
     <input type="hidden" name="alerts_prefs_present" value="1">
     <div class="alert-prefs">
       <label>
@@ -243,6 +243,13 @@
         <span>
           <strong>New episode or season</strong>
           <span class="meta">Episode aired; one alert if a full season drops the same day</span>
+        </span>
+      </label>
+      <label>
+        <input type="checkbox" name="alert_list_add" value="1" {% if alert_list_add %}checked{% endif %}>
+        <span>
+          <strong>Added to a list</strong>
+          <span class="meta">When you add a movie or show to Wishlist or a personal list in this app</span>
         </span>
       </label>
       {% if current_user.is_admin %}

@@ -6,6 +6,7 @@ Alert types:
   new_streaming    — a new TMDB stream provider appeared (per provider)
   episode_aired    — a new episode aired
   season_aired     — full season published on one calendar day
+  list_add         — user added a title to Wishlist or a personal list
   new_user_login   — admin: first login of a new local user
 
 Dedup / baselines live in AlertEvent so jobs never re-fire the same event.
@@ -43,6 +44,7 @@ ALERT_RELEASE_DAY = 'release_day'
 ALERT_NEW_STREAMING = 'new_streaming'
 ALERT_EPISODE_AIRED = 'episode_aired'
 ALERT_SEASON_AIRED = 'season_aired'
+ALERT_LIST_ADD = 'list_add'
 ALERT_NEW_USER_LOGIN = 'new_user_login'
 
 STREAMING_OFFER_TYPES = ('flatrate', 'ads', 'free')
@@ -102,6 +104,8 @@ def alert_pref_enabled(user: User, alert_type: str) -> bool:
         return bool(getattr(prefs, 'alert_new_streaming', True))
     if alert_type in (ALERT_EPISODE_AIRED, ALERT_SEASON_AIRED):
         return bool(getattr(prefs, 'alert_episode_aired', True))
+    if alert_type == ALERT_LIST_ADD:
+        return bool(getattr(prefs, 'alert_list_add', True))
     if alert_type == ALERT_NEW_USER_LOGIN:
         return bool(getattr(prefs, 'alert_new_user_login', True))
     return True
@@ -205,6 +209,49 @@ def _notify(
         payload_key=payload_key,
     ))
     return True
+
+
+def _join_list_names(names: list[str]) -> str:
+    clean = [n.strip() for n in names if (n or '').strip()]
+    if not clean:
+        return ''
+    if len(clean) == 1:
+        return clean[0]
+    if len(clean) == 2:
+        return f'{clean[0]} and {clean[1]}'
+    return f'{", ".join(clean[:-1])}, and {clean[-1]}'
+
+
+def notify_lists_added(
+    user: User,
+    media_type: str,
+    trakt_id: int,
+    list_names: list[str],
+    *,
+    title: str | None = None,
+    list_ids: list[str] | None = None,
+) -> bool:
+    """Inbox row when the user adds a title to Wishlist and/or personal lists."""
+    names = [n.strip() for n in (list_names or []) if (n or '').strip()]
+    if not names or media_type not in ('movie', 'show'):
+        return False
+    media = CachedMedia.query.filter_by(
+        media_type=media_type, trakt_id=int(trakt_id),
+    ).first()
+    display = (title or (media.title if media else '') or f'{media_type} {trakt_id}').strip()
+    ids_part = ','.join(sorted({str(x) for x in (list_ids or []) if str(x).strip()}))
+    stamp = datetime.utcnow().strftime('%Y%m%d%H%M%S%f')
+    payload = f'listadd:{stamp}:{ids_part}'[:200]
+    return _notify(
+        user.id,
+        ALERT_LIST_ADD,
+        title=display,
+        message=f'Added to {_join_list_names(names)}',
+        link=f'/catalog/{media_type}/{int(trakt_id)}',
+        media_type=media_type,
+        trakt_id=int(trakt_id),
+        payload_key=payload,
+    )
 
 
 def _notification_payload_key(note: Notification) -> str | None:

@@ -86,6 +86,7 @@ class UserPreference(db.Model):
     alert_release_day = db.Column(db.Boolean, default=True, nullable=False)
     alert_new_streaming = db.Column(db.Boolean, default=True, nullable=False)
     alert_episode_aired = db.Column(db.Boolean, default=True, nullable=False)  # episodes + season drops
+    alert_list_add = db.Column(db.Boolean, default=True, nullable=False)  # you added a title to a list
     alert_new_user_login = db.Column(db.Boolean, default=True, nullable=False)  # admins only
 
 
