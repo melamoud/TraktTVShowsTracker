@@ -67,6 +67,11 @@ Same server and Trakt login on the phone: My Shows / My Movies / Search / Alerts
 
 <img src="docs/screenshots/android-my-shows.jpg" alt="Android My Shows" width="360">
 
+Android Widget.
+
+<img src="docs/screenshots/TVTracker-Widget.jpeg" alt="Android Widget" width="360">
+
+
 ## Tests
 
 ```bat
