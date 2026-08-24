@@ -980,10 +980,8 @@ document.addEventListener('click', async function (ev) {
     'prefs-reminder',
     'review-marker-clear',
     'review-marker-caught-up',
-    'watched-add',
     'watched-remove',
     'review-marker',
-    'recommendation-hide',
     'season-watched',
     'season-unwatched',
     'series-watched',
@@ -1320,14 +1318,6 @@ document.addEventListener('click', async function (ev) {
       });
       requestReload();
     } else if (action === 'watched-add') {
-      const label = ctx.title || 'this title';
-      const warn = mediaType === 'show'
-        ? 'Mark ALL aired seasons/episodes of "' + label + '" as watched on Trakt?\n\n'
-          + 'This writes every remaining episode into watch history (not just the season you meant).'
-        : 'Mark "' + label + '" as watched on Trakt?';
-      if (!window.confirm(warn)) {
-        return;
-      }
       showPageLoading('Marking watched…');
       await apiPost('/api/watched/' + mediaType + '/' + traktId, { action: 'add' });
       requestReload();
@@ -1355,12 +1345,6 @@ document.addEventListener('click', async function (ev) {
       alert('Marker set on: ' + data.title);
       requestReload();
     } else if (action === 'recommendation-hide') {
-      const expected = ctx.title || '';
-      if (expected && !window.confirm(
-        'Hide from Trakt recommendations?\n\n"' + expected + '"\n\nSame as Not interested on Trakt.tv — it will stop appearing here.'
-      )) {
-        return;
-      }
       showPageLoading('Hiding…');
       await apiPost('/api/recommendations/' + mediaType + '/' + traktId + '/hide', {});
       const row = btn.closest('.media-row');

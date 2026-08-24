@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-23 — No confirm on Hide recommendation or Mark watched
+
+- Website **Hide recommendation** and **Mark watched** run immediately (no approve dialog). **Unwatch** still confirms
+
 ## 2026-08-23 — Android home-screen widget
 
 - Add a resizable **TV Tracker** widget with **Shows Progress**, **Movies**, and **Alerts** (switch on the widget). Header shows the app icon and **TV Tracker ·** mode

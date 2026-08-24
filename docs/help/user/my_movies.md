@@ -31,7 +31,7 @@ Filter choices and page size are remembered for your account when you leave and 
 
 Open the title page for **Write review…** (posts a Trakt comment; optional spoiler). Episode reviews are only in the Progress panel for shows.
 - **Favorite / Unfavorite** — add or remove from Trakt favorites
-- **Mark watched / Unwatch** — syncs to Trakt (asks for confirmation first)
+- **Mark watched / Unwatch** — syncs to Trakt (**Unwatch** asks for confirmation first)
 - **Streaming** / **Plays on your services** — TMDB availability (same as Latest); highlighted when it matches services in Preferences  
 - **Found on…** — multi-select where *you* found it (local only; see [Streaming](streaming)). Each row has **Search** to open that service for the title without saving first.
 - Open the title for full detail, IMDb, Trakt, trailer

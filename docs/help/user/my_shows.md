@@ -24,7 +24,7 @@ Opening the page uses a local cache shared with Progress, Latest tags, and Alert
 
 **Rate…** (1–10) and **Favorite / Unfavorite** sync to Trakt the same way as on trakt.tv.
 
-**Mark watched** on a show confirms first: it marks **all** aired seasons/episodes on Trakt (same as Trakt’s whole-show watched). Prefer **Progress** → season/episode actions when you only finished one season.
+**Mark watched** on a show marks **all** aired seasons/episodes on Trakt immediately (same as Trakt’s whole-show watched). Prefer **Progress** → season/episode actions when you only finished one season.
 
 Cards show **Streaming** / **Plays on your services** from TMDB (same layout as Latest), plus your local **Found on** choices.
 
