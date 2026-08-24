@@ -21,7 +21,9 @@ from datetime import date, datetime, timedelta
 
 from flask import Flask
 
-from models import User, UserCalendarEvent, UserMediaState, db
+from sqlalchemy import and_, func as sa_func, or_
+
+from models import CachedMedia, User, UserCalendarEvent, UserMediaState, db
 from services import trakt_client
 from services.sync_jobs import (
     _update_latest_aired_for_show,
@@ -35,6 +37,47 @@ logger = logging.getLogger('app')
 # via the forward calendar window in the meantime).
 SEED_RECHECK_DAYS = 30
 _SEED_SPACING_SECONDS = 0.25
+
+
+def newest_aired_show_clause(today: date):
+    """Shows that belong on Newest aired (past last-aired, or aired count without a date).
+
+    A first seed before premiere stamps ``last_aired_checked_at`` with a NULL
+    date and will not retry for 30 days. Progress can still know episodes
+    aired — those shows must not disappear from the view.
+    """
+    past_aired = and_(
+        UserMediaState.last_episode_aired_at.isnot(None),
+        sa_func.date(UserMediaState.last_episode_aired_at) <= today,
+    )
+    aired_count_missing_date = and_(
+        UserMediaState.last_episode_aired_at.is_(None),
+        UserMediaState.episodes_aired.isnot(None),
+        UserMediaState.episodes_aired > 0,
+    )
+    return or_(past_aired, aired_count_missing_date)
+
+
+def newest_aired_show_sort_day():
+    """Sort key: last-aired date, else CachedMedia premiere (caller must join)."""
+    return sa_func.coalesce(
+        sa_func.date(UserMediaState.last_episode_aired_at),
+        CachedMedia.released_at,
+    )
+
+
+def _needs_last_aired_seed(row: UserMediaState | None, recheck_before: datetime) -> bool:
+    if row is None:
+        return True
+    if row.last_episode_aired_at is not None:
+        return False
+    # Progress already knows something aired — don't wait out the 30-day stamp.
+    if (row.episodes_aired or 0) > 0:
+        return True
+    return (
+        row.last_aired_checked_at is None
+        or row.last_aired_checked_at < recheck_before
+    )
 
 
 def _calendar_last_aired(user_id: int, show_ids: list[int], today: date) -> dict[int, tuple]:
@@ -110,12 +153,7 @@ def refresh_shows_cache_for_user(user: User, *, skip_per_show: bool = False) -> 
     recheck_before = datetime.utcnow() - timedelta(days=SEED_RECHECK_DAYS)
     need_seed = [
         tid for tid in show_ids
-        if (states.get(tid) is None or states[tid].last_episode_aired_at is None)
-        and (
-            states.get(tid) is None
-            or states[tid].last_aired_checked_at is None
-            or states[tid].last_aired_checked_at < recheck_before
-        )
+        if _needs_last_aired_seed(states.get(tid), recheck_before)
     ]
     for tid in need_seed:
         time.sleep(_SEED_SPACING_SECONDS)

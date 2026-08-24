@@ -94,6 +94,40 @@ def test_refresh_seeds_list_only_shows_and_marks_never_aired(app, user):
         assert stats2['seeded'] == 0
 
 
+def test_refresh_reseeds_when_episodes_aired_but_no_last_aired_date(app, user):
+    """A pre-premiere seed must not hide a show after progress sees aired episodes."""
+    with app.app_context():
+        _list_show(
+            user, 157599,
+            last_aired_checked_at=datetime.utcnow() - timedelta(days=10),
+            episodes_aired=2, episodes_completed=0,
+        )
+        db.session.commit()
+        seasons = [{
+            'number': 1, 'aired_episodes': 2,
+            'episodes': [
+                {'season': 1, 'number': 1,
+                 'first_aired': f'{date.today() - timedelta(days=6)}T00:00:00.000Z',
+                 'title': 'Pilot'},
+                {'season': 1, 'number': 2,
+                 'first_aired': f'{date.today() - timedelta(days=1)}T00:00:00.000Z',
+                 'title': 'Episode 2'},
+            ],
+        }]
+        with patch(
+            'services.shows_cache.trakt_client.get_show_seasons', return_value=seasons,
+        ) as get_seasons, patch(
+            'services.shows_cache.refresh_show_progress_for_ids', return_value=0,
+        ):
+            stats = refresh_shows_cache_for_user(_reload_user(user))
+        assert stats['seeded'] == 1
+        get_seasons.assert_called_once()
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=157599,
+        ).one()
+        assert st.last_episode_aired_at.date() == date.today() - timedelta(days=1)
+
+
 def test_refresh_aborts_seed_loop_on_429(app, user):
     """First 429 stops the seed loop; remaining shows keep NULL checked_at."""
     with app.app_context():

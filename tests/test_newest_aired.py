@@ -1,6 +1,6 @@
 """My Shows / My Movies "Newest aired" view."""
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
 from models import CachedMedia, UserMediaState, UserPreference, db
@@ -56,6 +56,31 @@ def test_newest_aired_hides_future_shows_and_sorts(app, client, user):
     assert 'Caught Up Show' in html
     assert 'Future Show' not in html
     assert html.index('New Show') < html.index('Caught Up Show') < html.index('Old Show')
+
+
+def test_newest_aired_includes_show_with_aired_count_but_no_date(app, client, user):
+    """Progress can know episodes aired before last_episode_aired_at is seeded."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        _seed_state(
+            user, trakt_id=157599, on_watchlist=True,
+            episodes_aired=2, episodes_completed=0, progress_percent=0.0,
+        )
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=157599, title='Lanterns', year=2026,
+            released_at=date(2026, 8, 17),
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        resp = client.get('/my/shows?lists_set=1&lists=watchlist&filter=lists&display=newest_aired')
+    assert resp.status_code == 200
+    assert 'Lanterns' in resp.get_data(as_text=True)
 
 
 def test_newest_aired_movies_sort_by_release_date(app, client, user):

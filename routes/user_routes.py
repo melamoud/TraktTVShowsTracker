@@ -736,13 +736,18 @@ def _my_media(media_type: str):
     # Pure cache read — last-aired/progress are maintained by the 6h media job.
     newest_aired = display_mode == 'newest_aired'
     if newest_aired:
-        from sqlalchemy import func as sa_func
         today = date.today()
         if media_type == 'show':
-            q = q.filter(
-                UserMediaState.last_episode_aired_at.isnot(None),
-                sa_func.date(UserMediaState.last_episode_aired_at) <= today,
-            )
+            from services.shows_cache import newest_aired_show_clause
+            if not needs_media_join:
+                q = q.outerjoin(
+                    CachedMedia,
+                    and_(
+                        CachedMedia.media_type == UserMediaState.media_type,
+                        CachedMedia.trakt_id == UserMediaState.trakt_id,
+                    ),
+                )
+            q = q.filter(newest_aired_show_clause(today))
         else:  # movie
             if not needs_media_join:
                 q = q.outerjoin(
@@ -770,10 +775,11 @@ def _my_media(media_type: str):
     if newest_aired:
         # Pins as a group on top; within pins (and the rest) newest aired / release first.
         if media_type == 'show':
+            from services.shows_cache import newest_aired_show_sort_day
             states = (
                 q.order_by(
                     UserMediaState.pinned.desc(),
-                    UserMediaState.last_episode_aired_at.desc(),
+                    newest_aired_show_sort_day().desc(),
                     UserMediaState.id.desc(),
                 )
                 .offset((page - 1) * per_page)

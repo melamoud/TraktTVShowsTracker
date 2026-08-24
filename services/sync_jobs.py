@@ -1281,8 +1281,9 @@ def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
     if not row:
         row = UserMediaState(user_id=user_id, media_type='show', trakt_id=trakt_id)
         db.session.add(row)
-    row.last_episode_aired_at = latest
-    row.last_episode_label = label
+    if latest is not None:
+        row.last_episode_aired_at = latest
+        row.last_episode_label = label
     row.last_aired_checked_at = datetime.utcnow()
     return True
 

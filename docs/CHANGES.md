@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-23 — Newest aired hid shows like Lanterns
+
+- Newest aired dropped shows whose last-aired date was never cached (first seed ran before premiere, then waited 30 days)
+- Those shows now appear from episode counts / premiere date, and the cache job re-seeds as soon as progress knows episodes aired
+
 ## 2026-08-23 — No confirm on Hide recommendation or Mark watched
 
 - Website **Hide recommendation** and **Mark watched** run immediately (no approve dialog). **Unwatch** still confirms

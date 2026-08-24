@@ -51,9 +51,11 @@ def _media_items(user, media_type: str) -> list[dict]:
         ),
     )
     if media_type == 'show':
+        from services.shows_cache import (
+            newest_aired_show_clause, newest_aired_show_sort_day,
+        )
         q = q.filter(
-            UserMediaState.last_episode_aired_at.isnot(None),
-            sa_func.date(UserMediaState.last_episode_aired_at) <= today,
+            newest_aired_show_clause(today),
             UserMediaState.next_episode_season.isnot(None),
             UserMediaState.next_episode_number.isnot(None),
             or_(
@@ -66,7 +68,7 @@ def _media_items(user, media_type: str) -> list[dict]:
         states = (
             q.order_by(
                 UserMediaState.pinned.desc(),
-                UserMediaState.last_episode_aired_at.desc(),
+                newest_aired_show_sort_day().desc(),
                 UserMediaState.id.desc(),
             )
             .limit(WIDGET_LIMIT)
