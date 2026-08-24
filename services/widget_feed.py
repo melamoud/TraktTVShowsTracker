@@ -38,7 +38,8 @@ def _media_items(user, media_type: str) -> list[dict]:
     if not list_ids:
         return []
 
-    today = date.today()
+    from services.local_time import local_today
+    today = local_today()
     q = UserMediaState.query.filter(
         UserMediaState.user_id == user.id,
         UserMediaState.media_type == media_type,
@@ -51,11 +52,8 @@ def _media_items(user, media_type: str) -> list[dict]:
         ),
     )
     if media_type == 'show':
-        from services.shows_cache import (
-            newest_aired_show_clause, newest_aired_show_sort_day,
-        )
+        from services.shows_cache import order_shows_newest_aired
         q = q.filter(
-            newest_aired_show_clause(today),
             UserMediaState.next_episode_season.isnot(None),
             UserMediaState.next_episode_number.isnot(None),
             or_(
@@ -65,15 +63,9 @@ def _media_items(user, media_type: str) -> list[dict]:
                 > sa_func.coalesce(UserMediaState.episodes_completed, 0),
             ),
         )
-        states = (
-            q.order_by(
-                UserMediaState.pinned.desc(),
-                newest_aired_show_sort_day().desc(),
-                UserMediaState.id.desc(),
-            )
-            .limit(WIDGET_LIMIT)
-            .all()
-        )
+        raw = q.all()
+        media_by_id = _cached_by_id(media_type, [st.trakt_id for st in raw])
+        states = order_shows_newest_aired(raw, media_by_id, today)[:WIDGET_LIMIT]
     else:
         q = q.filter(
             CachedMedia.released_at.isnot(None),

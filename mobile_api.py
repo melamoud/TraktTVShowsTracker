@@ -300,12 +300,13 @@ def api_alerts_read_all():
 @mobile_api_bp.route('/alerts/<int:notif_id>/read', methods=['POST'])
 @login_required
 def api_alert_read(notif_id):
+    from services.alerts import set_notification_read
     row = Notification.query.filter_by(
         id=notif_id, user_id=current_user.id,
     ).first()
     if not row:
         return jsonify({'success': False, 'message': 'Alert not found'}), 404
-    row.is_read = True
+    set_notification_read(current_user.id, row, True)
     db.session.commit()
     return jsonify({'success': True, 'is_read': True})
 
@@ -313,12 +314,13 @@ def api_alert_read(notif_id):
 @mobile_api_bp.route('/alerts/<int:notif_id>/unread', methods=['POST'])
 @login_required
 def api_alert_unread(notif_id):
+    from services.alerts import set_notification_read
     row = Notification.query.filter_by(
         id=notif_id, user_id=current_user.id,
     ).first()
     if not row:
         return jsonify({'success': False, 'message': 'Alert not found'}), 404
-    row.is_read = False
+    set_notification_read(current_user.id, row, False)
     db.session.commit()
     return jsonify({'success': True, 'is_read': False})
 

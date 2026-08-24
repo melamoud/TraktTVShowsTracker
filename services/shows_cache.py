@@ -66,22 +66,88 @@ def newest_aired_show_sort_day():
     )
 
 
-def _needs_last_aired_seed(row: UserMediaState | None, recheck_before: datetime) -> bool:
+def newest_aired_day(st: UserMediaState, media: CachedMedia | None) -> date | None:
+    """Local calendar day used for Newest aired (UTC timestamps converted)."""
+    from services.local_time import local_date
+    day = local_date(st.last_episode_aired_at)
+    if day is None and media is not None:
+        day = local_date(media.released_at)
+    return day
+
+
+def order_shows_newest_aired(
+    states: list[UserMediaState],
+    media_by_tid: dict[int, CachedMedia],
+    today: date,
+) -> list[UserMediaState]:
+    """Pins first, then newest local air/premiere day; drop still-future titles."""
+    scored: list[tuple[UserMediaState, date]] = []
+    for st in states:
+        media = media_by_tid.get(int(st.trakt_id))
+        day = newest_aired_day(st, media)
+        if day is None:
+            if (st.episodes_aired or 0) <= 0:
+                continue
+            day = date.min
+        elif day > today:
+            continue
+        scored.append((st, day))
+    scored.sort(
+        key=lambda item: (bool(item[0].pinned), item[1], item[0].id or 0),
+        reverse=True,
+    )
+    return [item[0] for item in scored]
+
+
+def _needs_last_aired_seed(
+    row: UserMediaState | None,
+    recheck_before: datetime,
+    *,
+    airing_today: bool = False,
+) -> bool:
+    from services.local_time import is_calendar_midnight, local_date, local_today
+
     if row is None:
         return True
-    if row.last_episode_aired_at is not None:
-        return False
-    # Progress already knows something aired — don't wait out the 30-day stamp.
-    if (row.episodes_aired or 0) > 0:
-        return True
-    return (
-        row.last_aired_checked_at is None
-        or row.last_aired_checked_at < recheck_before
-    )
+    last = row.last_episode_aired_at
+    if last is None:
+        # Progress already knows something aired — don't wait out the 30-day stamp.
+        if (row.episodes_aired or 0) > 0:
+            return True
+        return (
+            row.last_aired_checked_at is None
+            or row.last_aired_checked_at < recheck_before
+        )
+    # Calendar has an episode dated today; seasons fetch has the clock time so
+    # we do not treat 9pm ET as already aired at noon.
+    if airing_today:
+        last_day = local_date(last)
+        if last_day is None or last_day < local_today():
+            return True
+    # Upgrade a recent date-only stamp once (seasons have the clock time).
+    if is_calendar_midnight(last):
+        day = local_date(last)
+        today = local_today()
+        if (
+            day is not None
+            and day >= today - timedelta(days=1)
+            and (
+                row.last_aired_checked_at is None
+                or row.last_aired_checked_at < recheck_before
+            )
+        ):
+            return True
+    return False
 
 
-def _calendar_last_aired(user_id: int, show_ids: list[int], today: date) -> dict[int, tuple]:
-    """Latest aired calendar row per show: {trakt_id: (event_date, label)}."""
+def _calendar_last_aired(
+    user_id: int, show_ids: list[int], today: date,
+) -> tuple[dict[int, tuple], set[int]]:
+    """Past calendar rows for last-aired, plus show ids with an episode today.
+
+    Today's rows are not used as last-aired (date-only would count a 9pm ET
+    episode all day). Callers seed those from seasons instead.
+    """
     rows = (
         UserCalendarEvent.query
         .filter(
@@ -94,15 +160,20 @@ def _calendar_last_aired(user_id: int, show_ids: list[int], today: date) -> dict
         .all()
     )
     latest: dict[int, tuple] = {}
+    airing_today: set[int] = set()
     for e in rows:
+        tid = int(e.trakt_id)
+        if e.event_date == today:
+            airing_today.add(tid)
+            continue
         label = None
         if e.season_number is not None and e.episode_number is not None:
             parts = [f'S{int(e.season_number):02d}E{int(e.episode_number):02d}']
             if e.episode_title:
                 parts.append(str(e.episode_title))
             label = ' · '.join(parts)
-        latest[int(e.trakt_id)] = (e.event_date, label)
-    return latest
+        latest[tid] = (e.event_date, label)
+    return latest, airing_today
 
 
 def refresh_shows_cache_for_user(user: User, *, skip_per_show: bool = False) -> dict:
@@ -111,7 +182,9 @@ def refresh_shows_cache_for_user(user: User, *, skip_per_show: bool = False) -> 
     ``skip_per_show`` skips steps 2-3 entirely (caller hit a Trakt 429 this
     run — calendar-derived updates are cache reads and still run).
     """
-    today = date.today()
+    from services.local_time import is_calendar_midnight, local_date, local_today
+
+    today = local_today()
     show_ids = sorted(collection_trakt_ids(user.id, 'show'))
     stats = {'calendar': 0, 'seeded': 0, 'progress': 0, 'aborted': skip_per_show}
     if not show_ids:
@@ -134,15 +207,19 @@ def refresh_shows_cache_for_user(user: User, *, skip_per_show: bool = False) -> 
             states[tid] = row
         return row
 
-    # 1. Free: derive last-aired from the freshly synced calendar rows.
-    for tid, (air_day, label) in _calendar_last_aired(user.id, show_ids, today).items():
+    # 1. Free: last-aired from past calendar days (not today — no clock time).
+    cal_latest, airing_today = _calendar_last_aired(user.id, show_ids, today)
+    for tid, (air_day, label) in cal_latest.items():
         row = _state(tid)
         aired_dt = datetime.combine(air_day, datetime.min.time())
-        if row.last_episode_aired_at is None or aired_dt > row.last_episode_aired_at:
+        last = row.last_episode_aired_at
+        last_day = local_date(last)
+        if last is not None and last_day == air_day and not is_calendar_midnight(last):
+            continue
+        if last is None or last_day is None or air_day > last_day:
             row.last_episode_aired_at = aired_dt
             if label:
                 row.last_episode_label = label
-            row.last_aired_checked_at = datetime.utcnow()
             stats['calendar'] += 1
 
     # 2. Per-show seed: nothing stored yet and (never checked or stale check).
@@ -153,7 +230,9 @@ def refresh_shows_cache_for_user(user: User, *, skip_per_show: bool = False) -> 
     recheck_before = datetime.utcnow() - timedelta(days=SEED_RECHECK_DAYS)
     need_seed = [
         tid for tid in show_ids
-        if _needs_last_aired_seed(states.get(tid), recheck_before)
+        if _needs_last_aired_seed(
+            states.get(tid), recheck_before, airing_today=tid in airing_today,
+        )
     ]
     for tid in need_seed:
         time.sleep(_SEED_SPACING_SECONDS)
@@ -200,7 +279,11 @@ def seed_new_shows_inline(user: User, *, limit: int = 3) -> int:
         .filter(
             UserMediaState.user_id == user.id,
             UserMediaState.media_type == 'show',
-            UserMediaState.last_aired_checked_at.is_(None),
+            UserMediaState.last_episode_aired_at.is_(None),
+            or_(
+                UserMediaState.last_aired_checked_at.is_(None),
+                UserMediaState.episodes_aired > 0,
+            ),
         )
         .limit(limit)
         .all()

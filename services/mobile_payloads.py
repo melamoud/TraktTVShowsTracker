@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from services.local_time import format_local_date
+
 
 def _link_maps():
     """User service URLs + search templates, cached on the request."""
@@ -113,7 +115,8 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
         'next_episode_number': st.next_episode_number if st is not None else None,
         'next_episode_title': st.next_episode_title if st is not None else None,
         'last_episode_aired_at': (
-            _iso(st.last_episode_aired_at) if st is not None else None
+            (format_local_date(st.last_episode_aired_at) or None)
+            if st is not None else None
         ),
         'last_episode_label': st.last_episode_label if st is not None else None,
         'next_ep': next_payload,
@@ -286,7 +289,9 @@ def serialize_alert_card(card: dict) -> dict:
         'found_on_links': service_link_entries(found_on, title, year),
         'my_provider_links': service_link_entries(my_providers, title, year),
         'other_provider_links': service_link_entries(other_providers, title, year),
-        'last_episode_aired_at': _iso(st.last_episode_aired_at) if st else None,
+        'last_episode_aired_at': (
+            format_local_date(st.last_episode_aired_at) or None
+        ) if st else None,
         'last_episode_label': st.last_episode_label if st else None,
         'kind_label': card.get('kind_label') or '',
         'episode_code': card.get('episode_code') or '',

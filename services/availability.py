@@ -11,6 +11,8 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Any
 
+from services.local_time import local_today
+
 THEATER_DAYS = 30
 AVAIL_CHOICES = ('upcoming', 'theater', 'streaming')
 
@@ -25,7 +27,19 @@ def _release_date(media) -> date | None:
     if not media:
         return None
     released = getattr(media, 'released_at', None)
-    return released if isinstance(released, date) else None
+    if not isinstance(released, date):
+        return None
+    # Show rows sometimes got a later episode date stamped as the premiere.
+    # Theater/Upcoming must use the real public release, not last-aired.
+    if getattr(media, 'media_type', None) == 'show':
+        year = getattr(media, 'year', None)
+        try:
+            year_i = int(year) if year is not None else None
+        except (TypeError, ValueError):
+            year_i = None
+        if year_i is not None and released.year > year_i + 1:
+            return None
+    return released
 
 
 def availability_flags(
@@ -41,7 +55,7 @@ def availability_flags(
     ``providers`` should be subscription/free names already filtered
     (flatrate/ads/free). When omitted, reads ``media.providers``.
     """
-    today = today or date.today()
+    today = today or local_today()
     released = _release_date(media)
     upcoming = False
     theater = False
@@ -134,11 +148,11 @@ def filter_rows_by_avail(rows: list[dict], avail: str) -> list[dict]:
 
 def theater_window_bounds(today: date | None = None) -> tuple[date, date]:
     """Inclusive start/end dates for the theater window."""
-    today = today or date.today()
+    today = today or local_today()
     return today - timedelta(days=THEATER_DAYS), today + timedelta(days=THEATER_DAYS)
 
 
 def upcoming_after(today: date | None = None) -> date:
     """First date that counts as Upcoming (exclusive theater upper bound + 1)."""
-    today = today or date.today()
+    today = today or local_today()
     return today + timedelta(days=THEATER_DAYS + 1)

@@ -58,6 +58,45 @@ def test_newest_aired_hides_future_shows_and_sorts(app, client, user):
     assert html.index('New Show') < html.index('Caught Up Show') < html.index('Old Show')
 
 
+def test_newest_aired_orders_timed_utc_episode_above_calendar_day(app, client, user):
+    """HBO 01:00Z last night ranks above a Netflix drop whose date is midnight UTC."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=157599, title='Lanterns', year=2026,
+            released_at=date(2026, 8, 17),
+        ))
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=159815, title='Outer Banks', year=2020,
+            released_at=date(2026, 8, 20),
+        ))
+        _seed_state(
+            user, trakt_id=157599, on_watchlist=True,
+            last_episode_aired_at=datetime(2026, 8, 24, 1, 0, 0),
+            last_episode_label='S01E02 Episode 2',
+            episodes_aired=2, episodes_completed=1,
+        )
+        _seed_state(
+            user, trakt_id=159815, on_watchlist=True,
+            last_episode_aired_at=datetime(2026, 8, 20, 0, 0, 0),
+            last_episode_label='S05E10 Episode 10',
+            episodes_aired=50, episodes_completed=40,
+        )
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'), \
+         patch('services.local_time.local_today', return_value=date(2026, 8, 23)):
+        resp = client.get('/my/shows?lists_set=1&lists=watchlist&filter=lists&display=newest_aired')
+    html = resp.get_data(as_text=True)
+    assert 'Lanterns' in html and 'Outer Banks' in html
+    assert html.index('Lanterns') < html.index('Outer Banks')
+
+
 def test_newest_aired_includes_show_with_aired_count_but_no_date(app, client, user):
     """Progress can know episodes aired before last_episode_aired_at is seeded."""
     with app.app_context():

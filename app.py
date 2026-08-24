@@ -131,6 +131,8 @@ def create_app(config_object=Config):
     app.add_template_global(_found_on_open_url, name='found_on_open_url')
     from routes.catalog_routes import media_detail_url as _media_detail_url
     app.add_template_global(_media_detail_url, name='media_detail_url')
+    from services.local_time import format_local_date as _format_local_date
+    app.add_template_filter(_format_local_date, name='local_date')
 
     from routes import register_routes
     register_routes(app)

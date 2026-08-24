@@ -23,18 +23,22 @@ logger = logging.getLogger('app')
 
 # Trakt allows up to 33 days per calendar call.
 _CAL_CHUNK_DAYS = 33
+# Timed UTC stamps (01:00Z) land on the previous local evening — fetch ±1 day
+# so those episodes are stored on the local calendar day.
+_CAL_TZ_PAD_DAYS = 1
 
 _HAS_DASH_STRFTIME = None
 
 
 def parse_calendar_day(value) -> date | None:
-    """Parse a YYYY-MM-DD-ish value from Trakt calendar payloads."""
-    if not value:
-        return None
-    try:
-        return date.fromisoformat(str(value)[:10])
-    except ValueError:
-        return None
+    """Local calendar day for a Trakt date or ISO timestamp.
+
+    Date-only and midnight-UTC values stay on that day (Netflix drops).
+    Timed UTC (HBO 01:00Z) converts to the scheduler timezone.
+    """
+    from services.local_time import local_date, parse_trakt_datetime
+
+    return local_date(parse_trakt_datetime(value))
 
 
 def _fmt(day: date, fmt: str) -> str:
@@ -102,14 +106,17 @@ def ensure_user_calendar_fresh(
     if calendar_window_covers(user, start, end):
         log_cache_event('calendar', 'hit', user=user, calls=0)
         return False
+    fetch_start = start - timedelta(days=_CAL_TZ_PAD_DAYS)
+    fetch_end = end + timedelta(days=_CAL_TZ_PAD_DAYS)
+    fetch_days = (fetch_end - fetch_start).days + 1
     span = cache_http_span()
     try:
-        if days <= _CAL_CHUNK_DAYS:
-            chunks = [(start, days)]
+        if fetch_days <= _CAL_CHUNK_DAYS:
+            chunks = [(fetch_start, fetch_days)]
         else:
             chunks = []
-            cur = start
-            remaining = days
+            cur = fetch_start
+            remaining = fetch_days
             while remaining > 0:
                 step = min(remaining, _CAL_CHUNK_DAYS)
                 chunks.append((cur, step))
@@ -135,8 +142,8 @@ def ensure_user_calendar_fresh(
         UserCalendarEvent.query.filter(
             UserCalendarEvent.user_id == user.id,
             UserCalendarEvent.media_type == media_type,
-            UserCalendarEvent.event_date >= start,
-            UserCalendarEvent.event_date <= end,
+            UserCalendarEvent.event_date >= fetch_start,
+            UserCalendarEvent.event_date <= fetch_end,
         ).delete(synchronize_session=False)
 
     for media_type, entry in entries:
@@ -157,7 +164,7 @@ def ensure_user_calendar_fresh(
         if not air_day or not tid:
             continue
         tid = int(tid)
-        if not (start <= air_day <= end):
+        if not (fetch_start <= air_day <= fetch_end):
             continue
         existing = UserCalendarEvent.query.filter_by(
             user_id=user.id,
@@ -182,7 +189,7 @@ def ensure_user_calendar_fresh(
             ))
         upsert_cached_media(media_type, entry)
 
-    note_calendar_window(user, start, end)
+    note_calendar_window(user, fetch_start, fetch_end)
     db.session.commit()
     log_cache_event('calendar', 'fetch', user=user, reason='stale', calls=span())
     return True
@@ -244,7 +251,9 @@ def build_calendar_view(
 
     days_out = []
     cur = grid_start
-    today = date.today()
+    from services.local_time import local_today
+
+    today = local_today()
     month_starts = set()
     while cur <= grid_end:
         days_out.append({

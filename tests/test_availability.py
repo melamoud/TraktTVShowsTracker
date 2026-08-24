@@ -43,6 +43,24 @@ def test_availability_flags_buckets():
     assert edge_th['theater'] is True
 
 
+def test_availability_flags_ignores_episode_date_on_old_show():
+    """Outer Banks 2020 must not get a Theater chip from a 2026 episode stamp."""
+    today = date(2026, 8, 23)
+
+    class M:
+        media_type = 'show'
+        year = 2020
+        providers = []
+
+        def __init__(self, released):
+            self.released_at = released
+
+    flags = availability_flags(M(date(2026, 8, 20)), today=today)
+    assert flags['theater'] is False
+    assert flags['upcoming'] is False
+    assert flags['released_at'] is None
+
+
 def test_availability_chips_streaming_label():
     flags = {
         'upcoming': False,

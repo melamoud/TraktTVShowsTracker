@@ -32,17 +32,18 @@ def _episode_air_info(ep: dict, *, progress_says_aired: bool | None) -> dict:
 
     Returns aired (bool), air_date (datetime|None), air_label (str).
 
-    When Trakt progress already marks the episode as aired, trust that over a
-    still-future first_aired timestamp (timezone / same-day air-time skew).
+    Air time is converted to the admin scheduler timezone. Trakt progress
+    cannot force an episode to look aired while it is still in the future
+    locally (UTC-date vs Eastern evening mismatch).
     """
+    from services.local_time import format_local_date, has_aired_at
+
     air_dt = _parse_air_datetime(ep.get('first_aired')) or _parse_air_datetime(ep.get('released'))
-    now = datetime.utcnow()
     if air_dt is not None:
-        label = air_dt.strftime('%Y-%m-%d')
-        if progress_says_aired is not None:
-            is_aired = bool(progress_says_aired)
-        else:
-            is_aired = air_dt <= now
+        label = format_local_date(air_dt) or air_dt.strftime('%Y-%m-%d')
+        is_aired = has_aired_at(air_dt)
+        if progress_says_aired is False:
+            is_aired = False
         if is_aired:
             air_label = f'Aired {label}'
         else:
@@ -606,11 +607,12 @@ def _my_media(media_type: str):
     calendar_ctx = None
     if display_mode in ('daily', 'weekly', 'monthly'):
         from services import calendar_view as cal_view
+        from services.local_time import local_today
         try:
             anchor_str = (request.args.get('cal_date') or '').strip()
-            anchor = date.fromisoformat(anchor_str) if anchor_str else date.today()
+            anchor = date.fromisoformat(anchor_str) if anchor_str else local_today()
         except ValueError:
-            anchor = date.today()
+            anchor = local_today()
         cal_start, cal_end = cal_view.period_bounds(display_mode, anchor)
         cal_days = (cal_end - cal_start).days + 1
         try:
@@ -719,12 +721,22 @@ def _my_media(media_type: str):
         ]))
     if avail == 'upcoming':
         q = q.filter(CachedMedia.released_at >= upcoming_after())
+        if media_type == 'show':
+            q = q.filter(or_(
+                CachedMedia.year.is_(None),
+                extract('year', CachedMedia.released_at) <= CachedMedia.year + 1,
+            ))
     elif avail == 'theater':
         start, end = theater_window_bounds()
         q = q.filter(
             CachedMedia.released_at >= start,
             CachedMedia.released_at <= end,
         )
+        if media_type == 'show':
+            q = q.filter(or_(
+                CachedMedia.year.is_(None),
+                extract('year', CachedMedia.released_at) <= CachedMedia.year + 1,
+            ))
     elif avail == 'streaming':
         streaming_ids = (
             db.session.query(MediaProviderAvailability.cached_media_id)
@@ -735,10 +747,11 @@ def _my_media(media_type: str):
     # Newest-aired view: hide future-only titles and sort by latest aired/release date.
     # Pure cache read — last-aired/progress are maintained by the 6h media job.
     newest_aired = display_mode == 'newest_aired'
+    from services.local_time import local_today
+    today = local_today()
+    newest_show_python = newest_aired and media_type == 'show'
     if newest_aired:
-        today = date.today()
         if media_type == 'show':
-            from services.shows_cache import newest_aired_show_clause
             if not needs_media_join:
                 q = q.outerjoin(
                     CachedMedia,
@@ -747,7 +760,6 @@ def _my_media(media_type: str):
                         CachedMedia.trakt_id == UserMediaState.trakt_id,
                     ),
                 )
-            q = q.filter(newest_aired_show_clause(today))
         else:  # movie
             if not needs_media_join:
                 q = q.outerjoin(
@@ -762,31 +774,39 @@ def _my_media(media_type: str):
                 CachedMedia.released_at <= today,
             )
 
-    total = q.count()
     per_page = _per_page(f'my_{media_type}')
-    pages = max((total + per_page - 1) // per_page, 1) if total else 1
     try:
         page = max(int(request.args.get('page', 1)), 1)
     except (TypeError, ValueError):
         page = 1
-    if page > pages:
-        page = pages
 
-    if newest_aired:
-        # Pins as a group on top; within pins (and the rest) newest aired / release first.
-        if media_type == 'show':
-            from services.shows_cache import newest_aired_show_sort_day
-            states = (
-                q.order_by(
-                    UserMediaState.pinned.desc(),
-                    newest_aired_show_sort_day().desc(),
-                    UserMediaState.id.desc(),
-                )
-                .offset((page - 1) * per_page)
-                .limit(per_page)
-                .all()
-            )
-        else:
+    if newest_show_python:
+        from services.shows_cache import order_shows_newest_aired
+        raw_states = q.all()
+        tids = [int(s.trakt_id) for s in raw_states]
+        media_by_tid = {}
+        if tids:
+            media_by_tid = {
+                int(m.trakt_id): m
+                for m in CachedMedia.query.filter(
+                    CachedMedia.media_type == 'show',
+                    CachedMedia.trakt_id.in_(tids),
+                ).all()
+            }
+        ranked = order_shows_newest_aired(raw_states, media_by_tid, today)
+        total = len(ranked)
+        pages = max((total + per_page - 1) // per_page, 1) if total else 1
+        if page > pages:
+            page = pages
+        states = ranked[(page - 1) * per_page: page * per_page]
+    else:
+        total = q.count()
+        pages = max((total + per_page - 1) // per_page, 1) if total else 1
+        if page > pages:
+            page = pages
+
+        if newest_aired:
+            # Pins as a group on top; within pins (and the rest) newest release first.
             states = (
                 q.order_by(
                     UserMediaState.pinned.desc(),
@@ -797,33 +817,33 @@ def _my_media(media_type: str):
                 .limit(per_page)
                 .all()
             )
-    else:
-        # Meaningful DB sort (page-only; no full fetch):
-        # Pinned first (newest pin first), then:
-        # 0 = in progress, 1 = has watch history, 2 = never started.
-        # Within those: most recently watched first.
-        in_progress = and_(
-            UserMediaState.progress_percent.isnot(None),
-            UserMediaState.progress_percent > 0,
-            UserMediaState.progress_percent < 100,
-        )
-        sort_bucket = case(
-            (in_progress, 0),
-            (UserMediaState.last_watched_at.isnot(None), 1),
-            else_=2,
-        )
-        states = (
-            q.order_by(
-                UserMediaState.pinned.desc(),
-                UserMediaState.pinned_at.desc(),
-                sort_bucket.asc(),
-                UserMediaState.last_watched_at.desc(),
-                UserMediaState.id.desc(),
+        else:
+            # Meaningful DB sort (page-only; no full fetch):
+            # Pinned first (newest pin first), then:
+            # 0 = in progress, 1 = has watch history, 2 = never started.
+            # Within those: most recently watched first.
+            in_progress = and_(
+                UserMediaState.progress_percent.isnot(None),
+                UserMediaState.progress_percent > 0,
+                UserMediaState.progress_percent < 100,
             )
-            .offset((page - 1) * per_page)
-            .limit(per_page)
-            .all()
-        )
+            sort_bucket = case(
+                (in_progress, 0),
+                (UserMediaState.last_watched_at.isnot(None), 1),
+                else_=2,
+            )
+            states = (
+                q.order_by(
+                    UserMediaState.pinned.desc(),
+                    UserMediaState.pinned_at.desc(),
+                    sort_bucket.asc(),
+                    UserMediaState.last_watched_at.desc(),
+                    UserMediaState.id.desc(),
+                )
+                .offset((page - 1) * per_page)
+                .limit(per_page)
+                .all()
+            )
     trakt_ids = [s.trakt_id for s in states]
     try:
         ensure_media_cached(media_type, trakt_ids)
@@ -840,7 +860,7 @@ def _my_media(media_type: str):
                 UserCalendarEvent.user_id == current_user.id,
                 UserCalendarEvent.media_type == 'show',
                 UserCalendarEvent.trakt_id.in_(trakt_ids),
-                UserCalendarEvent.event_date > date.today(),
+                UserCalendarEvent.event_date >= today,
             )
             .order_by(UserCalendarEvent.event_date.asc())
             .all()
@@ -849,6 +869,20 @@ def _my_media(media_type: str):
             tid = int(e.trakt_id)
             if tid in next_ep_map:
                 continue  # ascending order → first seen is soonest
+            st_row = next((s for s in states if int(s.trakt_id) == tid), None)
+            if (
+                e.event_date == today
+                and st_row is not None
+                and st_row.last_episode_aired_at is not None
+            ):
+                from services.local_time import has_aired_at, local_date
+                last = st_row.last_episode_aired_at
+                if has_aired_at(last) and local_date(last) == today:
+                    tag = None
+                    if e.season_number is not None and e.episode_number is not None:
+                        tag = f'S{int(e.season_number):02d}E{int(e.episode_number):02d}'
+                    if tag and st_row.last_episode_label and tag in st_row.last_episode_label:
+                        continue
             label = None
             if e.season_number is not None and e.episode_number is not None:
                 label = f'S{int(e.season_number):02d}E{int(e.episode_number):02d}'
@@ -1554,6 +1588,58 @@ def _group_kind_label(cards: list[dict]) -> str:
     return 'Show'
 
 
+def _streaming_vendor_label(n, media) -> str:
+    """Service name from a Now-on-X streaming alert."""
+    title = (getattr(n, 'title', None) or '').strip()
+    name = (media.title if media is not None else '') or ''
+    if title.startswith('Now on ') and ': ' in title[7:]:
+        vendor, _, rest = title[7:].partition(': ')
+        if not name or rest.strip() == name:
+            return vendor.strip()
+    key = (getattr(n, 'payload_key', None) or '')
+    if key.startswith('provider:'):
+        return key.split(':', 1)[1].strip()
+    return ''
+
+
+def _merge_streaming_alert_cards(cards: list[dict]) -> list[dict]:
+    """One streaming card per title; vendors listed together; unread if any is unread."""
+    buckets: dict[tuple, list[dict]] = {}
+    order: list[tuple] = []
+    for card in cards:
+        n = card['n']
+        pair = card.get('media_pair')
+        if getattr(n, 'alert_type', None) == 'new_streaming' and pair:
+            key = ('stream', pair[0], int(pair[1]))
+        else:
+            key = ('keep', n.id)
+        if key not in buckets:
+            buckets[key] = []
+            order.append(key)
+        buckets[key].append(card)
+    out: list[dict] = []
+    for key in order:
+        items = buckets[key]
+        if key[0] != 'stream' or len(items) == 1:
+            out.extend(items)
+            continue
+        unread = [c for c in items if not c['n'].is_read]
+        lead = dict(unread[0] if unread else items[0])
+        vendors = []
+        seen: set[str] = set()
+        for c in items:
+            vendor = _streaming_vendor_label(c['n'], c.get('media'))
+            fold = vendor.casefold()
+            if vendor and fold not in seen:
+                seen.add(fold)
+                vendors.append(vendor)
+        if vendors:
+            lead['headline'] = ' · '.join(vendors)
+        lead['merged_ids'] = [c['n'].id for c in items]
+        out.append(lead)
+    return out
+
+
 def _alert_headline(n, media, episode_code: str = '') -> str:
     """Subtitle: episode name + date, or a movie date — not S#E# (that's in the title)."""
     kind = n.alert_type or ''
@@ -1573,10 +1659,16 @@ def _alert_headline(n, media, episode_code: str = '') -> str:
                 '', text, count=1, flags=re.IGNORECASE,
             )
         return text.strip()
+    if kind == 'new_streaming':
+        vendor = _streaming_vendor_label(n, media)
+        if vendor:
+            return vendor
     if media is not None and media.released_at:
-        return media.released_at.isoformat()
+        from services.local_time import format_local_date
+        return format_local_date(media.released_at) or media.released_at.isoformat()
     if n.created_at:
-        return n.created_at.strftime('%Y-%m-%d')
+        from services.local_time import format_local_date
+        return format_local_date(n.created_at) or n.created_at.strftime('%Y-%m-%d')
     return ''
 
 
@@ -1717,6 +1809,36 @@ def _group_alert_cards(cards: list[dict], *, group_shows: bool, sort: str) -> li
     return entries
 
 
+def _include_streaming_siblings(user_id, rows, pair_by_notif, title_to_pair):
+    """Pull the other Now-on-X rows for a title so merge can list every vendor."""
+    keys = set()
+    for n in rows:
+        if getattr(n, 'alert_type', None) != 'new_streaming':
+            continue
+        pair = pair_by_notif.get(n.id) or _alert_media_pair(n, title_to_pair)
+        if pair:
+            keys.add(pair)
+            pair_by_notif[n.id] = pair
+    if not keys:
+        return rows, pair_by_notif
+    have = {n.id for n in rows}
+    extra = []
+    for media_type, trakt_id in keys:
+        extra.extend(Notification.query.filter_by(
+            user_id=user_id,
+            alert_type='new_streaming',
+            media_type=media_type,
+            trakt_id=int(trakt_id),
+        ).all())
+    for n in extra:
+        if n.id in have:
+            continue
+        rows.append(n)
+        have.add(n.id)
+        pair_by_notif[n.id] = (n.media_type, int(n.trakt_id))
+    return rows, pair_by_notif
+
+
 def _collect_alert_cards() -> dict:
     """Build Alerts page/API payload for the current user."""
     from services import view_prefs
@@ -1766,6 +1888,12 @@ def _collect_alert_cards() -> dict:
             rows = [n for n in rows if not n.is_read]
             pair_by_notif = {n.id: pair_by_notif[n.id] for n in rows if n.id in pair_by_notif}
             pairs = set(pair_by_notif.values())
+    rows, pair_by_notif = _include_streaming_siblings(
+        current_user.id, rows, pair_by_notif, title_to_pair,
+    )
+    pairs = {
+        pair_by_notif[n.id] for n in rows if n.id in pair_by_notif
+    }
     media_map = {}
     if pairs:
         show_ids = [tid for mt, tid in pairs if mt == 'show']
@@ -1860,6 +1988,8 @@ def _collect_alert_cards() -> dict:
             'alerts_pinned': bool(st and getattr(st, 'alerts_pinned', False)),
         })
     cards.sort(key=lambda c: _alert_sort_key(c, sort))
+    cards = _merge_streaming_alert_cards(cards)
+    cards.sort(key=lambda c: _alert_sort_key(c, sort))
     entries = _group_alert_cards(cards, group_shows=group_shows, sort=sort)
     return {
         'cards': cards,
@@ -1892,8 +2022,9 @@ def notifications_read_all():
 @login_required
 def notification_read(notif_id):
     """Mark one notification as read; optionally open its link."""
+    from services.alerts import set_notification_read
     row = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
-    row.is_read = True
+    set_notification_read(current_user.id, row, True)
     db.session.commit()
     if request.form.get('open') == '1' and row.link:
         return redirect(row.link)
@@ -1904,8 +2035,9 @@ def notification_read(notif_id):
 @login_required
 def notification_unread(notif_id):
     """Mark one notification as unread."""
+    from services.alerts import set_notification_read
     row = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
-    row.is_read = False
+    set_notification_read(current_user.id, row, False)
     db.session.commit()
     return redirect(url_for('user.notifications'))
 

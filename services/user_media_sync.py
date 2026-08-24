@@ -187,6 +187,12 @@ def ensure_user_media_fresh(
             logger.warning('Could not extend TTL after unchanged probe: %s', exc)
             db.session.rollback()
         log_cache_event('user_media', 'probe', user=user, reason='unchanged', calls=span())
+        if 'show' in types:
+            try:
+                from services.shows_cache import seed_new_shows_inline
+                seed_new_shows_inline(user)
+            except Exception as exc:
+                logger.warning('Latest-aired seed on cache hit failed: %s', exc)
         return False
 
     ok = sync_user_media_state(user, media_types=types)

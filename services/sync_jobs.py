@@ -1076,16 +1076,34 @@ def apply_show_episode_progress(
         )
         db.session.add(row)
 
+    last = row.last_episode_aired_at
+    last_still_upcoming = False
+    if last is not None:
+        from services.local_time import has_aired_at
+        last_still_upcoming = not has_aired_at(last)
+
     if aired is not None:
-        row.episodes_aired = int(aired)
+        count = int(aired)
+        if last_still_upcoming:
+            # Trakt's UTC aired count can include tonight's episode before 9pm ET.
+            stored = row.episodes_aired
+            if stored is not None and int(stored) < count:
+                count = int(stored)
+            else:
+                count = max(0, count - 1)
+        row.episodes_aired = count
     if completed is not None:
         row.episodes_completed = int(completed)
-    if aired is not None and completed is not None and int(aired) > 0:
-        row.progress_percent = round(100.0 * int(completed) / int(aired), 1)
+    stored_aired = row.episodes_aired
+    if stored_aired is not None and completed is not None and int(stored_aired) > 0:
+        row.progress_percent = round(100.0 * int(completed) / int(stored_aired), 1)
         if int(completed) > 0:
             row.watched = True
 
-    if next_episode:
+    if last_still_upcoming:
+        # Keep the locally-upcoming episode as Next; Trakt already skipped it.
+        pass
+    elif next_episode:
         row.next_episode_season = next_episode.get('season')
         row.next_episode_number = next_episode.get('number')
         title = next_episode.get('title')
@@ -1199,18 +1217,24 @@ def _parse_first_aired(value: str | None) -> datetime | None:
         return None
 
 
-def _latest_aired_from_seasons(seasons: list) -> tuple[datetime | None, str | None]:
-    """Return (latest aired datetime, label) from Trakt seasons payload."""
-    now = datetime.utcnow()
+def _latest_aired_from_seasons(seasons: list) -> tuple[datetime | None, str | None, int]:
+    """Return (latest aired datetime, label, regular-season aired count)."""
+    from services.local_time import has_aired_at
     latest: datetime | None = None
     label: str | None = None
+    aired_count = 0
     for season in seasons or []:
         s_no = season.get('number')
         if s_no is None:
             continue
+        s_no = int(s_no)
         for ep in season.get('episodes') or []:
             air = _parse_first_aired(ep.get('first_aired'))
-            if air and air <= now and (latest is None or air > latest):
+            if not air or not has_aired_at(air):
+                continue
+            if s_no > 0:
+                aired_count += 1
+            if latest is None or air > latest:
                 latest = air
                 e_no = ep.get('number')
                 title = ep.get('title')
@@ -1220,7 +1244,7 @@ def _latest_aired_from_seasons(seasons: list) -> tuple[datetime | None, str | No
                 if title:
                     parts.append(str(title))
                 label = ' · '.join(parts)
-    return latest, label
+    return latest, label, aired_count
 
 
 def collection_trakt_ids(user_id: int, media_type: str) -> set[int]:
@@ -1269,7 +1293,7 @@ def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
     """
     try:
         seasons = trakt_client.get_show_seasons(trakt_id)
-        latest, label = _latest_aired_from_seasons(seasons)
+        latest, label, aired_count = _latest_aired_from_seasons(seasons)
     except Exception as exc:
         if getattr(exc, 'status_code', None) == 429:
             raise
@@ -1284,6 +1308,15 @@ def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
     if latest is not None:
         row.last_episode_aired_at = latest
         row.last_episode_label = label
+    ep_rows = sum(len(s.get('episodes') or []) for s in (seasons or []))
+    if ep_rows:
+        row.episodes_aired = aired_count
+        if row.episodes_completed is not None:
+            if aired_count > 0:
+                done = min(int(row.episodes_completed), aired_count)
+                row.progress_percent = round(100.0 * done / aired_count, 1)
+            else:
+                row.progress_percent = 0.0
     row.last_aired_checked_at = datetime.utcnow()
     return True
 

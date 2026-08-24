@@ -174,7 +174,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
         </h2>
         <div class="meta">
           Trakt DB added/updated: {{ m.trakt_listed_at or 'unknown' }}
-          {% if m.released_at %} · Public release: {{ m.released_at }}{% endif %}
+          {% if m.released_at %} · Public release: {{ m.released_at|local_date }}{% endif %}
           {% if m.network %} · Network: {{ m.network }}{% endif %}
           {% if m.runtime %} · {{ m.runtime }} min{% endif %}
         </div>

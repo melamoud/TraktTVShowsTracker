@@ -84,8 +84,8 @@ def test_notifications_page_renders_episode_card(app, client, user):
     assert also_at != -1 and found_at != -1 and also_at < found_at
 
 
-def test_streaming_movie_alert_shows_release_date_not_blurb(app, client, user):
-    """Now-streaming movies put the release date on the title line, not 'available on'."""
+def test_streaming_movie_alert_shows_vendor_not_blurb(app, client, user):
+    """Now-streaming movies list the vendor on the title line, not 'available on'."""
     with app.app_context():
         db.session.add(CachedMedia(
             media_type='movie', trakt_id=99, title='Altered', year=2014,
@@ -104,7 +104,7 @@ def test_streaming_movie_alert_shows_release_date_not_blurb(app, client, user):
     assert 'Altered' in html
     assert 'Now streaming' in html
     assert 'Streaming' in html
-    assert '2014-01-15' in html
+    assert 'YouTube Free' in html
     assert 'is available on' not in html
     assert 'data-action="progress-open"' not in html
 
@@ -437,3 +437,33 @@ def test_notifications_page_renders_list_add_card(app, client, user):
     assert 'Added to list' in html
     assert 'Added to Wishlist' in html
     assert 'data-trakt-id="202341"' in html
+
+
+def test_streaming_alerts_for_same_title_merge(app, client, user):
+    """Two Now-on-X cards for one show render as one unread row listing both vendors."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=157599, title='Lanterns', year=2026,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='new_streaming',
+            title='Now on HBO Max: Lanterns',
+            message='Lanterns is available on HBO Max.',
+            media_type='show', trakt_id=157599, is_read=True,
+            payload_key='provider:hbo max',
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='new_streaming',
+            title='Now on HBO Max Amazon Channel: Lanterns',
+            message='Lanterns is available on HBO Max Amazon Channel.',
+            media_type='show', trakt_id=157599, is_read=False,
+            payload_key='provider:hbo max amazon channel',
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications?hide_read=0&group_shows=0').get_data(as_text=True)
+    assert html.count('Now streaming') == 1
+    assert 'HBO Max' in html
+    assert 'HBO Max Amazon Channel' in html
+    assert html.count('Unread') >= 1
+    assert 'Show 2 alerts' not in html

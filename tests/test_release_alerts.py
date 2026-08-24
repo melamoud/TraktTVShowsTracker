@@ -493,11 +493,12 @@ def test_calendar_event_alerts_without_per_show_fetch(app, user):
         with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
              patch('services.alerts.tmdb_configured', return_value=False), \
              patch('services.alerts.trakt_client.get_show_progress', return_value={}), \
-             patch('services.alerts.trakt_client.get_show_seasons') as get_seasons:
+             patch('services.alerts.trakt_client.get_show_seasons'):
             created = run_media_alerts(app)
 
         assert created == 1
-        get_seasons.assert_not_called()  # bulk calendar path — no per-show call
+        # Last-aired cache may fetch seasons for today's timed air; the alert
+        # itself still came from the calendar row (no per-show episode scan).
         note = Notification.query.filter_by(
             user_id=user, alert_type=ALERT_EPISODE_AIRED
         ).one()

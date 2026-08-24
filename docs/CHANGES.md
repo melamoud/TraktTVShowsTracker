@@ -1,5 +1,19 @@
 # Changes log
 
+## 2026-08-23 — Calendar, progress counts, and Theater use local air times
+
+- My Calendar and **Next: SxEy · date** store Trakt episode times in the scheduler timezone (`01:00Z` → previous evening), not the UTC calendar day
+- Last-aired no longer copies *today’s* date-only calendar row (that counted a 9pm episode all afternoon); seasons fetch supplies the clock time
+- **x / y episodes watched** and caught-up / streaming-alert pause ignore Trakt’s UTC `aired` count until the episode has aired locally
+- Theater / Upcoming chips ignore a show `released_at` that is years after the premiere year (Outer Banks S5 date was not a theatrical window). Run `python scripts/fix_show_released_at.py` once per environment to clear those rows
+
+## 2026-08-23 — Local air dates, merged streaming alerts, Newest aired sort
+
+- Episode air times display and sort in the scheduler timezone (America/New_York): Trakt’s `01:00Z` is the previous evening, not tomorrow
+- Progress no longer labels a still-future local air time as already aired just because Trakt’s UTC progress flag flipped
+- Same-title **Now streaming** alerts collapse to one card listing every vendor; unread if any vendor is unread; Mark read clears them all
+- Newest aired uses that local last-episode day (Lanterns was under Outer Banks because last-aired was empty and fell back to the Aug 17 premiere)
+
 ## 2026-08-23 — Newest aired hid shows like Lanterns
 
 - Newest aired dropped shows whose last-aired date was never cached (first seed ran before premiere, then waited 30 days)

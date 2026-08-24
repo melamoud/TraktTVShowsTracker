@@ -3,7 +3,7 @@ Auto in-app alerts for titles on alert-enabled lists (default: Wishlist only).
 
 Alert types:
   release_day      — release/first-aired date arrived
-  new_streaming    — a new TMDB stream provider appeared (per provider)
+  new_streaming    — a new TMDB stream provider appeared (merged to one card per title)
   episode_aired    — a new episode aired
   season_aired     — full season published on one calendar day
   list_add         — user added a title to Wishlist or a personal list
@@ -22,6 +22,7 @@ from datetime import date, datetime, timedelta
 from typing import Iterable
 
 from flask import Flask
+from services.local_time import local_today
 from models import (
     AlertEvent,
     CachedMedia,
@@ -735,13 +736,34 @@ def _parse_air_date(value) -> date | None:
         if text.endswith('Z'):
             text = text[:-1] + '+00:00'
         dt = datetime.fromisoformat(text)
-        return dt.date()
+        from services.local_time import local_date
+        return local_date(dt.replace(tzinfo=None) if dt.tzinfo is None else dt)
     except ValueError:
         pass
     try:
         return date.fromisoformat(text[:10])
     except ValueError:
         return None
+
+
+def set_notification_read(user_id: int, row: Notification, is_read: bool) -> None:
+    """Mark one alert read/unread. Streaming cards for the same title stay in sync."""
+    targets = [row]
+    if (
+        row.alert_type == ALERT_NEW_STREAMING
+        and row.media_type
+        and row.trakt_id
+    ):
+        siblings = Notification.query.filter_by(
+            user_id=user_id,
+            alert_type=ALERT_NEW_STREAMING,
+            media_type=row.media_type,
+            trakt_id=int(row.trakt_id),
+        ).all()
+        if siblings:
+            targets = siblings
+    for note in targets:
+        note.is_read = is_read
 
 
 def notify_admins_new_user(new_user: User) -> int:
@@ -775,7 +797,7 @@ def _check_release_day(user: User, media_type: str, trakt_id: int, media: Cached
         return 0
     if not media.released_at:
         return 0
-    today = date.today()
+    today = local_today()
     released = media.released_at
     if released > today:
         return 0
@@ -902,7 +924,7 @@ def _confirm_full_season_drop(trakt_id: int, season: int) -> date | None:
     except Exception as exc:
         logger.warning('Season-drop confirm failed for show %s: %s', trakt_id, exc)
         return None
-    today = date.today()
+    today = local_today()
     for s in seasons or []:
         if s.get('number') is None or int(s['number']) != season:
             continue
@@ -931,7 +953,7 @@ def _check_episodes_from_calendar(
     run covers all watchlisted/watched shows). ``events`` are this show's
     UserCalendarEvent rows; only the grace window alerts.
     """
-    today = date.today()
+    today = local_today()
     rows = [
         e for e in events
         if e.season_number is not None
@@ -983,7 +1005,7 @@ def _check_episodes(user: User, trakt_id: int, media: CachedMedia) -> int:
         logger.warning('Episode alert fetch failed for show %s: %s', trakt_id, exc)
         return 0
 
-    today = date.today()
+    today = local_today()
     _ensure_providers(media)
 
     baseline_key = 'baseline:episodes'
@@ -1089,7 +1111,7 @@ def run_media_alerts(app: Flask) -> int:
 def _run_alerts_for_user(user: User) -> tuple[int, bool]:
     """Returns (notifications created, hit Trakt rate limit during this run)."""
     created = 0
-    today = date.today()
+    today = local_today()
     win_start = today - timedelta(days=RELEASE_GRACE_DAYS)
 
     # One bulk pull: /calendars/my covers every watchlisted or in-progress show.

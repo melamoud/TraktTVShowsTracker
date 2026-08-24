@@ -58,7 +58,35 @@ def test_refresh_derives_last_aired_from_calendar_rows(app, user):
         assert stats['calendar'] == 1
         assert st.last_episode_aired_at.date() == date.today() - timedelta(days=2)
         assert st.last_episode_label == 'S03E04 · The Old One'
-        assert st.last_aired_checked_at is not None
+
+
+def test_refresh_does_not_use_todays_calendar_as_last_aired(app, user):
+    """Date-only today would count a 9pm ET episode all afternoon."""
+    from services.local_time import local_today
+
+    with app.app_context():
+        today = local_today()
+        _show(user, 1, last_episode_aired_at=datetime(2026, 8, 17, 1, 0, 0))
+        _cal_event(user, 1, today, 1, 2, 'Tonight')
+        db.session.commit()
+        with patch(
+            'services.shows_cache.trakt_client.get_show_seasons',
+            return_value=[{
+                'number': 1,
+                'episodes': [
+                    {'number': 1, 'first_aired': '2026-08-17T01:00:00.000Z', 'title': 'Pilot'},
+                    {'number': 2, 'first_aired': '2030-01-01T01:00:00.000Z', 'title': 'Tonight'},
+                ],
+            }],
+        ), patch(
+            'services.shows_cache.refresh_show_progress_for_ids', return_value=0,
+        ):
+            refresh_shows_cache_for_user(_reload_user(user))
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=1,
+        ).one()
+        assert st.last_episode_aired_at == datetime(2026, 8, 17, 1, 0, 0)
+
 
 
 def test_refresh_seeds_list_only_shows_and_marks_never_aired(app, user):
@@ -185,6 +213,33 @@ def test_seed_new_shows_inline_is_bounded(app, user):
         assert get_seasons.call_count == 3
 
 
+def test_seed_inline_fills_aired_show_with_stale_check(app, user):
+    """List-only shows with episodes_aired but no last-aired date seed on page load."""
+    with app.app_context():
+        _list_show(
+            user, 157599,
+            last_aired_checked_at=datetime.utcnow() - timedelta(days=10),
+            episodes_aired=2, episodes_completed=1,
+        )
+        db.session.commit()
+        seasons = [{
+            'number': 1,
+            'episodes': [
+                {'number': 1, 'first_aired': '2026-08-17T01:00:00.000Z', 'title': 'Pilot'},
+                {'number': 2, 'first_aired': '2026-08-24T01:00:00.000Z', 'title': 'Episode 2'},
+            ],
+        }]
+        with patch(
+            'services.sync_jobs.trakt_client.get_show_seasons', return_value=seasons,
+        ):
+            n = seed_new_shows_inline(_reload_user(user), limit=3)
+        assert n == 1
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=157599,
+        ).one()
+        assert st.last_episode_aired_at is not None
+
+
 def test_queue_user_media_cycle_inline_without_scheduler(app, user):
     """No scheduler in tests → runs the cycle inline."""
     with app.app_context():
@@ -267,6 +322,32 @@ def test_my_shows_card_shows_next_episode_date(app, client, user):
     assert 'Dated Show' in html
     assert 'Next:' in html
     assert future.strftime('%Y-%m-%d') in html
+
+
+def test_apply_progress_clamps_aired_until_local_air_time(app, user):
+    """Trakt aired=2 before 9pm ET must not become 2/2 on the card."""
+    from services.sync_jobs import apply_show_episode_progress
+    from zoneinfo import ZoneInfo
+
+    with app.app_context():
+        _show(
+            user, 157599,
+            last_episode_aired_at=datetime(2026, 8, 24, 1, 0, 0),
+            episodes_aired=1, episodes_completed=1,
+            next_episode_season=1, next_episode_number=2,
+        )
+        db.session.commit()
+        before = datetime(2026, 8, 23, 20, 0, 0, tzinfo=ZoneInfo('America/New_York'))
+        with patch('services.local_time.local_now', return_value=before):
+            apply_show_episode_progress(
+                user, 157599, aired=2, completed=1,
+                next_episode={'season': 1, 'number': 3, 'title': 'Too far'},
+            )
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=157599,
+        ).one()
+        assert st.episodes_aired == 1
+        assert st.next_episode_number == 2
 
 
 def _reload_user(user_id):

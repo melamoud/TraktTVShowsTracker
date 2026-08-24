@@ -292,6 +292,8 @@ def summarize_progress(
     aired_keys: set[tuple[int, int]],
 ) -> tuple[int, int, dict | None]:
     """Return (aired, completed, next_episode) for regular seasons."""
+    from services.local_time import has_aired_at, parse_trakt_datetime
+
     total_aired = 0
     total_completed = 0
     next_regular = None
@@ -309,6 +311,10 @@ def summarize_progress(
             ep_no = int(ep_no)
             key = (number, ep_no)
             is_aired = key in aired_keys if aired_keys else False
+            if is_aired:
+                air = parse_trakt_datetime(ep.get('first_aired') or ep.get('released'))
+                if air is not None and not has_aired_at(air):
+                    is_aired = False
             if not is_aired:
                 continue
             if not is_specials:

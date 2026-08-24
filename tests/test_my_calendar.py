@@ -177,7 +177,9 @@ def test_ensure_user_calendar_fresh_parses_entries(app, user):
         ]
 
         def fake_get(_user, media_type, start_date, days):
-            assert start_date == '2026-08-10'
+            # ±1 day pad so 02:00Z (previous evening ET) is still stored.
+            assert start_date == '2026-08-09'
+            assert days == 9
             return shows_payload if media_type == 'show' else movies_payload
 
         with patch.object(
@@ -190,7 +192,7 @@ def test_ensure_user_calendar_fresh_parses_entries(app, user):
         show_ev = UserCalendarEvent.query.filter_by(
             user_id=user, media_type='show', trakt_id=195475,
         ).one()
-        assert show_ev.event_date == date(2026, 8, 10)
+        assert show_ev.event_date == date(2026, 8, 9)
         assert (show_ev.season_number, show_ev.episode_number) == (3, 2)
         movie_ev = UserCalendarEvent.query.filter_by(
             user_id=user, media_type='movie', trakt_id=700,
@@ -222,3 +224,14 @@ def test_ensure_user_calendar_fresh_keeps_cache_on_error(app, user):
         assert UserCalendarEvent.query.filter_by(
             user_id=user, media_type='show', trakt_id=1,
         ).count() == 1
+
+
+def test_parse_calendar_day_converts_hbo_utc_to_eastern(app):
+    """2026-08-24T01:00:00Z is Sunday evening Aug 23 in America/New_York."""
+    from services.calendar_view import parse_calendar_day
+
+    with app.app_context():
+        assert parse_calendar_day('2026-08-24T01:00:00.000Z') == date(2026, 8, 23)
+        assert parse_calendar_day('2026-08-20') == date(2026, 8, 20)
+        assert parse_calendar_day('2026-08-20T00:00:00.000Z') == date(2026, 8, 20)
+
