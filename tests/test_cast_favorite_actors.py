@@ -156,6 +156,8 @@ def test_api_favorite_actor_toggles_and_prefs_remove(app, client, user):
         'alert_new_streaming': '1',
         'alert_episode_aired': '1',
         'alert_list_add': '1',
+        'alert_season_streaming': '1',
+        'alert_favorite_actor': '1',
     }, follow_redirects=True)
     assert resp.status_code == 200
 

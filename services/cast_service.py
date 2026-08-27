@@ -5,8 +5,8 @@ Cast is loaded from Trakt /movies|shows/{id}/people on detail view and stored
 locally. Headshots come from one TMDB credits call per title and are downloaded
 into instance/actor_cache once per person (skip if file already exists).
 
-Favorite actors are app-local (Preferences), not Trakt favorites — ready for a
-future “new titles with your actors” alert path.
+Favorite actors are app-local (Preferences), not Trakt favorites. Catalog ingest
+matches those people against newly listed titles for favorite-actor alerts.
 """
 
 from __future__ import annotations
@@ -104,6 +104,8 @@ def sync_cast_for_media(media: CachedMedia, *, force: bool = False) -> list[Medi
     try:
         payload = trakt_client.fetch_media_people(media.media_type, media.trakt_id)
     except Exception as exc:
+        if getattr(exc, 'status_code', None) == 429:
+            raise
         current_app.logger.warning(
             'Cast fetch failed %s %s: %s', media.media_type, media.trakt_id, exc,
         )
@@ -155,7 +157,7 @@ def favorite_actor_trakt_ids(user: User) -> set[int]:
     """
     Return Trakt person ids the user has favorited.
 
-    Useful for future catalog/alert matching against cast credits.
+    Useful for catalog/alert matching against cached cast credits.
     """
     if not user or not getattr(user, 'id', None):
         return set()

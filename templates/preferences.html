@@ -221,7 +221,7 @@
   </section>
 
   <section>
-    <h2 title="In-app alert types. List-add fires when you add a title; the others use lists checked under Alerts above">Alerts</h2>
+    <h2 title="In-app alert types. List-add and favorite-actor are not list-scoped; the others use lists checked under Alerts above">Alerts</h2>
     <input type="hidden" name="alerts_prefs_present" value="1">
     <div class="alert-prefs">
       <label>
@@ -235,7 +235,14 @@
         <input type="checkbox" name="alert_new_streaming" value="1" {% if alert_new_streaming %}checked{% endif %}>
         <span>
           <strong>Added to a streaming service</strong>
-          <span class="meta">Each time any service starts carrying a listed title</span>
+          <span class="meta">New service for a listed title (one card listing every vendor; unread again when another service is added)</span>
+        </span>
+      </label>
+      <label>
+        <input type="checkbox" name="alert_season_streaming" value="1" {% if alert_season_streaming %}checked{% endif %}>
+        <span>
+          <strong>New season on a streaming service</strong>
+          <span class="meta">A season of a listed show appears on a service, or that season gains a new vendor (one card per season)</span>
         </span>
       </label>
       <label>
@@ -250,6 +257,13 @@
         <span>
           <strong>Added to a list</strong>
           <span class="meta">When you add a movie or show to Wishlist or a personal list in this app</span>
+        </span>
+      </label>
+      <label>
+        <input type="checkbox" name="alert_favorite_actor" value="1" {% if alert_favorite_actor %}checked{% endif %}>
+        <span>
+          <strong>New title with a favorite actor</strong>
+          <span class="meta">A newly listed movie or show includes an actor you favorited (not titles already on your lists or watched)</span>
         </span>
       </label>
       {% if current_user.is_admin %}

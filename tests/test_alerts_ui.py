@@ -467,3 +467,46 @@ def test_streaming_alerts_for_same_title_merge(app, client, user):
     assert 'HBO Max Amazon Channel' in html
     assert html.count('Unread') >= 1
     assert 'Show 2 alerts' not in html
+
+
+def test_season_streaming_alert_renders_sxe_and_vendors(app, client, user):
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=1401, title='Fauda', year=2015,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='season_streaming',
+            title='Season 5 on stream: Fauda',
+            message='Netflix',
+            media_type='show', trakt_id=1401, is_read=False,
+            payload_key='seasonstream:5',
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Fauda' in html
+    assert 'S5' in html
+    assert 'Season on stream' in html
+    assert 'Netflix' in html
+    assert 'alert-kind-streaming' in html
+
+
+def test_notifications_page_renders_favorite_actor_card(app, client, user):
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=7701, title='Fauda Film', year=2024,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='favorite_actor',
+            title='Fauda Film',
+            message='Lior Raz',
+            media_type='movie', trakt_id=7701, is_read=False,
+            payload_key='favactor',
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Fauda Film' in html
+    assert 'Lior Raz' in html
+    assert 'Favorite actor' in html
+    assert 'alert-kind-actor' in html

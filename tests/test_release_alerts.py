@@ -6,9 +6,12 @@ from unittest.mock import patch
 from models import (
     AlertEvent,
     CachedMedia,
+    CachedPerson,
+    MediaCastMember,
     Notification,
     User,
     UserCalendarEvent,
+    UserFavoriteActor,
     UserListMembership,
     UserMediaState,
     UserPreference,
@@ -16,8 +19,10 @@ from models import (
 )
 from services.alerts import (
     ALERT_EPISODE_AIRED,
+    ALERT_FAVORITE_ACTOR,
     ALERT_LIST_ADD,
     ALERT_NEW_STREAMING,
+    ALERT_SEASON_STREAMING,
     ALERT_NEW_USER_LOGIN,
     ALERT_RELEASE_DAY,
     ALERT_SEASON_AIRED,
@@ -254,7 +259,27 @@ def test_new_streaming_baselines_then_alerts_delta(app, user):
         assert created == 1
         notes = Notification.query.filter_by(user_id=user, alert_type=ALERT_NEW_STREAMING).all()
         assert len(notes) == 1
-        assert 'Hulu' in notes[0].title
+        assert 'Hulu' in (notes[0].message or '') or 'Hulu' in (notes[0].title or '')
+        notes[0].is_read = True
+        db.session.commit()
+
+        third = second + [
+            {
+                'provider_name': 'Disney Plus',
+                'tmdb_provider_id': 337,
+                'offer_type': 'flatrate',
+                'region': 'US',
+            }
+        ]
+        with patch('services.alerts.tmdb_configured', return_value=True), patch(
+            'services.sync_jobs.tmdb_configured', return_value=True
+        ), patch('services.sync_jobs.get_watch_providers', return_value=third):
+            created = run_media_alerts(app)
+        assert created == 1
+        notes = Notification.query.filter_by(user_id=user, alert_type=ALERT_NEW_STREAMING).all()
+        assert len(notes) == 1
+        assert notes[0].is_read is False
+        assert 'Disney' in (notes[0].message or '')
 
 
 def test_normalize_streaming_provider_key_collapses_channels():
@@ -298,17 +323,99 @@ def test_streaming_channel_rename_does_not_realert(app, user):
 
         with patch('services.alerts.tmdb_configured', return_value=True), patch(
             'services.sync_jobs.tmdb_configured', return_value=True
-        ), patch('services.sync_jobs.get_watch_providers', return_value=first):
+        ), patch('services.sync_jobs.get_watch_providers', return_value=first), patch(
+            'services.tmdb_client.get_season_watch_providers', return_value=[],
+        ):
             assert run_media_alerts(app) == 0
 
         with patch('services.alerts.tmdb_configured', return_value=True), patch(
             'services.sync_jobs.tmdb_configured', return_value=True
-        ), patch('services.sync_jobs.get_watch_providers', return_value=renamed):
+        ), patch('services.sync_jobs.get_watch_providers', return_value=renamed), patch(
+            'services.tmdb_client.get_season_watch_providers', return_value=[],
+        ):
             assert run_media_alerts(app) == 0
 
         assert Notification.query.filter_by(
             user_id=user, alert_type=ALERT_NEW_STREAMING,
         ).count() == 0
+
+
+def test_season_streaming_alerts_recent_season(app, user):
+    """A season that just aired on a service gets one Season-on-stream card."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=1401, title='Fauda', tmdb_id=77,
+        ))
+        _watchlist(user, 'show', 1401)
+        db.session.add(UserCalendarEvent(
+            user_id=user, media_type='show', trakt_id=1401,
+            event_date=date.today(), season_number=5, episode_number=1,
+            episode_title='The beginning',
+        ))
+        db.session.commit()
+        season_providers = [
+            {'provider_name': 'Netflix', 'offer_type': 'flatrate', 'region': 'US'},
+        ]
+        with patch('services.alerts.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.get_watch_providers', return_value=[]), \
+             patch(
+                 'services.tmdb_client.get_season_watch_providers',
+                 return_value=season_providers,
+             ), \
+             patch('services.alerts.ensure_user_calendar_fresh', return_value=True):
+            run_media_alerts(app)
+        note = Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_SEASON_STREAMING,
+        ).one()
+        assert note.payload_key == 'seasonstream:5'
+        assert 'Netflix' in note.message
+        assert note.is_read is False
+
+
+def test_season_streaming_new_vendor_after_baseline(app, user):
+    """Old season is baselined silently; a later vendor marks the card unread."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=1401, title='Fauda', tmdb_id=77,
+        ))
+        _watchlist(user, 'show', 1401)
+        db.session.add(UserCalendarEvent(
+            user_id=user, media_type='show', trakt_id=1401,
+            event_date=date.today() - timedelta(days=40),
+            season_number=5, episode_number=1,
+        ))
+        db.session.commit()
+        prime = [{'provider_name': 'Prime Video', 'offer_type': 'flatrate'}]
+        both = prime + [{'provider_name': 'Netflix', 'offer_type': 'flatrate'}]
+        with patch('services.alerts.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.get_watch_providers', return_value=[]), \
+             patch(
+                 'services.tmdb_client.get_season_watch_providers',
+                 return_value=prime,
+             ), \
+             patch('services.alerts.ensure_user_calendar_fresh', return_value=True):
+            run_media_alerts(app)
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_SEASON_STREAMING,
+        ).count() == 0
+
+        with patch('services.alerts.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.get_watch_providers', return_value=[]), \
+             patch(
+                 'services.tmdb_client.get_season_watch_providers',
+                 return_value=both,
+             ), \
+             patch('services.alerts.ensure_user_calendar_fresh', return_value=True):
+            created = run_media_alerts(app)
+        assert created == 1
+        note = Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_SEASON_STREAMING,
+        ).one()
+        assert 'Netflix' in note.message
+        assert note.is_read is False
 
 
 def test_pref_off_records_event_without_notification(app, user):
@@ -670,7 +777,9 @@ def test_preferences_alert_toggles(app, client, user):
     get = client.get('/preferences')
     assert get.status_code == 200
     assert b'Added to a streaming service' in get.data
+    assert b'New season on a streaming service' in get.data
     assert b'Added to a list' in get.data
+    assert b'New title with a favorite actor' in get.data
 
     resp = client.post('/preferences', data={
         'alerts_prefs_present': '1',
@@ -682,8 +791,10 @@ def test_preferences_alert_toggles(app, client, user):
         prefs = UserPreference.query.filter_by(user_id=user).one()
         assert prefs.alert_release_day is False
         assert prefs.alert_new_streaming is False
+        assert prefs.alert_season_streaming is False
         assert prefs.alert_episode_aired is False
         assert prefs.alert_list_add is False
+        assert prefs.alert_favorite_actor is False
 
 
 def test_notify_lists_added_creates_alert(app, user):
@@ -923,3 +1034,186 @@ def test_rate_limit_mid_fallback_stops_remaining_scans(app, user):
             run_media_alerts(app)
 
         assert get_seasons.call_count == 1
+
+
+def _seed_favorite_actor_catalog(user_id, *, listed_at, favorited_at, on_list=False, watched=False,
+                                 cast_fetched=True):
+    person = CachedPerson(trakt_id=501, name='Lior Raz', slug='lior-raz')
+    media = CachedMedia(
+        media_type='movie', trakt_id=7701, title='Fauda Film',
+        trakt_listed_at=listed_at,
+        cast_fetched_at=datetime.utcnow() if cast_fetched else None,
+    )
+    db.session.add_all([person, media])
+    db.session.flush()
+    db.session.add(UserFavoriteActor(
+        user_id=user_id, person_id=person.id, created_at=favorited_at,
+    ))
+    if cast_fetched:
+        db.session.add(MediaCastMember(
+            cached_media_id=media.id, person_id=person.id, sort_order=0,
+        ))
+    if on_list or watched:
+        db.session.add(UserMediaState(
+            user_id=user_id, media_type='movie', trakt_id=7701,
+            on_watchlist=on_list, watched=watched,
+        ))
+    db.session.commit()
+    return person, media
+
+
+def test_favorite_actor_notifies_new_catalog_title(app, user):
+    """Ingested title with a favorite actor creates one alert; second run is a no-op."""
+    with app.app_context():
+        _seed_favorite_actor_catalog(
+            user,
+            listed_at=datetime.utcnow(),
+            favorited_at=datetime.utcnow() - timedelta(days=10),
+        )
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.trakt_client.fetch_media_people') as fetch_people:
+            created = run_media_alerts(app)
+        assert created == 1
+        fetch_people.assert_not_called()
+        note = Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+        ).one()
+        assert note.title == 'Fauda Film'
+        assert 'Lior Raz' in note.message
+        assert note.payload_key == 'favactor'
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.trakt_client.fetch_media_people') as fetch_people:
+            assert run_media_alerts(app) == 0
+        fetch_people.assert_not_called()
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+        ).count() == 1
+
+
+def test_favorite_actor_fetches_credits_for_uncached_title_not_filmography(app, user):
+    """Missing cast cache uses one title people lookup, not an actor filmography poll."""
+    with app.app_context():
+        person, media = _seed_favorite_actor_catalog(
+            user,
+            listed_at=datetime.utcnow(),
+            favorited_at=datetime.utcnow() - timedelta(days=10),
+            cast_fetched=False,
+        )
+        payload = {
+            'cast': [{
+                'characters': ['Doron'],
+                'person': {
+                    'name': 'Lior Raz',
+                    'ids': {'trakt': 501, 'slug': 'lior-raz'},
+                },
+            }],
+        }
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.trakt_client.fetch_media_people', return_value=payload) as fetch_people:
+            created = run_media_alerts(app)
+        assert created == 1
+        fetch_people.assert_called_once_with('movie', 7701)
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+        ).one().message == 'Lior Raz'
+
+
+def test_favorite_actor_pref_off_records_event_only(app, user):
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_favorite_actor = False
+        _seed_favorite_actor_catalog(
+            user,
+            listed_at=datetime.utcnow(),
+            favorited_at=datetime.utcnow() - timedelta(days=10),
+        )
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False):
+            assert run_media_alerts(app) == 0
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+        ).count() == 0
+        assert AlertEvent.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+            payload_key='baseline:favactor',
+        ).count() == 1
+
+
+def test_favorite_actor_skips_listed_and_old_and_pre_favorite(app, user):
+    with app.app_context():
+        _seed_favorite_actor_catalog(
+            user,
+            listed_at=datetime.utcnow(),
+            favorited_at=datetime.utcnow() - timedelta(days=10),
+            on_list=True,
+        )
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.trakt_client.fetch_media_people') as fetch_people:
+            assert run_media_alerts(app) == 0
+        fetch_people.assert_not_called()
+        assert Notification.query.filter_by(user_id=user).count() == 0
+
+        db.session.query(AlertEvent).delete()
+        db.session.query(UserMediaState).delete()
+        media = CachedMedia.query.filter_by(trakt_id=7701).one()
+        media.trakt_listed_at = datetime.utcnow() - timedelta(days=5)
+        db.session.commit()
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.trakt_client.fetch_media_people') as fetch_people:
+            assert run_media_alerts(app) == 0
+        fetch_people.assert_not_called()
+
+        db.session.query(AlertEvent).delete()
+        media.trakt_listed_at = datetime.utcnow()
+        fav = UserFavoriteActor.query.filter_by(user_id=user).one()
+        fav.created_at = datetime.utcnow() + timedelta(days=1)
+        db.session.commit()
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False), \
+             patch('services.trakt_client.fetch_media_people') as fetch_people:
+            assert run_media_alerts(app) == 0
+        fetch_people.assert_not_called()
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+        ).count() == 0
+
+
+def test_season_streaming_respects_pref_off(app, user):
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.alert_season_streaming = False
+        prefs.alert_episode_aired = False
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=1401, title='Fauda', tmdb_id=77,
+        ))
+        _watchlist(user, 'show', 1401)
+        db.session.add(UserCalendarEvent(
+            user_id=user, media_type='show', trakt_id=1401,
+            event_date=date.today(), season_number=5, episode_number=1,
+        ))
+        db.session.commit()
+        season_providers = [
+            {'provider_name': 'Netflix', 'offer_type': 'flatrate', 'region': 'US'},
+        ]
+        with patch('services.alerts.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.get_watch_providers', return_value=[]), \
+             patch(
+                 'services.tmdb_client.get_season_watch_providers',
+                 return_value=season_providers,
+             ), \
+             patch('services.alerts.ensure_user_calendar_fresh', return_value=True):
+            assert run_media_alerts(app) == 0
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_SEASON_STREAMING,
+        ).count() == 0
+        assert AlertEvent.query.filter_by(
+            user_id=user, alert_type=ALERT_SEASON_STREAMING,
+            payload_key='baseline:seasonstream:5',
+        ).count() == 1
+

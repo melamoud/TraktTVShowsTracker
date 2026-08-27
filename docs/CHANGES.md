@@ -1,5 +1,15 @@
 # Changes log
 
+## 2026-08-26 — Favorite-actor alerts; separate Preferences toggles
+
+- **New title with a favorite actor** alerts when a just-listed catalog movie/show includes someone you favorited. Credits are loaded for those new titles only (no per-actor filmography polling). Existing catalog is baselined; titles already on your lists or watched, and titles listed before you favorited the actor, are skipped
+- Preferences → Alerts now has a checkbox per type, including **New season on a streaming service** (no longer bundled with title-level streaming) and **New title with a favorite actor**. Defaults are on; uncheck to opt out
+
+## 2026-08-26 — Season-on-stream alerts; one streaming card per title
+
+- **Added to a streaming service** keeps a single card per title listing every vendor; a new vendor marks that same card unread again
+- New **Season on stream** alert when a season of a listed show appears on TMDB streaming (or gains a vendor), e.g. Fauda S5 on Netflix
+
 ## 2026-08-23 — Calendar, progress counts, and Theater use local air times
 
 - My Calendar and **Next: SxEy · date** store Trakt episode times in the scheduler timezone (`01:00Z` → previous evening), not the UTC calendar day

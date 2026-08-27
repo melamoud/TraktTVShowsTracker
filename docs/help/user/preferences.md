@@ -15,7 +15,7 @@ On any title detail page, the **Cast** section lists main actors (expand for the
 - Manage removals under Preferences → **Favorite actors**
 - Headshots: one TMDB credits lookup per title; each actor image is downloaded into the local actors cache **at most once** and reused on every title
 - An actor’s name (or **Titles**) opens Search for their movies/shows, with the same hide-watched / lists / year / genre filters
-- Not synced to Trakt favorites — reserved for a future “new titles with your actors” highlight/alert
+- Not synced to Trakt favorites. **New title with a favorite actor** alerts (Preferences → Alerts) fire when a newly listed catalog title includes one of these people — the app does **not** poll each actor’s filmography
 
 ## Trakt lists in Set lists
 
@@ -50,7 +50,17 @@ These drive the purple **Preference match** highlight and the default Latest **M
 
 ## Alerts
 
-Toggle which in-app alert **types** you want (release, streaming, episodes, added-to-a-list…). Which **lists** can produce release / streaming / episode alerts is set in the table above under **Alerts** (default Wishlist only). **Added to a list** fires for any list you add a title to in this app; uncheck that type to opt out.
+Toggle which in-app alert **types** you want. Each type has its own checkbox (all default on):
+
+- Movie release date
+- Added to a streaming service (title-level vendors)
+- New season on a streaming service
+- New episode or season
+- Added to a list
+- New title with a favorite actor
+- New user signed up (admins)
+
+Which **lists** can produce release / streaming / episode / season-on-stream alerts is set in the table above under **Alerts** (default Wishlist only). **Added to a list** and **favorite actor** are not list-scoped; uncheck those types to opt out.
 
 Details: [Alerts](release_alerts).
 

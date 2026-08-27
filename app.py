@@ -216,6 +216,8 @@ def _ensure_schema(app):
                 ('alert_new_streaming', 'ALTER TABLE user_preferences ADD COLUMN alert_new_streaming BOOLEAN DEFAULT 1 NOT NULL'),
                 ('alert_episode_aired', 'ALTER TABLE user_preferences ADD COLUMN alert_episode_aired BOOLEAN DEFAULT 1 NOT NULL'),
                 ('alert_list_add', 'ALTER TABLE user_preferences ADD COLUMN alert_list_add BOOLEAN DEFAULT 1 NOT NULL'),
+                ('alert_season_streaming', 'ALTER TABLE user_preferences ADD COLUMN alert_season_streaming BOOLEAN DEFAULT 1 NOT NULL'),
+                ('alert_favorite_actor', 'ALTER TABLE user_preferences ADD COLUMN alert_favorite_actor BOOLEAN DEFAULT 1 NOT NULL'),
                 ('alert_new_user_login', 'ALTER TABLE user_preferences ADD COLUMN alert_new_user_login BOOLEAN DEFAULT 1 NOT NULL'),
             ):
                 if col not in cols:

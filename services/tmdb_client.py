@@ -46,6 +46,20 @@ def _get(path: str, params: dict | None = None) -> Any:
     return resp.json()
 
 
+def _providers_from_regional(regional: dict, region: str) -> list[dict]:
+    providers: list[dict] = []
+    for offer_type in ('flatrate', 'ads', 'free', 'rent', 'buy'):
+        for item in (regional or {}).get(offer_type) or []:
+            providers.append({
+                'provider_name': item.get('provider_name'),
+                'tmdb_provider_id': item.get('provider_id'),
+                'offer_type': offer_type,
+                'region': region,
+                'logo_path': item.get('logo_path'),
+            })
+    return providers
+
+
 def get_watch_providers(media_type: str, tmdb_id: int, region: str | None = None) -> list[dict]:
     """
     Return normalized watch providers for a movie/tv id in a region.
@@ -58,18 +72,17 @@ def get_watch_providers(media_type: str, tmdb_id: int, region: str | None = None
     tmdb_type = 'tv' if media_type == 'show' else 'movie'
     data = _get(f'/{tmdb_type}/{tmdb_id}/watch/providers')
     results = (data or {}).get('results') or {}
-    regional = results.get(region) or {}
-    providers: list[dict] = []
-    for offer_type in ('flatrate', 'ads', 'free', 'rent', 'buy'):
-        for item in regional.get(offer_type) or []:
-            providers.append({
-                'provider_name': item.get('provider_name'),
-                'tmdb_provider_id': item.get('provider_id'),
-                'offer_type': offer_type,
-                'region': region,
-                'logo_path': item.get('logo_path'),
-            })
-    return providers
+    return _providers_from_regional(results.get(region) or {}, region)
+
+
+def get_season_watch_providers(tmdb_id: int, season_number: int, region: str | None = None) -> list[dict]:
+    """Watch providers for one TV season (TMDB ``/tv/{id}/season/{n}/watch/providers``)."""
+    if not tmdb_id or int(season_number) < 1:
+        return []
+    region = region or current_app.config.get('STREAMING_REGION', 'US')
+    data = _get(f'/tv/{int(tmdb_id)}/season/{int(season_number)}/watch/providers')
+    results = (data or {}).get('results') or {}
+    return _providers_from_regional(results.get(region) or {}, region)
 
 
 def poster_url(poster_path: str | None, size: str = 'w342') -> str | None:

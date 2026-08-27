@@ -1015,6 +1015,7 @@ body.modal-open { overflow: hidden; }
 .alert-kind-badge.alert-kind-season { color: #c4b5fd; border-color: #8b5cf6; }
 .alert-kind-badge.alert-kind-streaming { color: #86efac; border-color: #22c55e; }
 .alert-kind-badge.alert-kind-list { color: #fcd34d; border-color: #f59e0b; }
+.alert-kind-badge.alert-kind-actor { color: #f9a8d4; border-color: #ec4899; }
 .alert-kind-badge.alert-kind-admin { color: #fca5a5; border-color: #f87171; }
 .alert-kind-badge.alert-kind-alert { color: #e5e7eb; }
 .alert-group {

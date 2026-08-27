@@ -332,6 +332,8 @@ def preferences():
             prefs.alert_new_streaming = request.form.get('alert_new_streaming') == '1'
             prefs.alert_episode_aired = request.form.get('alert_episode_aired') == '1'
             prefs.alert_list_add = request.form.get('alert_list_add') == '1'
+            prefs.alert_season_streaming = request.form.get('alert_season_streaming') == '1'
+            prefs.alert_favorite_actor = request.form.get('alert_favorite_actor') == '1'
             if current_user.is_admin:
                 prefs.alert_new_user_login = request.form.get('alert_new_user_login') == '1'
 
@@ -421,6 +423,8 @@ def preferences():
         alert_new_streaming=bool(getattr(prefs, 'alert_new_streaming', True)),
         alert_episode_aired=bool(getattr(prefs, 'alert_episode_aired', True)),
         alert_list_add=bool(getattr(prefs, 'alert_list_add', True)),
+        alert_season_streaming=bool(getattr(prefs, 'alert_season_streaming', True)),
+        alert_favorite_actor=bool(getattr(prefs, 'alert_favorite_actor', True)),
         alert_new_user_login=bool(getattr(prefs, 'alert_new_user_login', True)),
         favorite_actors=favorite_actors,
     )
@@ -1495,9 +1499,11 @@ def api_season_unwatched(trakt_id, season_number):
 ALERT_TYPE_LABELS = {
     'release_day': 'Released',
     'new_streaming': 'Now streaming',
+    'season_streaming': 'Season on stream',
     'episode_aired': 'New episode',
     'season_aired': 'Season out',
     'list_add': 'Added to list',
+    'favorite_actor': 'Favorite actor',
     'new_user_login': 'New login',
 }
 
@@ -1531,6 +1537,11 @@ def _parse_season_episode(n) -> tuple[int | None, int | None]:
             except (TypeError, ValueError):
                 pass
     if key.startswith('season:'):
+        try:
+            return int(key.split(':', 1)[1]), None
+        except (TypeError, ValueError):
+            pass
+    if key.startswith('seasonstream:'):
         try:
             return int(key.split(':', 1)[1]), None
         except (TypeError, ValueError):
@@ -1570,6 +1581,10 @@ def _alert_kind_label(media_type: str | None, alert_type: str | None) -> str:
         return 'Episode'
     if alert_type == 'new_streaming':
         return 'Streaming'
+    if alert_type == 'season_streaming':
+        return 'Streaming'
+    if alert_type == 'favorite_actor':
+        return 'Actor'
     if media_type == 'movie':
         return 'Movie'
     if media_type == 'show':
@@ -1583,7 +1598,7 @@ def _group_kind_label(cards: list[dict]) -> str:
         return 'Episode'
     if 'season_aired' in types:
         return 'Season'
-    if types == {'new_streaming'}:
+    if types == {'new_streaming'} or types == {'season_streaming'} or types <= {'new_streaming', 'season_streaming'}:
         return 'Streaming'
     return 'Show'
 
@@ -1609,8 +1624,12 @@ def _merge_streaming_alert_cards(cards: list[dict]) -> list[dict]:
     for card in cards:
         n = card['n']
         pair = card.get('media_pair')
-        if getattr(n, 'alert_type', None) == 'new_streaming' and pair:
+        kind = getattr(n, 'alert_type', None)
+        if kind == 'new_streaming' and pair:
             key = ('stream', pair[0], int(pair[1]))
+        elif kind == 'season_streaming' and pair:
+            season = (getattr(n, 'payload_key', None) or '').split(':')[-1]
+            key = ('seasonstream', pair[0], int(pair[1]), season)
         else:
             key = ('keep', n.id)
         if key not in buckets:
@@ -1643,7 +1662,7 @@ def _merge_streaming_alert_cards(cards: list[dict]) -> list[dict]:
 def _alert_headline(n, media, episode_code: str = '') -> str:
     """Subtitle: episode name + date, or a movie date — not S#E# (that's in the title)."""
     kind = n.alert_type or ''
-    if kind in ('episode_aired', 'season_aired', 'list_add', 'new_user_login'):
+    if kind in ('episode_aired', 'season_aired', 'list_add', 'favorite_actor', 'new_user_login'):
         text = _strip_available_on_blurb(n.message or '')
         if episode_code:
             text = re.sub(
@@ -1659,7 +1678,10 @@ def _alert_headline(n, media, episode_code: str = '') -> str:
                 '', text, count=1, flags=re.IGNORECASE,
             )
         return text.strip()
-    if kind == 'new_streaming':
+    if kind in ('new_streaming', 'season_streaming'):
+        msg = (n.message or '').strip()
+        if msg and 'available on' not in msg.lower() and 'published on' not in msg.lower():
+            return msg
         vendor = _streaming_vendor_label(n, media)
         if vendor:
             return vendor
@@ -1682,11 +1704,13 @@ def _alert_display_title(media, n, episode_code: str) -> str:
 def _media_name_from_alert_title(title: str) -> str | None:
     """Best-effort show/movie name from older alert titles that lack trakt_id."""
     raw = (title or '').strip()
-    for prefix in ('New episode: ', 'Released: '):
+    for prefix in ('New episode: ', 'Released: ', 'Now streaming: '):
         if raw.startswith(prefix):
             return raw[len(prefix):].strip() or None
     if raw.startswith('Season ') and ' out: ' in raw:
         return raw.split(' out: ', 1)[1].strip() or None
+    if raw.startswith('Season ') and ' on stream: ' in raw:
+        return raw.split(' on stream: ', 1)[1].strip() or None
     if raw.startswith('Now on ') and ': ' in raw[7:]:
         return raw.split(': ', 1)[1].strip() or None
     return None
@@ -1763,7 +1787,7 @@ def _group_alert_cards(cards: list[dict], *, group_shows: bool, sort: str) -> li
     for card in cards:
         pair = card.get('media_pair')
         note_type = getattr(card.get('n'), 'alert_type', None)
-        if pair and pair[0] == 'show' and note_type != 'list_add':
+        if pair and pair[0] == 'show' and note_type not in ('list_add', 'favorite_actor'):
             key = ('show', int(pair[1]))
         else:
             key = ('single', card['n'].id)

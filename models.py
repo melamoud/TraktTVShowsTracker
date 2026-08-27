@@ -87,6 +87,8 @@ class UserPreference(db.Model):
     alert_new_streaming = db.Column(db.Boolean, default=True, nullable=False)
     alert_episode_aired = db.Column(db.Boolean, default=True, nullable=False)  # episodes + season drops
     alert_list_add = db.Column(db.Boolean, default=True, nullable=False)  # you added a title to a list
+    alert_season_streaming = db.Column(db.Boolean, default=True, nullable=False)  # new season on a streamer
+    alert_favorite_actor = db.Column(db.Boolean, default=True, nullable=False)  # new catalog title with a favorite actor
     alert_new_user_login = db.Column(db.Boolean, default=True, nullable=False)  # admins only
 
 
@@ -239,7 +241,7 @@ class UserFavoriteActor(db.Model):
     """
     Local favorite actor preference (not Trakt favorites).
 
-    Stored for Preferences management and future “titles with your actors” alerts.
+    Stored for Preferences management and ingest-only “new title with this actor” alerts.
     """
 
     __tablename__ = 'user_favorite_actors'

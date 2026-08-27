@@ -3,7 +3,9 @@ Auto in-app alerts for titles on alert-enabled lists (default: Wishlist only).
 
 Alert types:
   release_day      — release/first-aired date arrived
-  new_streaming    — a new TMDB stream provider appeared (merged to one card per title)
+  new_streaming    — a new TMDB stream provider appeared (one card per title; unread again on a new vendor)
+  season_streaming — a season of a listed show appeared on a streamer
+  favorite_actor   — a newly listed catalog title includes a favorite actor
   episode_aired    — a new episode aired
   season_aired     — full season published on one calendar day
   list_add         — user added a title to Wishlist or a personal list
@@ -26,30 +28,39 @@ from services.local_time import local_today
 from models import (
     AlertEvent,
     CachedMedia,
+    CachedPerson,
     MediaProviderAvailability,
     Notification,
     User,
     UserCalendarEvent,
+    UserFavoriteActor,
     UserMediaState,
     db,
 )
 from services import trakt_client
 from services.calendar_view import ensure_user_calendar_fresh
 from services.streaming_matcher import get_alert_enabled_list_ids
-from services.sync_jobs import alert_collection_trakt_ids, sync_providers_for_media
+from services.sync_jobs import (
+    alert_collection_trakt_ids,
+    collection_trakt_ids,
+    sync_providers_for_media,
+)
 from services.tmdb_client import is_configured as tmdb_configured
 
 logger = logging.getLogger('app')
 
 ALERT_RELEASE_DAY = 'release_day'
 ALERT_NEW_STREAMING = 'new_streaming'
+ALERT_SEASON_STREAMING = 'season_streaming'
 ALERT_EPISODE_AIRED = 'episode_aired'
 ALERT_SEASON_AIRED = 'season_aired'
 ALERT_LIST_ADD = 'list_add'
+ALERT_FAVORITE_ACTOR = 'favorite_actor'
 ALERT_NEW_USER_LOGIN = 'new_user_login'
 
 STREAMING_OFFER_TYPES = ('flatrate', 'ads', 'free')
 RELEASE_GRACE_DAYS = 3
+FAV_ACTOR_WINDOW_DAYS = 7
 
 # TMDB often lists the same service under channel / tier renames. Alerts key on
 # the brand, not the packaging string, so "Paramount Plus Apple TV channel"
@@ -103,10 +114,14 @@ def alert_pref_enabled(user: User, alert_type: str) -> bool:
         return bool(getattr(prefs, 'alert_release_day', True))
     if alert_type == ALERT_NEW_STREAMING:
         return bool(getattr(prefs, 'alert_new_streaming', True))
+    if alert_type == ALERT_SEASON_STREAMING:
+        return bool(getattr(prefs, 'alert_season_streaming', True))
     if alert_type in (ALERT_EPISODE_AIRED, ALERT_SEASON_AIRED):
         return bool(getattr(prefs, 'alert_episode_aired', True))
     if alert_type == ALERT_LIST_ADD:
         return bool(getattr(prefs, 'alert_list_add', True))
+    if alert_type == ALERT_FAVORITE_ACTOR:
+        return bool(getattr(prefs, 'alert_favorite_actor', True))
     if alert_type == ALERT_NEW_USER_LOGIN:
         return bool(getattr(prefs, 'alert_new_user_login', True))
     return True
@@ -750,16 +765,19 @@ def set_notification_read(user_id: int, row: Notification, is_read: bool) -> Non
     """Mark one alert read/unread. Streaming cards for the same title stay in sync."""
     targets = [row]
     if (
-        row.alert_type == ALERT_NEW_STREAMING
+        row.alert_type in (ALERT_NEW_STREAMING, ALERT_SEASON_STREAMING)
         and row.media_type
         and row.trakt_id
     ):
-        siblings = Notification.query.filter_by(
+        q = Notification.query.filter_by(
             user_id=user_id,
-            alert_type=ALERT_NEW_STREAMING,
+            alert_type=row.alert_type,
             media_type=row.media_type,
             trakt_id=int(row.trakt_id),
-        ).all()
+        )
+        if row.alert_type == ALERT_SEASON_STREAMING and row.payload_key:
+            q = q.filter_by(payload_key=row.payload_key)
+        siblings = q.all()
         if siblings:
             targets = siblings
     for note in targets:
@@ -843,22 +861,233 @@ def _check_new_streaming(user: User, media_type: str, trakt_id: int, media: Cach
         return 0
 
     seen = _seen_streaming_provider_keys(user.id, media_type, trakt_id)
-    created = 0
-    for key, display in by_key.items():
-        if key in seen:
-            continue
-        payload = f'provider:{key}'
-        if _notify(
-            user.id,
-            ALERT_NEW_STREAMING,
-            title=f'Now on {display}: {media.title}',
-            message=f'{media.title} is available on {display}.',
-            link=f'/catalog/{media_type}/{trakt_id}',
-            media_type=media_type,
-            trakt_id=trakt_id,
-            payload_key=payload,
+    new_items = [(key, display) for key, display in by_key.items() if key not in seen]
+    if not new_items:
+        return 0
+    for key, _display in new_items:
+        _record_event(
+            user.id, ALERT_NEW_STREAMING, media_type, trakt_id, f'provider:{key}',
+        )
+    return _upsert_streaming_card(
+        user, ALERT_NEW_STREAMING, media, trakt_id,
+        new_displays=[d for _k, d in new_items],
+        payload_key='providers',
+        link=f'/catalog/{media_type}/{trakt_id}',
+    )
+
+
+def _upsert_streaming_card(
+    user: User,
+    alert_type: str,
+    media: CachedMedia,
+    trakt_id: int,
+    *,
+    new_displays: list[str],
+    payload_key: str,
+    link: str,
+) -> int:
+    """One notification per title (or season). New vendors mark it unread again."""
+    if not new_displays:
+        return 0
+    q = Notification.query.filter_by(
+        user_id=user.id,
+        alert_type=alert_type,
+        media_type=media.media_type,
+        trakt_id=int(trakt_id),
+    )
+    if payload_key != 'providers':
+        q = q.filter_by(payload_key=payload_key)
+    notes = q.order_by(Notification.id.asc()).all()
+    ordered: list[str] = []
+    seen_fold: set[str] = set()
+
+    def _add_vendor(name: str) -> None:
+        text = (name or '').strip()
+        fold = text.casefold()
+        if (
+            not fold or fold in seen_fold
+            or fold == (media.title or '').casefold()
+            or 'available on' in fold
         ):
-            created += 1
+            return
+        seen_fold.add(fold)
+        ordered.append(text)
+
+    for note in notes:
+        for part in re.split(r'\s*[·,]\s*|\s+and\s+', note.message or ''):
+            _add_vendor(part)
+        heading = (note.title or '')
+        if heading.startswith('Now on ') and ': ' in heading[7:]:
+            _add_vendor(heading[7:].split(': ', 1)[0])
+    for name in new_displays:
+        _add_vendor(name)
+    vendor_line = _join_list_names(ordered) if len(ordered) <= 2 else ' · '.join(ordered)
+    if alert_type == ALERT_SEASON_STREAMING:
+        season = payload_key.split(':')[-1] if payload_key.startswith('seasonstream:') else ''
+        title = f'Season {season} on stream: {media.title}' if season else f'Season on stream: {media.title}'
+    else:
+        title = f'Now streaming: {media.title}'
+    if not alert_pref_enabled(user, alert_type):
+        return 0
+    if notes:
+        lead = notes[0]
+        lead.title = title
+        lead.message = vendor_line
+        lead.payload_key = payload_key
+        lead.link = link
+        lead.is_read = False
+        lead.created_at = datetime.utcnow()
+        for extra in notes[1:]:
+            db.session.delete(extra)
+        return 1
+    db.session.add(Notification(
+        user_id=user.id,
+        alert_type=alert_type,
+        title=title,
+        message=vendor_line,
+        link=link,
+        media_type=media.media_type,
+        trakt_id=int(trakt_id),
+        payload_key=payload_key,
+        is_read=False,
+    ))
+    return 1
+
+
+_SEASON_LABEL_RE = re.compile(r'^S(\d{1,2})\b', re.IGNORECASE)
+
+
+def _season_numbers_to_check(
+    user_id: int, trakt_id: int, events: list, state: UserMediaState | None,
+) -> set[int]:
+    """Latest aired season plus any season with a recently aired episode."""
+    today = local_today()
+    grace = today - timedelta(days=RELEASE_GRACE_DAYS)
+    seasons: set[int] = set()
+    for e in events or []:
+        if e.season_number:
+            seasons.add(int(e.season_number))
+    rows = (
+        UserCalendarEvent.query
+        .filter(
+            UserCalendarEvent.user_id == user_id,
+            UserCalendarEvent.media_type == 'show',
+            UserCalendarEvent.trakt_id == int(trakt_id),
+            UserCalendarEvent.season_number.isnot(None),
+            UserCalendarEvent.event_date <= today,
+        )
+        .all()
+    )
+    latest = 0
+    for e in rows:
+        s_num = int(e.season_number)
+        if s_num > latest:
+            latest = s_num
+        if e.event_date and e.event_date >= grace:
+            seasons.add(s_num)
+    if latest:
+        seasons.add(latest)
+    if state and state.last_episode_label:
+        m = _SEASON_LABEL_RE.match(state.last_episode_label.strip())
+        if m:
+            seasons.add(int(m.group(1)))
+    return {s for s in seasons if s >= 1}
+
+
+def _season_is_recent(user_id: int, trakt_id: int, season: int) -> bool:
+    today = local_today()
+    grace = today - timedelta(days=RELEASE_GRACE_DAYS)
+    row = (
+        UserCalendarEvent.query
+        .filter(
+            UserCalendarEvent.user_id == user_id,
+            UserCalendarEvent.media_type == 'show',
+            UserCalendarEvent.trakt_id == int(trakt_id),
+            UserCalendarEvent.season_number == int(season),
+            UserCalendarEvent.event_date >= grace,
+            UserCalendarEvent.event_date <= today,
+        )
+        .first()
+    )
+    return row is not None
+
+
+def _check_season_streaming(
+    user: User,
+    trakt_id: int,
+    media: CachedMedia,
+    *,
+    events: list,
+    state: UserMediaState | None,
+) -> int:
+    """Alert when a season of a listed show appears (or gains a vendor) on TMDB streaming."""
+    if not tmdb_configured() or not media.tmdb_id:
+        return 0
+    from services.tmdb_client import get_season_watch_providers
+
+    created = 0
+    for season in sorted(_season_numbers_to_check(user.id, trakt_id, events, state)):
+        try:
+            raw = get_season_watch_providers(int(media.tmdb_id), season)
+        except Exception as exc:
+            logger.warning(
+                'Season streaming providers failed for show %s S%s: %s',
+                trakt_id, season, exc,
+            )
+            continue
+        names = [
+            (p.get('provider_name') or '').strip()
+            for p in raw
+            if (p.get('offer_type') or '') in STREAMING_OFFER_TYPES
+            and (p.get('provider_name') or '').strip()
+        ]
+        by_key = _provider_keys_by_display(names)
+        baseline_key = f'baseline:seasonstream:{season}'
+        first_seen = not _event_exists(
+            user.id, ALERT_SEASON_STREAMING, 'show', trakt_id, baseline_key
+        )
+        if first_seen:
+            _record_event(
+                user.id, ALERT_SEASON_STREAMING, 'show', trakt_id, baseline_key
+            )
+            for key in by_key:
+                _record_event(
+                    user.id, ALERT_SEASON_STREAMING, 'show', trakt_id,
+                    f'seasonstream:{season}:provider:{key}',
+                )
+            if by_key and _season_is_recent(user.id, trakt_id, season):
+                created += _upsert_streaming_card(
+                    user, ALERT_SEASON_STREAMING, media, trakt_id,
+                    new_displays=list(by_key.values()),
+                    payload_key=f'seasonstream:{season}',
+                    link=f'/shows/{trakt_id}/progress',
+                )
+            continue
+        seen_keys = set()
+        for row in AlertEvent.query.filter_by(
+            user_id=user.id,
+            alert_type=ALERT_SEASON_STREAMING,
+            media_type='show',
+            trakt_id=int(trakt_id),
+        ).all():
+            prefix = f'seasonstream:{season}:provider:'
+            payload = row.payload_key or ''
+            if payload.startswith(prefix):
+                seen_keys.add(normalize_streaming_provider_key(payload[len(prefix):]))
+        new_items = [(k, d) for k, d in by_key.items() if k not in seen_keys]
+        if not new_items:
+            continue
+        for key, _display in new_items:
+            _record_event(
+                user.id, ALERT_SEASON_STREAMING, 'show', trakt_id,
+                f'seasonstream:{season}:provider:{key}',
+            )
+        created += _upsert_streaming_card(
+            user, ALERT_SEASON_STREAMING, media, trakt_id,
+            new_displays=[d for _k, d in new_items],
+            payload_key=f'seasonstream:{season}',
+            link=f'/shows/{trakt_id}/progress',
+        )
     return created
 
 
@@ -1078,6 +1307,121 @@ def _check_episodes(user: User, trakt_id: int, media: CachedMedia) -> int:
     return created
 
 
+def _check_favorite_actor_titles(user: User) -> int:
+    """
+    Alert when a recently ingested catalog title includes a favorite actor.
+
+    Ingest-only: credits are loaded for new Latest/catalog titles, never by
+    polling each actor's filmography. Existing catalog outside the grace
+    window is baselined silently. Titles listed before the actor was
+    favorited, and titles already on the user's lists or watched, are skipped.
+    """
+    from services.cast_service import sync_cast_for_media
+
+    fav_rows = (
+        db.session.query(UserFavoriteActor, CachedPerson)
+        .join(CachedPerson, CachedPerson.id == UserFavoriteActor.person_id)
+        .filter(UserFavoriteActor.user_id == user.id)
+        .all()
+    )
+    if not fav_rows:
+        return 0
+
+    fav_by_person_id: dict[int, tuple[datetime | None, str]] = {}
+    for fav, person in fav_rows:
+        fav_by_person_id[person.id] = (
+            fav.created_at,
+            (person.name or '').strip() or 'Favorite actor',
+        )
+
+    cutoff = datetime.utcnow() - timedelta(days=FAV_ACTOR_WINDOW_DAYS)
+    titles = CachedMedia.query.filter(
+        CachedMedia.media_type.in_(('movie', 'show')),
+        CachedMedia.trakt_listed_at.isnot(None),
+        CachedMedia.trakt_listed_at >= cutoff,
+        CachedMedia.trakt_id.isnot(None),
+    ).all()
+    if not titles:
+        return 0
+
+    owned_movies = collection_trakt_ids(user.id, 'movie')
+    owned_shows = collection_trakt_ids(user.id, 'show')
+    watched_pairs = {
+        (mt, int(tid))
+        for mt, tid in UserMediaState.query.filter_by(
+            user_id=user.id, watched=True,
+        ).with_entities(UserMediaState.media_type, UserMediaState.trakt_id).all()
+        if tid
+    }
+    utc_today = datetime.utcnow().date()
+    created = 0
+    for media in titles:
+        trakt_id = int(media.trakt_id)
+        if _event_exists(
+            user.id, ALERT_FAVORITE_ACTOR, media.media_type, trakt_id, 'baseline:favactor',
+        ):
+            continue
+
+        listed_at = media.trakt_listed_at
+        listed_day = listed_at.date() if listed_at else None
+        too_old = listed_day is None or (utc_today - listed_day).days > RELEASE_GRACE_DAYS
+        already_has = (
+            (media.media_type, trakt_id) in watched_pairs
+            or (media.media_type == 'movie' and trakt_id in owned_movies)
+            or (media.media_type == 'show' and trakt_id in owned_shows)
+        )
+        eligible_ids = set()
+        if listed_day is not None:
+            for pid, (fav_at, _name) in fav_by_person_id.items():
+                if fav_at is None or fav_at.date() <= listed_day:
+                    eligible_ids.add(pid)
+
+        if too_old or already_has or not eligible_ids:
+            _record_event(
+                user.id, ALERT_FAVORITE_ACTOR, media.media_type, trakt_id,
+                'baseline:favactor',
+            )
+            continue
+
+        members = list(media.cast_members)
+        if not members and media.cast_fetched_at is None:
+            members = list(sync_cast_for_media(media))
+        elif not members:
+            members = list(media.cast_members)
+
+        names: list[str] = []
+        seen: set[str] = set()
+        for credit in members:
+            meta = fav_by_person_id.get(credit.person_id)
+            if not meta or credit.person_id not in eligible_ids:
+                continue
+            _fav_at, actor_name = meta
+            fold = actor_name.casefold()
+            if fold in seen:
+                continue
+            seen.add(fold)
+            names.append(actor_name)
+
+        _record_event(
+            user.id, ALERT_FAVORITE_ACTOR, media.media_type, trakt_id,
+            'baseline:favactor',
+        )
+        if not names:
+            continue
+        actors = _join_list_names(names)
+        created += int(_notify(
+            user.id,
+            ALERT_FAVORITE_ACTOR,
+            title=media.title or 'New title',
+            message=actors,
+            link=f'/catalog/{media.media_type}/{trakt_id}',
+            media_type=media.media_type,
+            trakt_id=trakt_id,
+            payload_key='favactor',
+        ))
+    return created
+
+
 def run_media_alerts(app: Flask) -> int:
     """
     Per-user media cycle: due notifications + My Shows cache refresh.
@@ -1174,6 +1518,11 @@ def _run_alerts_for_user(user: User) -> tuple[int, bool]:
         # the calendar so a new season is not skipped by a stale 100% cache.
         if not finished:
             created += _check_new_streaming(user, 'show', trakt_id, media)
+        created += _check_season_streaming(
+            user, trakt_id, media,
+            events=show_events.get(trakt_id, []),
+            state=states.get(trakt_id),
+        )
         st = states.get(trakt_id)
         covered = bool(st and (st.on_watchlist or st.watched))
         if calendar_ok and covered:
@@ -1195,6 +1544,15 @@ def _run_alerts_for_user(user: User) -> tuple[int, bool]:
                 logger.warning(
                     'Trakt is throttling; remaining episode scans deferred to next run'
                 )
+    if not rate_limited:
+        try:
+            created += _check_favorite_actor_titles(user)
+        except Exception as exc:
+            if getattr(exc, 'status_code', None) == 429:
+                rate_limited = True
+                logger.warning('Trakt is throttling; favorite-actor alerts deferred')
+            else:
+                logger.warning('Favorite-actor alerts failed for user %s: %s', user.id, exc)
     try:
         cleared = _mark_watched_alerts_read(user, rate_limited=rate_limited)
         if cleared:
