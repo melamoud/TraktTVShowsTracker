@@ -489,12 +489,23 @@ def test_season_streaming_alert_renders_sxe_and_vendors(app, client, user):
     assert 'Season on stream' in html
     assert 'Netflix' in html
     assert 'alert-kind-streaming' in html
+    from services.local_time import format_local_date
+    with app.app_context():
+        note = Notification.query.filter_by(user_id=user, alert_type='season_streaming').one()
+        added = format_local_date(note.created_at)
+    assert added in html
 
 
 def test_notifications_page_renders_favorite_actor_card(app, client, user):
     with app.app_context():
+        from models import UserPreference
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.genres_json = '["drama"]'
+        prefs.keywords_json = '["heist"]'
         db.session.add(CachedMedia(
             media_type='movie', trakt_id=7701, title='Fauda Film', year=2024,
+            overview='A clever heist in the city',
+            genres_json='["drama","crime"]',
         ))
         db.session.add(Notification(
             user_id=user, alert_type='favorite_actor',
@@ -510,6 +521,9 @@ def test_notifications_page_renders_favorite_actor_card(app, client, user):
     assert 'Lior Raz' in html
     assert 'Favorite actor' in html
     assert 'alert-kind-actor' in html
+    assert 'Preference match' in html
+    assert 'drama' in html
+    assert 'heist' in html
 
 
 def test_alerts_page_caches_poster_for_new_title(app, client, user):

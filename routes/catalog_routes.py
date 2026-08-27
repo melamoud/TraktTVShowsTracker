@@ -728,6 +728,11 @@ def _recommendations_page(media_type: str):
         unique_items.append(m)
 
     rows_all = _decorate(media_type, unique_items)
+    from services.streaming_matcher import media_has_excluded_genre
+    rows_all = [
+        r for r in rows_all
+        if not media_has_excluded_genre(r.get('media'), current_user)
+    ]
     if hide_wishlist:
         rows_all = [r for r in rows_all if not r['on_watchlist']]
     if hide_watched:
@@ -869,6 +874,12 @@ def _latest_visible_rows(
     after_year = len(items)
 
     rows_all = _decorate(media_type, items)
+    from services.streaming_matcher import media_has_excluded_genre
+    if getattr(current_user, 'is_authenticated', False):
+        rows_all = [
+            r for r in rows_all
+            if not media_has_excluded_genre(r.get('media'), current_user)
+        ]
     if hide_watched:
         rows_all = [r for r in rows_all if not r['watched']]
     after_watched = len(rows_all)

@@ -16,6 +16,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **Hide watched** (default on)  
 - **On my services** — only titles available on services you marked in Preferences  
 - **Matches only** — purple preference matches  
+- Hidden genres from Preferences are always dropped  
 - **10 / 50 / 100** per page  
 - **Filter this page…** — filter current results by title  
 - **More filters** — year range, actor (jumps to Search), and genres (any selected)

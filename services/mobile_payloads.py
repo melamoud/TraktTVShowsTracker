@@ -267,6 +267,7 @@ def serialize_alert_card(card: dict) -> dict:
     found_on = card.get('found_on') or []
     my_providers = card.get('my_providers') or []
     other_providers = card.get('other_providers') or []
+    match = card.get('match') or {}
     return {
         'id': n.id if n else None,
         'alert_type': n.alert_type if n else None,
@@ -297,6 +298,11 @@ def serialize_alert_card(card: dict) -> dict:
         'episode_code': card.get('episode_code') or '',
         'display_title': card.get('display_title') or title,
         'alerts_pinned': bool(card.get('alerts_pinned')),
+        'match': {
+            'matched': bool(match.get('matched')),
+            'genres': list(match.get('genres') or []),
+            'keywords': list(match.get('keywords') or []),
+        },
     }
 
 

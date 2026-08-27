@@ -33,6 +33,22 @@ def get_user_genres_keywords(user: User) -> tuple[list[str], list[str]]:
     return _parse_json_list(prefs.genres_json), _parse_json_list(prefs.keywords_json)
 
 
+def get_user_excluded_genres(user: User) -> list[str]:
+    """Return genres the user never wants on Latest, Recs, or alerts."""
+    prefs = getattr(user, 'preferences', None)
+    if not prefs:
+        return []
+    return _parse_json_list(getattr(prefs, 'excluded_genres_json', None))
+
+
+def media_has_excluded_genre(media: CachedMedia | None, user: User) -> bool:
+    """True when cached genres include a hide-genre. Unknown/empty genres do not hide."""
+    excluded = {g.casefold() for g in get_user_excluded_genres(user)}
+    if not excluded or media is None:
+        return False
+    return any(g.casefold() in excluded for g in media_genres(media))
+
+
 def get_hidden_list_ids(user: User) -> list[str]:
     """Return Trakt personal list ids the user hid from the Set lists menu."""
     prefs = user.preferences

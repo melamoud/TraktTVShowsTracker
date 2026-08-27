@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-08-27 — Hide genres and quieter alerts
+
+- Preferences **Hide these genres** is a blocklist: those titles never appear on Latest or Recommended, and they never alert — even when they also match a liked genre, keyword, or favorite actor. Hide wins if a genre is in both lists
+- Favorite-actor alerts default to titles that would be purple on Latest (**Only matching my genres or keywords**); uncheck to hear about every new catalog title with those actors
+- Season-on-stream skips a season you already watched (or a later one) and shows the date we first saw it on a service
+- Alert cards (web and Android) show the same purple **Preference match** genre/keyword tags as Latest
+
 ## 2026-08-27 — Alert posters for the widget
 
 - New alerts download a local poster when they are created, and Alerts (web / app / widget) fills any still-missing artwork on load. You no longer have to open the title page first for the widget tile to show a picture

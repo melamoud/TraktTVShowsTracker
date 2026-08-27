@@ -39,6 +39,32 @@ def test_preference_match_highlight(app, user):
         assert 'drama' in [x.lower() for x in result['genres']] or result['keywords']
 
 
+def test_excluded_genre_wins_over_match(app, user):
+    """Hide-genre overlap beats a liked genre on the same title."""
+    from services.streaming_matcher import media_has_excluded_genre
+
+    with app.app_context():
+        u = db.session.get(User, user)
+        prefs = u.preferences
+        prefs.genres_json = '["drama"]'
+        prefs.excluded_genres_json = '["animation"]'
+        media = CachedMedia(
+            media_type='movie',
+            trakt_id=199,
+            title='Drawn Drama',
+            genres_json='["drama","animation"]',
+        )
+        db.session.add(media)
+        db.session.commit()
+        assert match_preferences(media, u)['matched'] is True
+        assert media_has_excluded_genre(media, u) is True
+        comedy = CachedMedia(
+            media_type='movie', trakt_id=200, title='Only Drama',
+            genres_json='["drama"]',
+        )
+        assert media_has_excluded_genre(comedy, u) is False
+
+
 def test_preference_match_ignores_streaming(app, user):
     """Owned streaming services alone must not purple-highlight a title."""
     with app.app_context():

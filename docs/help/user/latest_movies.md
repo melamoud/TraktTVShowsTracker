@@ -9,7 +9,7 @@ Trakt can add **hundreds of updates per day**, and most are **metadata edits on 
 By default Latest applies two local filters:
 
 1. **Recent years** — keep production year ≥ this year (or ≥ last year in Jan–Jun). Toggle **Include older years** to see classics that just got a DB edit.  
-2. **Matches only** — purple genres/keywords. Toggle **All titles** for the unfiltered (but still year-filtered) feed.  
+2. **Matches only** — purple genres/keywords. Toggle **All titles** for the unfiltered (but still year-filtered) feed. **Hide these genres** in Preferences still applies on All titles.  
 3. **Hide list titles** — hides titles already saved to your personal Trakt lists (e.g., “TV Show Favs”) so Latest only surfaces new discoveries. Toggle **Show list titles** to see them again.  
 
 Without genres/keywords, Matches only is empty — use the setup wizard / Preferences, or All titles.

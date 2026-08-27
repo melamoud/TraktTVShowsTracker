@@ -66,7 +66,7 @@ from models import (
     UserStreamingService, db,
 )
 from services import trakt_client
-from services.alerts import STREAMING_OFFER_TYPES
+from services.alerts import STREAMING_OFFER_TYPES, _STREAM_ADDED_DATE_RE
 from services.seed import COMMON_GENRES
 from services.streaming_matcher import (
     WATCHLIST_LIST_ID,
@@ -74,10 +74,12 @@ from services.streaming_matcher import (
     get_alert_enabled_list_ids,
     get_default_selected_list_ids,
     get_hidden_list_ids,
+    get_user_excluded_genres,
     get_user_genres_keywords,
     serialize_prefs,
     split_csv_terms,
     user_has_match_prefs,
+    match_preferences,
 )
 from routes.catalog_routes import _pagination_pages, _per_page
 from services.sync_jobs import (
@@ -277,12 +279,19 @@ def preferences():
             row.custom_search_template = (request.form.get(field) or '').strip() or None
 
         old_genres, old_keywords = get_user_genres_keywords(current_user)
+        old_excluded = get_user_excluded_genres(current_user)
         genres = split_csv_terms(request.form.get('genres', ''))
         genres.extend(request.form.getlist('genre_checks'))
+        excluded = split_csv_terms(request.form.get('exclude_genres', ''))
+        excluded.extend(request.form.getlist('exclude_genre_checks'))
         keywords = split_csv_terms(request.form.get('keywords', ''))
+        excluded_fold = {g.casefold() for g in excluded}
+        genres = [g for g in genres if g.casefold() not in excluded_fold]
         g_json, k_json = serialize_prefs(genres, keywords)
+        excluded_json, _ = serialize_prefs(excluded, [])
         prefs.genres_json = g_json
         prefs.keywords_json = k_json
+        prefs.excluded_genres_json = excluded_json
 
         # List prefs: show in menu, auto-select, and which lists generate alerts.
         import json
@@ -335,6 +344,9 @@ def preferences():
             prefs.alert_list_add = request.form.get('alert_list_add') == '1'
             prefs.alert_season_streaming = request.form.get('alert_season_streaming') == '1'
             prefs.alert_favorite_actor = request.form.get('alert_favorite_actor') == '1'
+            prefs.alert_favorite_actor_match_only = (
+                request.form.get('alert_favorite_actor_match_only') == '1'
+            )
             if current_user.is_admin:
                 prefs.alert_new_user_login = request.form.get('alert_new_user_login') == '1'
 
@@ -358,9 +370,11 @@ def preferences():
         prefs.updated_at = datetime.utcnow()
         new_genres = json.loads(g_json or '[]')
         new_keywords = json.loads(k_json or '[]')
+        new_excluded = json.loads(excluded_json or '[]')
         match_filters_changed = (
             sorted(x.lower() for x in old_genres) != sorted(x.lower() for x in new_genres)
             or sorted(x.lower() for x in old_keywords) != sorted(x.lower() for x in new_keywords)
+            or sorted(x.lower() for x in old_excluded) != sorted(x.lower() for x in new_excluded)
         )
         if new_genres or new_keywords:
             prefs.onboarding_completed_at = prefs.onboarding_completed_at or datetime.utcnow()
@@ -384,6 +398,7 @@ def preferences():
     import json
     user_genres = json.loads(prefs.genres_json or '[]')
     user_keywords = json.loads(prefs.keywords_json or '[]')
+    user_excluded_genres = json.loads(getattr(prefs, 'excluded_genres_json', None) or '[]')
     hidden_list_ids = set(get_hidden_list_ids(current_user))
     default_selected_list_ids = set(get_default_selected_list_ids(current_user))
     alert_enabled_list_ids = set(get_alert_enabled_list_ids(current_user))
@@ -410,6 +425,7 @@ def preferences():
         common_genres=COMMON_GENRES,
         user_genres=user_genres,
         user_keywords=user_keywords,
+        user_excluded_genres=user_excluded_genres,
         keywords_text=', '.join(user_keywords),
         marker_prompt=marker_prompt,
         markers=markers,
@@ -426,6 +442,9 @@ def preferences():
         alert_list_add=bool(getattr(prefs, 'alert_list_add', True)),
         alert_season_streaming=bool(getattr(prefs, 'alert_season_streaming', True)),
         alert_favorite_actor=bool(getattr(prefs, 'alert_favorite_actor', True)),
+        alert_favorite_actor_match_only=bool(
+            getattr(prefs, 'alert_favorite_actor_match_only', True)
+        ),
         alert_new_user_login=bool(getattr(prefs, 'alert_new_user_login', True)),
         favorite_actors=favorite_actors,
     )
@@ -1681,11 +1700,22 @@ def _alert_headline(n, media, episode_code: str = '') -> str:
         return text.strip()
     if kind in ('new_streaming', 'season_streaming'):
         msg = (n.message or '').strip()
+        added = ''
+        if kind == 'season_streaming':
+            from services.local_time import format_local_date
+            m = _STREAM_ADDED_DATE_RE.search(msg)
+            if m:
+                added = m.group(1)
+                msg = _STREAM_ADDED_DATE_RE.sub('', msg).strip()
+            elif n.created_at:
+                added = format_local_date(n.created_at) or ''
         if msg and 'available on' not in msg.lower() and 'published on' not in msg.lower():
-            return msg
+            return f'{msg} · {added}' if added else msg
         vendor = _streaming_vendor_label(n, media)
         if vendor:
-            return vendor
+            return f'{vendor} · {added}' if added else vendor
+        if added:
+            return added
     if media is not None and media.released_at:
         from services.local_time import format_local_date
         return format_local_date(media.released_at) or media.released_at.isoformat()
@@ -2016,6 +2046,7 @@ def _collect_alert_cards() -> dict:
         st = state_map.get(pair) if pair else None
         episode_code = _episode_code(n)
         media_type = pair[0] if pair else n.media_type
+        match = match_preferences(media, current_user) if media is not None else None
         cards.append({
             'n': n,
             'media': media,
@@ -2024,6 +2055,7 @@ def _collect_alert_cards() -> dict:
             'my_providers': my_providers,
             'other_providers': other_providers,
             'found_on': found_on,
+            'match': match,
             'type_label': ALERT_TYPE_LABELS.get(
                 n.alert_type, (n.alert_type or '').replace('_', ' '),
             ),

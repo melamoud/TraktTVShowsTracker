@@ -66,6 +66,8 @@ class UserPreference(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
     genres_json = db.Column(db.Text, default='[]')  # JSON list of genre strings
     keywords_json = db.Column(db.Text, default='[]')  # JSON list of keyword strings
+    # Genres to hide everywhere (Latest, Recs, alerts). Wins over liked genres/keywords/actors.
+    excluded_genres_json = db.Column(db.Text, default='[]')
     # Trakt personal list ids (stringified trakt ids) hidden from Set lists menu.
     # Empty/default = all lists shown (Wishlist is always shown).
     hidden_list_ids_json = db.Column(db.Text, default='[]')
@@ -89,6 +91,7 @@ class UserPreference(db.Model):
     alert_list_add = db.Column(db.Boolean, default=True, nullable=False)  # you added a title to a list
     alert_season_streaming = db.Column(db.Boolean, default=True, nullable=False)  # new season on a streamer
     alert_favorite_actor = db.Column(db.Boolean, default=True, nullable=False)  # new catalog title with a favorite actor
+    alert_favorite_actor_match_only = db.Column(db.Boolean, default=True, nullable=False)  # only genre/keyword matches
     alert_new_user_login = db.Column(db.Boolean, default=True, nullable=False)  # admins only
 
 

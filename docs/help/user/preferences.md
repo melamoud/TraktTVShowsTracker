@@ -48,6 +48,14 @@ On **Set lists…**:
 
 These drive the purple **Preference match** highlight and the default Latest **Matches only** filter (genre overlap, keyword hits in title/overview/network). Your streaming services do **not** count toward that highlight — they are for Found-on / “on my services” filters only.
 
+## Hide these genres
+
+A reverse of the list above. Checked genres are **never** shown on **Latest** or **Recommended** movies/shows, and they **never** get in-app alerts — even if the title also matches a liked genre, a keyword, or a favorite actor. Example: hide **animation**, and a new drama with a favorite actor that is also tagged animation stays off those pages and does not alert.
+
+If you check the same genre in both lists, **hide wins** (it is dropped from “genres you care about” on save). My lists, Search, and title pages are unchanged so you can still open something you already saved.
+
+Does not apply to titles with no cached genres yet (nothing to hide on).
+
 ## Alerts
 
 Toggle which in-app alert **types** you want. Each type has its own checkbox (all default on):
@@ -57,10 +65,10 @@ Toggle which in-app alert **types** you want. Each type has its own checkbox (al
 - New season on a streaming service
 - New episode or season
 - Added to a list
-- New title with a favorite actor
+- New title with a favorite actor (optional **Only matching my genres or keywords**, default on)
 - New user signed up (admins)
 
-Which **lists** can produce release / streaming / episode / season-on-stream alerts is set in the table above under **Alerts** (default Wishlist only). **Added to a list** and **favorite actor** are not list-scoped; uncheck those types to opt out.
+Which **lists** can produce release / streaming / episode / season-on-stream alerts is set in the table above under **Alerts** (default Wishlist only). **Added to a list** and **favorite actor** are not list-scoped; uncheck those types to opt out. Favorite-actor alerts default to titles that would be purple on Latest; uncheck **Only matching my genres or keywords** if you want every new catalog title with those actors.
 
 Details: [Alerts](release_alerts).
 

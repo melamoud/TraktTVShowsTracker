@@ -121,6 +121,41 @@ def test_recommendations_page_renders(app, client, user):
     assert 'Hiding wishlist' in html
 
 
+def test_recommendations_hides_excluded_genre(app, client, user):
+    login_client(client, app, user)
+    fake = [
+        {
+            'title': 'Drawn Rec',
+            'year': 2024,
+            'overview': 'Animated drama.',
+            'genres': ['drama', 'animation'],
+            'ids': {'trakt': 9101, 'slug': 'drawn-rec'},
+        },
+        {
+            'title': 'Live Rec',
+            'year': 2024,
+            'overview': 'Live-action drama.',
+            'genres': ['drama'],
+            'ids': {'trakt': 9102, 'slug': 'live-rec'},
+        },
+    ]
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).first()
+        prefs.genres_json = '["drama"]'
+        prefs.excluded_genres_json = '["animation"]'
+        db.session.commit()
+
+    with patch('services.trakt_client.get_recommendations', return_value=fake):
+        with patch('services.sync_jobs.enrich_media_list_for_display', return_value=[]):
+            with patch('services.sync_jobs.sync_providers_for_media', return_value=[]):
+                resp = client.get('/recommendations/movies?hide_wishlist=0')
+
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'Live Rec' in html
+    assert 'Drawn Rec' not in html
+
+
 def test_recommendations_show_wishlist_when_toggled(app, client, user):
     login_client(client, app, user)
     fake = [

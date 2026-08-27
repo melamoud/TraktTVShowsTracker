@@ -401,6 +401,7 @@ input[type=text], input[type=url], textarea, select {
 .alert-prefs label span { display: grid; gap: .15rem; }
 .alert-prefs label strong { font-weight: 650; }
 .alert-prefs .meta { margin: 0; }
+.alert-prefs label.alert-pref-nested { margin-left: 1.55rem; }
 
 .list-prefs {
   display: grid;

@@ -217,6 +217,7 @@ data class AlertItemDto(
     @SerializedName("episode_code") val episodeCode: String? = null,
     @SerializedName("display_title") val displayTitle: String? = null,
     @SerializedName("alerts_pinned") val alertsPinned: Boolean = false,
+    val match: MatchDto? = null,
 )
 
 data class AlertEntryDto(

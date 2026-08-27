@@ -16,6 +16,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **Hide watched** (default on) — drop titles you’ve already watched  
 - **On my services** — keep only titles TMDB lists on a streaming service you marked in Preferences  
 - **Matches only** — purple genre/keyword preference matches only  
+- Hidden genres from Preferences are always dropped (even with Matches only off)  
 - **10 / 50 / 100** per page  
 - **Filter this page…** — filter the current recommendation results by title (not remembered)
 - **More filters** — year range, actor (jumps to Search), and genres (any selected); remembered for this page

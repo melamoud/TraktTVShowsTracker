@@ -1,5 +1,6 @@
 """Auto media alerts: release day, new streaming, season/episode, prefs, admin."""
 
+import json
 from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
@@ -370,6 +371,8 @@ def test_season_streaming_alerts_recent_season(app, user):
         ).one()
         assert note.payload_key == 'seasonstream:5'
         assert 'Netflix' in note.message
+        from services.local_time import format_local_date, local_today
+        assert format_local_date(local_today()) in note.message
         assert note.is_read is False
 
 
@@ -415,6 +418,8 @@ def test_season_streaming_new_vendor_after_baseline(app, user):
             user_id=user, alert_type=ALERT_SEASON_STREAMING,
         ).one()
         assert 'Netflix' in note.message
+        from services.local_time import format_local_date, local_today
+        assert format_local_date(local_today()) in note.message
         assert note.is_read is False
 
 
@@ -780,6 +785,7 @@ def test_preferences_alert_toggles(app, client, user):
     assert b'New season on a streaming service' in get.data
     assert b'Added to a list' in get.data
     assert b'New title with a favorite actor' in get.data
+    assert b'Only matching my genres or keywords' in get.data
 
     resp = client.post('/preferences', data={
         'alerts_prefs_present': '1',
@@ -795,6 +801,7 @@ def test_preferences_alert_toggles(app, client, user):
         assert prefs.alert_episode_aired is False
         assert prefs.alert_list_add is False
         assert prefs.alert_favorite_actor is False
+        assert prefs.alert_favorite_actor_match_only is False
 
 
 def test_notify_lists_added_creates_alert(app, user):
@@ -1058,6 +1065,8 @@ def _seed_favorite_actor_catalog(user_id, *, listed_at, favorited_at, on_list=Fa
             user_id=user_id, media_type='movie', trakt_id=7701,
             on_watchlist=on_list, watched=watched,
         ))
+    prefs = UserPreference.query.filter_by(user_id=user_id).one()
+    prefs.alert_favorite_actor_match_only = False
     db.session.commit()
     return person, media
 
@@ -1216,4 +1225,136 @@ def test_season_streaming_respects_pref_off(app, user):
             user_id=user, alert_type=ALERT_SEASON_STREAMING,
             payload_key='baseline:seasonstream:5',
         ).count() == 1
+
+
+def test_season_streaming_skips_watched_season(app, user):
+    """A season already watched does not get a Season-on-stream card."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=1401, title='Fauda', tmdb_id=77,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=1401, on_watchlist=True,
+            progress_payload_json=json.dumps({
+                'watched_keys': [[5, 1], [5, 2]],
+                'aired_keys': [[5, 1], [5, 2]],
+            }),
+        ))
+        db.session.add(UserCalendarEvent(
+            user_id=user, media_type='show', trakt_id=1401,
+            event_date=date.today(), season_number=5, episode_number=1,
+        ))
+        db.session.commit()
+        season_providers = [
+            {'provider_name': 'Netflix', 'offer_type': 'flatrate', 'region': 'US'},
+        ]
+        with patch('services.alerts.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.tmdb_configured', return_value=True), \
+             patch('services.sync_jobs.get_watch_providers', return_value=[]), \
+             patch(
+                 'services.tmdb_client.get_season_watch_providers',
+                 return_value=season_providers,
+             ), \
+             patch('services.alerts.ensure_user_calendar_fresh', return_value=True):
+            run_media_alerts(app)
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_SEASON_STREAMING,
+        ).count() == 0
+        assert AlertEvent.query.filter_by(
+            user_id=user, alert_type=ALERT_SEASON_STREAMING,
+            payload_key='baseline:seasonstream:5',
+        ).count() == 1
+
+
+def test_favorite_actor_match_only_skips_non_matching(app, user):
+    """Match-only (default) skips a favorite-actor title outside genres/keywords."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.genres_json = '["drama"]'
+        prefs.keywords_json = '[]'
+        prefs.alert_favorite_actor_match_only = True
+        person, media = _seed_favorite_actor_catalog(
+            user,
+            listed_at=datetime.utcnow(),
+            favorited_at=datetime.utcnow() - timedelta(days=10),
+        )
+        media.genres_json = '["comedy"]'
+        prefs.alert_favorite_actor_match_only = True
+        db.session.commit()
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False):
+            assert run_media_alerts(app) == 0
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+        ).count() == 0
+        assert AlertEvent.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+            payload_key='baseline:favactor',
+        ).count() == 1
+
+
+def test_favorite_actor_match_only_notifies_matching(app, user):
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.genres_json = '["drama"]'
+        person, media = _seed_favorite_actor_catalog(
+            user,
+            listed_at=datetime.utcnow(),
+            favorited_at=datetime.utcnow() - timedelta(days=10),
+        )
+        media.genres_json = '["drama"]'
+        prefs.alert_favorite_actor_match_only = True
+        db.session.commit()
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False):
+            created = run_media_alerts(app)
+        assert created == 1
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+        ).count() == 1
+
+
+def test_favorite_actor_skips_excluded_genre_even_when_matching(app, user):
+    """Hide-genre wins over liked genre + favorite actor."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.genres_json = '["drama"]'
+        prefs.excluded_genres_json = '["animation"]'
+        prefs.alert_favorite_actor_match_only = False
+        person, media = _seed_favorite_actor_catalog(
+            user,
+            listed_at=datetime.utcnow(),
+            favorited_at=datetime.utcnow() - timedelta(days=10),
+        )
+        media.genres_json = '["drama","animation"]'
+        db.session.commit()
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False):
+            assert run_media_alerts(app) == 0
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+        ).count() == 0
+        assert AlertEvent.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+            payload_key='baseline:favactor',
+        ).count() == 1
+
+
+def test_notify_lists_added_skips_excluded_genre(app, user):
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.excluded_genres_json = '["animation"]'
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=8802, title='The Simpsons',
+            genres_json='["animation","comedy"]',
+            trakt_listed_at=datetime.utcnow(),
+        ))
+        db.session.commit()
+        u = db.session.get(User, user)
+        assert notify_lists_added(u, 'show', 8802, ['Wishlist']) is False
+        db.session.commit()
+        assert Notification.query.filter_by(
+            user_id=user, alert_type='list_add',
+        ).count() == 0
+
 

@@ -10,23 +10,24 @@ This is separate from **Streaming vs Found on** (where a title plays / where you
 |-------|---------|
 | **Movie release date** | A listed movie’s release day arrives |
 | **Added to a streaming service** | A **new** service brand starts carrying that listed title. Multiple brands share **one** alert card listing every vendor. Marking it read, then a later new vendor, makes that same card unread again. Channel/tier renames like “Paramount Plus Apple TV channel” after Premium do **not** re-alert |
-| **New season on a streaming service** | A season of a listed show shows up on TMDB streaming (or gains a new vendor) — e.g. Fauda S5 appearing on Netflix. Separate Preferences toggle. One card per season, vendors listed together |
+| **New season on a streaming service** | A season of a listed show shows up on TMDB streaming (or gains a new vendor) — e.g. Fauda S5 appearing on Netflix. Separate Preferences toggle. One card per season, vendors listed together. The card shows the date we first saw it on a service (or when a new vendor appeared), so old ones are easy to mark read. Does **not** fire if you already watched that season (or a later one) |
 | **New episode or season** | An episode aired; if a full season drops the same day, one season alert instead. A show premiere is announced by its S01E01 episode alert — there is no separate show “release” alert |
 | **Added to a list** | You add a movie or show to Wishlist or a personal list in this app (Set lists or Wishlist). Immediate — not the 4-hour schedule. Uncheck this type in Preferences to opt out |
-| **New title with a favorite actor** | A movie or show **just listed** on Latest/catalog includes an actor you favorited. Credits are checked on those new titles only — the app does not search each actor’s filmography. Skips titles already on your lists or watched, and titles listed before you favorited the actor. Uncheck this type in Preferences to opt out |
+| **New title with a favorite actor** | A movie or show **just listed** on Latest/catalog includes an actor you favorited. Credits are checked on those new titles only — the app does not search each actor’s filmography. Skips titles already on your lists or watched, and titles listed before you favorited the actor. By default only titles matching your **genres or keywords**. Uncheck that extra box (or the whole type) in Preferences to change this |
 | **New user signed up** | Admins only — first login of a new account |
 
 ## When they stop
 
 - Movie marked watched  
-- Show **caught up** on aired episodes (Progress `watched / aired`, not a sticky “finished” flag). Streaming alerts pause when caught up; **new episode/season** alerts still use your calendar for watchlisted or in-progress shows so a new season is not missed. An episode alert does **not** mean the show is still on Wishlist — Trakt may already have removed it after the first watch ([Wishlist vs lists](wishlist))  
-- Title no longer on any **alert-enabled** list (Preferences → Trakt lists → **Alerts**; default Wishlist). **Favorite actor** alerts are catalog-based, not list-scoped; they skip titles you already listed or watched 
+- Show **caught up** on aired episodes (Progress `watched / aired`, not a sticky “finished” flag). Streaming alerts pause when caught up; **new episode/season** alerts still use your calendar for watchlisted or in-progress shows so a new season is not missed. **New season on a streaming service** also skips a season you already watched. An episode alert does **not** mean the show is still on Wishlist — Trakt may already have removed it after the first watch ([Wishlist vs lists](wishlist))  
+- Title no longer on any **alert-enabled** list (Preferences → Trakt lists → **Alerts**; default Wishlist). **Favorite actor** alerts are catalog-based, not list-scoped; they skip titles you already listed or watched  
+- Title has a genre you **hide** in Preferences (wins over liked genres, keywords, and favorite-actor matches) 
 
 A batch of episodes airing the same day only counts as a **season** alert when the **whole** season drops that day. If more episodes air later (weekly or a partial drop), you get **per-episode** alerts instead.
 
 ## Reading an alert card
 
-Each alert is a compact card: poster with a badge for **what happened**, then the title. Posters are cached when the alert is written (and again when you open Alerts) so the home-screen widget is not a blank tile.
+Each alert is a compact card: poster with a badge for **what happened**, then the title. Posters are cached when the alert is written (and again when you open Alerts) so the home-screen widget is not a blank tile. When the title matches your genre/keyword filters, the same purple **Preference match** tags as Latest appear (matched genres and keywords).
 
 | Badge | Meaning |
 |-------|---------|

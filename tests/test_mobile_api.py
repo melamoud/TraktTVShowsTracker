@@ -75,8 +75,12 @@ def test_my_movies_and_alerts_json(app, client, user):
 def test_alerts_json_includes_found_on(app, client, user):
     login_client(client, app, user)
     with app.app_context():
+        from models import UserPreference
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.genres_json = '["drama"]'
         db.session.add(CachedMedia(
             media_type='show', trakt_id=42, title='The Bear', year=2022,
+            genres_json='["drama"]',
         ))
         db.session.add(Notification(
             user_id=user,
@@ -104,6 +108,9 @@ def test_alerts_json_includes_found_on(app, client, user):
     assert links[0]['url'] and 'hulu.com' in links[0]['url']
     assert item['last_episode_label'] == 'S03E01 — Next'
     assert (item.get('last_episode_aired_at') or '').startswith('2026-08-14')
+    match = item.get('match') or {}
+    assert match.get('matched') is True
+    assert 'drama' in (match.get('genres') or [])
 
 
 def test_catalog_detail_json(app, client, user):

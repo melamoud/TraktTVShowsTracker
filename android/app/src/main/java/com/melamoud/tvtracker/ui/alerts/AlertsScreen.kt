@@ -325,6 +325,17 @@ private fun AlertItemCard(
                 if (headline != null) {
                     Text(headline, color = TextMuted, style = MaterialTheme.typography.bodySmall)
                 }
+                val match = item.match
+                if (match?.matched == true) {
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        AlertMatchChip("Preference match")
+                        match.genres.forEach { AlertMatchChip(it) }
+                        match.keywords.forEach { AlertMatchChip(it) }
+                    }
+                }
                 if (item.otherProviders.isNotEmpty() || item.otherProviderLinks.isNotEmpty()) {
                     ServiceLinksLine(
                         prefix = if (item.myProviders.isNotEmpty()) "Also streaming:" else "Streaming:",
@@ -394,6 +405,19 @@ private fun AlertItemCard(
             }
         }
     }
+}
+
+@Composable
+private fun AlertMatchChip(label: String) {
+    Text(
+        label,
+        color = AccentGold,
+        style = MaterialTheme.typography.labelMedium,
+        modifier = Modifier
+            .clip(RoundedCornerShape(4.dp))
+            .background(AccentGold.copy(alpha = 0.14f))
+            .padding(horizontal = 8.dp, vertical = 3.dp),
+    )
 }
 
 @Composable

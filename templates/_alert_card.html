@@ -38,6 +38,14 @@
         <span class="alert-ep">{{ card.headline }}</span>
       {% endif %}
     </h2>
+    {% set match = card.match %}
+    {% if match and match.matched %}
+      <div class="tags">
+        <span class="tag match">Preference match</span>
+        {% for g in match.genres %}<span class="tag match">{{ g }}</span>{% endfor %}
+        {% for k in match.keywords %}<span class="tag match">{{ k }}</span>{% endfor %}
+      </div>
+    {% endif %}
     {% set title = m.title if m else n.title %}
     {% set year = m.year if m else none %}
     {% if card.other_providers %}

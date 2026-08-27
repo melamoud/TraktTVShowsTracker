@@ -66,6 +66,53 @@ def test_latest_show_all_includes_non_matches(app, client, user):
     assert 'All titles' in html
 
 
+def test_latest_show_all_hides_excluded_genre(app, client, user):
+    """Hide-genre blocklist applies even when Matches only is off."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).first()
+        prefs.genres_json = '["drama"]'
+        prefs.excluded_genres_json = '["animation"]'
+        db.session.add(_add_movie(
+            'Drawn Drama', 1, datetime(2026, 8, 3), genres=['Drama', 'Animation'],
+        ))
+        db.session.add(_add_movie('Live Drama', 2, datetime(2026, 8, 2), genres=['Drama']))
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.catalog_routes.feed_count', return_value=2), patch(
+        'routes.catalog_routes.ensure_catalog_through_marker'
+    ), patch('routes.catalog_routes.catalog_has_more_older', return_value=False), patch(
+        'services.sync_jobs.enrich_media_list_for_display'
+    ):
+        resp = client.get('/latest/movies?match_only=0')
+    html = resp.data.decode('utf-8')
+    assert 'Live Drama' in html
+    assert 'Drawn Drama' not in html
+
+
+def test_prefs_save_excluded_genre_wins_overlap(app, client, user):
+    """A genre in both lists is kept only on the hide list."""
+    login_client(client, app, user)
+    resp = client.post(
+        '/preferences',
+        data={
+            'genre_checks': ['drama', 'animation'],
+            'exclude_genre_checks': 'animation',
+            'keywords': 'heist',
+        },
+        follow_redirects=False,
+    )
+    assert resp.status_code == 302
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        import json
+        liked = [x.lower() for x in json.loads(prefs.genres_json or '[]')]
+        hidden = [x.lower() for x in json.loads(prefs.excluded_genres_json or '[]')]
+        assert 'drama' in liked
+        assert 'animation' not in liked
+        assert 'animation' in hidden
+
+
 def test_latest_recent_years_hides_old_production_year(app, client, user):
     """Default recent-years filter drops old titles even when they match genres."""
     with app.app_context():
