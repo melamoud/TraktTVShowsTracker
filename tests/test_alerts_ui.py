@@ -510,3 +510,38 @@ def test_notifications_page_renders_favorite_actor_card(app, client, user):
     assert 'Lior Raz' in html
     assert 'Favorite actor' in html
     assert 'alert-kind-actor' in html
+
+
+def test_alerts_page_caches_poster_for_new_title(app, client, user):
+    """Alerts download a local poster so the widget is not a blank tile."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=7701, title='Fauda Film', year=2024,
+            tmdb_id=55,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='favorite_actor',
+            title='Fauda Film',
+            message='Lior Raz',
+            media_type='movie', trakt_id=7701, is_read=False,
+            payload_key='favactor',
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    with patch('services.tmdb_client.is_configured', return_value=True), \
+         patch(
+             'services.tmdb_client.get_poster_for_tmdb_id',
+             return_value='https://image.tmdb.org/t/p/w342/x.jpg',
+         ) as tmdb, \
+         patch(
+             'services.poster_cache.cache_remote_poster',
+             return_value='/cache/posters/movie/7701',
+         ) as cache:
+        html = client.get('/notifications').get_data(as_text=True)
+    assert 'Fauda Film' in html
+    assert '/cache/posters/movie/7701' in html
+    tmdb.assert_called_once_with('movie', 55)
+    cache.assert_called_once()
+    with app.app_context():
+        media = CachedMedia.query.filter_by(media_type='movie', trakt_id=7701).one()
+        assert media.poster_url == '/cache/posters/movie/7701'

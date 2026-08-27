@@ -81,6 +81,7 @@ from services.streaming_matcher import (
 )
 from routes.catalog_routes import _pagination_pages, _per_page
 from services.sync_jobs import (
+    ensure_local_poster,
     ensure_media_cached,
     enrich_media_list_for_display,
 )
@@ -1934,6 +1935,27 @@ def _collect_alert_cards() -> dict:
                 CachedMedia.trakt_id.in_(movie_ids),
             ).all())
         media_map = {(m.media_type, int(m.trakt_id)): m for m in found}
+        from services.poster_cache import is_local_poster_url, local_poster_path
+        seen_media = set()
+        poster_fetches = 0
+        for n in rows:
+            pair = pair_by_notif.get(n.id)
+            media = media_map.get(pair) if pair else None
+            if media is None or media.id in seen_media:
+                continue
+            seen_media.add(media.id)
+            if poster_fetches >= 25:
+                break
+            already = (
+                is_local_poster_url(media.poster_url)
+                and local_poster_path(media.media_type, media.trakt_id)
+            )
+            if already:
+                continue
+            ok = ensure_local_poster(media)
+            poster_fetches += 1
+            if not ok:
+                break
     show_ids = [int(mt_id[1]) for mt_id in pairs if mt_id[0] == 'show']
     movie_ids = [int(mt_id[1]) for mt_id in pairs if mt_id[0] == 'movie']
     state_map: dict[tuple, object] = {}

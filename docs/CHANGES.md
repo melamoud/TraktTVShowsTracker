@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-08-27 — Alert posters for the widget
+
+- New alerts download a local poster when they are created, and Alerts (web / app / widget) fills any still-missing artwork on load. You no longer have to open the title page first for the widget tile to show a picture
+
 ## 2026-08-26 — Favorite-actor alerts; separate Preferences toggles
 
 - **New title with a favorite actor** alerts when a just-listed catalog movie/show includes someone you favorited. Credits are loaded for those new titles only (no per-actor filmography polling). Existing catalog is baselined; titles already on your lists or watched, and titles listed before you favorited the actor, are skipped

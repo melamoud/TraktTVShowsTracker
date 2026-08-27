@@ -104,6 +104,45 @@ def _ensure_local_poster(media: CachedMedia, remote_url: str | None = None) -> N
         db.session.commit()
 
 
+def ensure_local_poster(media: CachedMedia) -> bool:
+    """
+    Download a poster into local cache if this title does not have one yet.
+
+    Alerts and the widget always load ``/cache/posters/...``. Detail view used
+    to be the only place that fetched artwork, so new alerts showed a blank
+    tile until someone opened the title. Returns False on HTTP 429 so callers
+    can stop early.
+    """
+    from services.poster_cache import is_local_poster_url, local_poster_path
+
+    if (
+        media is None
+        or media.media_type not in ('movie', 'show')
+        or not media.trakt_id
+    ):
+        return True
+    try:
+        _ensure_local_poster(media)
+        if is_local_poster_url(media.poster_url) and local_poster_path(
+            media.media_type, media.trakt_id,
+        ):
+            return True
+        if media.tmdb_id:
+            from services.tmdb_client import get_poster_for_tmdb_id, is_configured
+            if is_configured():
+                url = get_poster_for_tmdb_id(media.media_type, media.tmdb_id)
+                if url:
+                    _ensure_local_poster(media, url)
+    except Exception as exc:
+        logger.warning(
+            'Poster cache failed for %s %s: %s',
+            media.media_type, media.trakt_id, exc,
+        )
+        if getattr(exc, 'status_code', None) == 429 or '429' in str(exc):
+            return False
+    return True
+
+
 def enrich_media_details_for_display(media: CachedMedia) -> bool:
     """
     Ensure overview/genres/poster exist (Trakt summary + local poster cache).

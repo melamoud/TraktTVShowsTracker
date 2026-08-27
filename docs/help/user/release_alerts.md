@@ -26,7 +26,7 @@ A batch of episodes airing the same day only counts as a **season** alert when t
 
 ## Reading an alert card
 
-Each alert is a compact card: poster with a badge for **what happened**, then the title.
+Each alert is a compact card: poster with a badge for **what happened**, then the title. Posters are cached when the alert is written (and again when you open Alerts) so the home-screen widget is not a blank tile.
 
 | Badge | Meaning |
 |-------|---------|

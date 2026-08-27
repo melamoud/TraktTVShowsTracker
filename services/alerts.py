@@ -43,6 +43,7 @@ from services.streaming_matcher import get_alert_enabled_list_ids
 from services.sync_jobs import (
     alert_collection_trakt_ids,
     collection_trakt_ids,
+    ensure_local_poster,
     sync_providers_for_media,
 )
 from services.tmdb_client import is_configured as tmdb_configured
@@ -224,6 +225,12 @@ def _notify(
         trakt_id=int(trakt_id) if trakt_id else None,
         payload_key=payload_key,
     ))
+    if media_type in ('movie', 'show') and trakt_id:
+        media = CachedMedia.query.filter_by(
+            media_type=media_type, trakt_id=int(trakt_id),
+        ).first()
+        if media is not None:
+            ensure_local_poster(media)
     return True
 
 
@@ -929,6 +936,7 @@ def _upsert_streaming_card(
         title = f'Now streaming: {media.title}'
     if not alert_pref_enabled(user, alert_type):
         return 0
+    ensure_local_poster(media)
     if notes:
         lead = notes[0]
         lead.title = title
