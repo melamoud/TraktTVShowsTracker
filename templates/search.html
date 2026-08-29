@@ -210,6 +210,12 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
             {% endif %}
             {% set providers = row.providers %}
             {% include '_found_on_button.html' %}
+            <button class="btn btn-small btn-danger" type="button"
+                    data-action="recommendation-hide"
+                    data-media-type="{{ media_type }}"
+                    data-trakt-id="{{ m.trakt_id }}"
+                    data-title="{{ m.title|e }}"
+                    title="Hide from Trakt recommendations (Not interested)">Hide recommendation</button>
             {% if media_type == 'show' %}
               <button class="btn btn-small btn-primary" type="button"
                       data-action="progress-open"

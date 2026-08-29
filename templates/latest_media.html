@@ -250,6 +250,12 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
                   data-media-type="{{ media_type }}"
                   data-trakt-id="{{ m.trakt_id }}"
                   data-title="{{ m.title|e }}">Reviewed older than this</button>
+          <button class="btn btn-small btn-danger" type="button"
+                  data-action="recommendation-hide"
+                  data-media-type="{{ media_type }}"
+                  data-trakt-id="{{ m.trakt_id }}"
+                  data-title="{{ m.title|e }}"
+                  title="Hide from Trakt recommendations (Not interested)">Hide recommendation</button>
           {% if m.imdb_id %}<a class="btn btn-small" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>{% endif %}
           {% if m.trailer_url %}<a class="btn btn-small" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>{% endif %}
           <a class="btn btn-small" href="https://trakt.tv/{{ media_type }}s/{{ m.slug or m.trakt_id }}" target="_blank" rel="noopener">Trakt</a>

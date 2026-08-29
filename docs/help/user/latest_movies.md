@@ -48,10 +48,11 @@ Trakt’s `/updates` API **cannot** filter by genre/keyword server-side. Matches
 - **10 / 50 / 100** per page  
 - **Hide watched** on by default  
 - **Hide list titles** on by default (personal Trakt lists)  
-- Preference highlights (genres/keywords only), **Set lists…** / watched, **Rate…** / **Favorite**, review marker (set / clear)  
+- Preference highlights (genres/keywords only), **Set lists…** / watched, **Rate…** / **Favorite**, review marker (set / clear), **Found on…**, **Hide recommendation**  
 - Open a title for the full page; **← Back** returns here (not always to another Latest view)  
 - Poster, description, genres  
 - **Streaming:** read-only TMDB/JustWatch list (needs free `TMDB_API_KEY`)  
+- **Hide recommendation:** sends Trakt a “Not interested” for this title; it disappears from future Trakt recommendations  
 
 Filter and page-size choices are remembered for your account when you leave and return.
 
