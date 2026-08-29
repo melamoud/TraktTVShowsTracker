@@ -1334,25 +1334,27 @@ document.addEventListener('click', async function (ev) {
       await apiPost('/api/watched/' + mediaType + '/' + traktId, { action: 'remove' });
       requestReload();
     } else if (action === 'review-marker') {
-      const expected = ctx.title || '';
-      if (expected && !window.confirm(
-        'Set review marker on:\n\n"' + expected + '"\n\nThat title and everything older below it will be dimmed.'
-      )) {
-        return;
-      }
       showPageLoading('Setting marker…');
-      const data = await apiPost('/api/review-marker/' + mediaType + '/' + traktId, {});
-      alert('Marker set on: ' + data.title);
+      await apiPost('/api/review-marker/' + mediaType + '/' + traktId, {});
       requestReload();
     } else if (action === 'recommendation-hide') {
       showPageLoading('Hiding…');
       await apiPost('/api/recommendations/' + mediaType + '/' + traktId + '/hide', {});
       const row = btn.closest('.media-row');
-      if (row) {
+      if (row && btn.getAttribute('data-remove-on-hide') === '1') {
         row.remove();
+      } else if (row) {
+        // On Latest/Search/Title the title still belongs in the feed; just
+        // confirm the action inline without removing the row.
+        btn.disabled = true;
+        btn.textContent = 'Hidden from Trakt recs';
+        btn.classList.remove('btn-danger');
+        btn.classList.add('btn-success');
+        btn.title = 'This title is hidden from future Trakt recommendations';
       } else {
         requestReload();
       }
+      hidePageLoading();
     } else if (action === 'found-on') {
       const labels = await openFoundOnDialog({
         title: ctx.title || '',

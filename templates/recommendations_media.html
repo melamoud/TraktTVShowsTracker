@@ -247,6 +247,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% include '_found_on_button.html' %}
           <button class="btn btn-small btn-danger" type="button"
                   data-action="recommendation-hide"
+                  data-remove-on-hide="1"
                   data-media-type="{{ media_type }}"
                   data-trakt-id="{{ m.trakt_id }}"
                   data-title="{{ m.title|e }}"

@@ -260,6 +260,17 @@ def _marker(media_type: str) -> ReviewMarker | None:
     return ReviewMarker.query.filter_by(user_id=current_user.id, media_type=media_type).first()
 
 
+def _marker_page(rows: list[dict], marker, per_page: int) -> int | None:
+    """Return the 1-based page number containing the review marker, if any."""
+    if not marker or not rows or per_page <= 0:
+        return None
+    marker_id = int(marker.trakt_id)
+    for i, row in enumerate(rows):
+        if int(row['media'].trakt_id) == marker_id:
+            return (i // per_page) + 1
+    return None
+
+
 def _decorate(media_type: str, items: list[CachedMedia]) -> list[dict]:
     """Attach preference match, list/watched, found-on flags (marker applied later)."""
     import json
@@ -1013,6 +1024,8 @@ def _latest_page(media_type: str):
         rows_all = filter_rows_by_avail(rows_all, avail)
     filter_stats = dict(filter_stats)
     filter_stats['visible'] = len(rows_all)
+    marker = _marker(media_type)
+    marker_page = _marker_page(rows_all, marker, per_page)
     # Do NOT auto-fetch older Trakt pages when the filtered list is short — that
     # made every Matches-only load walk the cache slowly. Use "Load older" instead.
 
@@ -1048,7 +1061,6 @@ def _latest_page(media_type: str):
             attach_availability(r)
     except Exception as exc:
         current_app.logger.warning('Visible-page enrich failed: %s', exc)
-    marker = _marker(media_type)
     has_match_prefs = user_has_match_prefs(current_user)
     current_app.logger.info(
         'Latest %s filters: cached=%s after_year=%s after_watched=%s after_lists=%s visible=%s page=%s/%s',
@@ -1073,6 +1085,7 @@ def _latest_page(media_type: str):
         total=total,
         filter_stats=filter_stats,
         marker=marker,
+        marker_page=marker_page,
         hide_watched=hide_watched,
         hide_lists=hide_lists,
         match_only=match_only,

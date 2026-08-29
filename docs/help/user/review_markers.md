@@ -19,3 +19,5 @@ Purple matches shift. Markers stay on the same titles, which can hide newly matc
 | **Caught up as of now** | Set the marker on the **newest** feed title — everything currently listed is dimmed; only future Trakt updates stay undimmed |
 
 Latest sync does **not** walk older Trakt pages down to your marker. Older pages load only when you page back. The marker dims titles already in the local cache.
+
+The pagination underlines the page that contains your review marker so you can jump straight to the oldest page that still has unreviewed titles.

@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-08-29 — No-confirm review marker; marker page indicator; clearer Hide recommendation feedback
+
+- **Reviewed older than this** sets the marker immediately with no confirmation dialog or success alert
+- Latest pagination underlines the page that contains your review marker so you can jump to the oldest page with unreviewed titles
+- **Hide recommendation** on Latest/Search/Title now gives inline feedback without removing the row, since the action only affects future Trakt recommendations, not the local feed; on the Recommended page the row still disappears because it is filtered from that list
+
 ## 2026-08-28 — Streaming alerts stopped bouncing unread
 
 - Netflix vs **Netflix Standard with Ads** (and similar leftover keys) no longer marks the same Now streaming / Season on stream card unread every night

@@ -10,7 +10,7 @@
 {% macro qs(page_n=None, per=None, hw_v=None, mo_v=None, ry_v=None, hl_v=None, q_v=None, avail_v=None) -%}
 page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&match_only={{ mo_v if mo_v is not none else mo }}&recent_years={{ ry_v if ry_v is not none else ry }}&hide_lists={{ hl_v if hl_v is not none else hl }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}
 {%- endmacro %}
-{% macro pager(position) %}
+{% macro pager(position, marker_page=none) %}
   {% if pages > 1 %}
   <nav class="pager pill-row" aria-label="Pagination {{ position }}">
     {% if page > 1 %}
@@ -23,6 +23,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
         <span class="pill ellipsis" aria-hidden="true">…</span>
       {% elif p == page %}
         <span class="pill on" aria-current="page">{{ p }}</span>
+      {% elif p == marker_page %}
+        <a class="pill marker-page" href="?{{ qs(page_n=p) }}" title="First page with unreviewed titles">{{ p }}</a>
       {% else %}
         <a class="pill" href="?{{ qs(page_n=p) }}">{{ p }}</a>
       {% endif %}
@@ -128,7 +130,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     Older Trakt pages are not loaded until you click <strong>Load older Trakt page</strong>.
   {% endif %}
 </p>
-{{ pager('top') }}
+{{ pager('top', marker_page=marker_page) }}
 
 {% if match_only and not has_match_prefs %}
   <div class="callout warn">
@@ -278,5 +280,5 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   {% endfor %}
 </div>
 
-{{ pager('bottom') }}
+{{ pager('bottom', marker_page=marker_page) }}
 {% endblock %}

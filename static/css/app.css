@@ -219,6 +219,11 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
   border-color: rgba(110, 168, 254, 0.45);
 }
 .pager { margin: .35rem 0 1rem; }
+.pill.marker-page {
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
 
 .media-list { display: grid; gap: .85rem; }
 .media-row {
