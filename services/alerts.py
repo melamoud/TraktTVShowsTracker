@@ -91,20 +91,31 @@ _STREAM_ADDED_DATE_RE = re.compile(
 
 
 def normalize_streaming_provider_key(name: str) -> str:
-    """Collapse TMDB provider label variants to one alert key."""
+    """Collapse TMDB provider label variants to one alert key.
+
+    Suffixes are stripped until the brand is stable so "Netflix Standard with
+    Ads" and a leftover ``netflix standard`` event key both become ``netflix``.
+    """
     text = re.sub(r'\s+', ' ', (name or '').strip().lower())
     if not text:
         return ''
     text = text.replace('paramount+', 'paramount plus')
     text = text.replace('disney+', 'disney plus')
-    for suffix in _PROVIDER_CHANNEL_SUFFIXES:
-        if text.endswith(suffix):
-            text = text[: -len(suffix)].rstrip()
-            break
-    for suffix in _PROVIDER_TIER_SUFFIXES:
-        if text.endswith(suffix):
-            text = text[: -len(suffix)].rstrip()
-            break
+    changed = True
+    while changed and text:
+        changed = False
+        for suffix in _PROVIDER_CHANNEL_SUFFIXES:
+            if text.endswith(suffix):
+                text = text[: -len(suffix)].rstrip()
+                changed = True
+                break
+        if changed:
+            continue
+        for suffix in _PROVIDER_TIER_SUFFIXES:
+            if text.endswith(suffix):
+                text = text[: -len(suffix)].rstrip()
+                changed = True
+                break
     if text in ('hbo max', 'max'):
         return 'max'
     return text
@@ -908,10 +919,14 @@ def _check_new_streaming(user: User, media_type: str, trakt_id: int, media: Cach
     new_items = [(key, display) for key, display in by_key.items() if key not in seen]
     if not new_items:
         return 0
+    recorded = False
     for key, _display in new_items:
-        _record_event(
+        if _record_event(
             user.id, ALERT_NEW_STREAMING, media_type, trakt_id, f'provider:{key}',
-        )
+        ):
+            recorded = True
+    if not recorded:
+        return 0
     return _upsert_streaming_card(
         user, ALERT_NEW_STREAMING, media, trakt_id,
         new_displays=[d for _k, d in new_items],
@@ -948,8 +963,9 @@ def _upsert_streaming_card(
     def _add_vendor(name: str) -> None:
         text = (name or '').strip()
         fold = text.casefold()
+        brand = normalize_streaming_provider_key(text) or fold
         if (
-            not fold or fold in seen_fold
+            not fold or fold in seen_fold or brand in seen_fold
             or fold == (media.title or '').casefold()
             or 'available on' in fold
             or re.fullmatch(r'\d{4}-\d{2}-\d{2}', fold)
@@ -957,6 +973,7 @@ def _upsert_streaming_card(
         ):
             return
         seen_fold.add(fold)
+        seen_fold.add(brand)
         ordered.append(text)
 
     for note in notes:
@@ -966,8 +983,12 @@ def _upsert_streaming_card(
         heading = (note.title or '')
         if heading.startswith('Now on ') and ': ' in heading[7:]:
             _add_vendor(heading[7:].split(': ', 1)[0])
+    before = len(ordered)
     for name in new_displays:
         _add_vendor(name)
+    gained = len(ordered) > before
+    if notes and not gained:
+        return 0
     vendor_line = _join_list_names(ordered) if len(ordered) <= 2 else ' · '.join(ordered)
     if alert_type == ALERT_SEASON_STREAMING:
         season = payload_key.split(':')[-1] if payload_key.startswith('seasonstream:') else ''
@@ -1168,12 +1189,14 @@ def _check_season_streaming(
         new_items = [(k, d) for k, d in by_key.items() if k not in seen_keys]
         if not new_items:
             continue
+        recorded = False
         for key, _display in new_items:
-            _record_event(
+            if _record_event(
                 user.id, ALERT_SEASON_STREAMING, 'show', trakt_id,
                 f'seasonstream:{season}:provider:{key}',
-            )
-        if watched_season:
+            ):
+                recorded = True
+        if not recorded or watched_season:
             continue
         created += _upsert_streaming_card(
             user, ALERT_SEASON_STREAMING, media, trakt_id,

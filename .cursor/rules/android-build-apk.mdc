@@ -1,0 +1,18 @@
+---
+description: Always assemble the Android debug APK after changing app code
+alwaysApply: true
+---
+
+# Build the Android app after code changes
+
+When you change anything under `android/` (Kotlin, resources, Gradle, manifests), **assemble an installable debug APK** before you finish. Compiling (`compileDebugKotlin`) is not enough.
+
+From `android/`:
+
+```bat
+gradlew.bat :app:assembleDebug
+```
+
+Report the APK path when it succeeds: `android/app/build/outputs/apk/debug/TVTracker-v1.0.0-debug.apk`.
+
+Skip the APK only when the change is purely website/Python with no Android files touched.

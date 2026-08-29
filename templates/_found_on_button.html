@@ -1,0 +1,10 @@
+{# Found on… picker. Expects: media_type, trakt_id, title; optional year, providers, found_on. #}
+<button class="btn btn-small"
+        type="button"
+        data-action="found-on"
+        data-media-type="{{ media_type }}"
+        data-trakt-id="{{ trakt_id }}"
+        data-title="{{ title|e }}"
+        {% if year %}data-year="{{ year }}"{% endif %}
+        data-providers="{{ (providers or [])|join('|') }}"
+        data-found-on="{{ (found_on or [])|join('|') }}">Found on…</button>

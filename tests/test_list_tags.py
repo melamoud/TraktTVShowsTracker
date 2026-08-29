@@ -3,7 +3,7 @@
 from datetime import datetime
 from unittest.mock import patch
 
-from models import CachedMedia, UserListMembership, UserMediaState, db
+from models import CachedMedia, MediaFoundOn, UserListMembership, UserMediaState, db
 from tests.conftest import login_client
 
 
@@ -51,6 +51,9 @@ def test_latest_page_shows_personal_list_tags(app, client, user):
         db.session.add(UserListMembership(
             user_id=user, list_id='10', media_type='movie', trakt_id=5,
         ))
+        db.session.add(MediaFoundOn(
+            user_id=user, media_type='movie', trakt_id=5, service_label='Hulu',
+        ))
         db.session.commit()
 
     login_client(client, app, user)
@@ -66,11 +69,17 @@ def test_latest_page_shows_personal_list_tags(app, client, user):
     html = resp.get_data(as_text=True)
     assert 'Listed Movie' in html
     assert 'TV Show Favs' in html
+    assert 'Found on:' in html
+    assert 'Hulu' in html
+    assert 'data-action="found-on"' in html
 
 
 def test_search_page_shows_personal_list_tags(app, client, user):
     with app.app_context():
         _seed_title('show', 7, 'Listed Show', user)
+        db.session.add(MediaFoundOn(
+            user_id=user, media_type='show', trakt_id=7, service_label='Netflix',
+        ))
         db.session.commit()
 
     def fake_search(_user, media_type, query, *, limit=20):
@@ -95,11 +104,17 @@ def test_search_page_shows_personal_list_tags(app, client, user):
     html = resp.get_data(as_text=True)
     assert 'Listed Show' in html
     assert 'TV Show Favs' in html
+    assert 'Found on:' in html
+    assert 'Netflix' in html
+    assert 'data-action="found-on"' in html
 
 
 def test_recommendations_page_shows_personal_list_tags(app, client, user):
     with app.app_context():
         _seed_title('movie', 9, 'Listed Rec', user)
+        db.session.add(MediaFoundOn(
+            user_id=user, media_type='movie', trakt_id=9, service_label='Max',
+        ))
         db.session.commit()
 
     login_client(client, app, user)
@@ -117,3 +132,6 @@ def test_recommendations_page_shows_personal_list_tags(app, client, user):
     html = resp.get_data(as_text=True)
     assert 'Listed Rec' in html
     assert 'TV Show Favs' in html
+    assert 'Found on:' in html
+    assert 'Max' in html
+    assert 'data-action="found-on"' in html

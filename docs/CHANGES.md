@@ -1,5 +1,14 @@
 # Changes log
 
+## 2026-08-28 — Streaming alerts stopped bouncing unread
+
+- Netflix vs **Netflix Standard with Ads** (and similar leftover keys) no longer marks the same Now streaming / Season on stream card unread every night
+
+## 2026-08-28 — Found on on Search, Latest, and Recs
+
+- Search, Latest, and Recommended cards show **Found on** chips and **Found on…** (same as My)
+- Android **Found on…** picker has a **Search** link per service, same as the website (opens that site for the title without saving first)
+
 ## 2026-08-27 — Hide genres and quieter alerts
 
 - Preferences **Hide these genres** is a blocklist: those titles never appear on Latest or Recommended, and they never alert — even when they also match a liked genre, keyword, or favorite actor. Hide wins if a genre is in both lists

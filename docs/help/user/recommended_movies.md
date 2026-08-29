@@ -28,6 +28,7 @@ The recommendation list is cached locally for the admin **Trakt read cache** TTL
 
 - **Purple** tags — which of your genres/keywords matched (same as Latest)  
 - **Plays on your services** — teal highlight for services you own that list the title (needs `TMDB_API_KEY`)  
+- **Found on** / **Found on…** — same local labels as My / Search; **Search** in the picker opens that service for the title  
 - **Set lists…** — multi-select Wishlist + your Trakt personal lists (hide unused lists under Preferences)  
 - **Rate…** / **Favorite** — same Trakt rating and favorites as on trakt.tv  
 - **Hide recommendation** — same as Trakt.tv “Not interested”; removes it from future Trakt recommendations  

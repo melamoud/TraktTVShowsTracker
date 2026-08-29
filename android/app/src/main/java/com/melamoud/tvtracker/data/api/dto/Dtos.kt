@@ -82,6 +82,7 @@ data class MediaItemDto(
     @SerializedName("other_providers") val otherProviders: List<String> = emptyList(),
     @SerializedName("found_on") val foundOn: List<String> = emptyList(),
     @SerializedName("found_on_links") val foundOnLinks: List<ServiceLinkDto> = emptyList(),
+    @SerializedName("found_on_choice_links") val foundOnChoiceLinks: List<ServiceLinkDto> = emptyList(),
     @SerializedName("my_provider_links") val myProviderLinks: List<ServiceLinkDto> = emptyList(),
     @SerializedName("other_provider_links") val otherProviderLinks: List<ServiceLinkDto> = emptyList(),
     val avail: AvailDto? = null,
@@ -345,6 +346,7 @@ data class FoundOnChoicesResponse(
     val success: Boolean,
     val message: String? = null,
     val choices: List<String> = emptyList(),
+    @SerializedName("choice_links") val choiceLinks: List<ServiceLinkDto> = emptyList(),
 )
 
 data class FeedbackResponse(

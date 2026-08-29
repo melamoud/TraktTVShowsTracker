@@ -1,6 +1,8 @@
 package com.melamoud.tvtracker.ui.components
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -18,8 +20,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import com.melamoud.tvtracker.data.api.dto.ListMembershipDto
+import com.melamoud.tvtracker.data.api.dto.ServiceLinkDto
 
 @Composable
 fun ConfirmDialog(
@@ -123,9 +128,14 @@ fun ListsDialog(
 fun FoundOnDialog(
     selected: List<String>,
     choices: List<String>,
+    choiceLinks: List<ServiceLinkDto> = emptyList(),
     onApply: (List<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
+    val uriHandler = LocalUriHandler.current
+    val linkByLabel = remember(choiceLinks) {
+        choiceLinks.associate { it.label.lowercase() to it.url }
+    }
     val chosen = selected.map { it.lowercase() }.toSet()
     var checked by remember {
         mutableStateOf(choices.filter { it.lowercase() in chosen }.toSet())
@@ -140,14 +150,34 @@ fun FoundOnDialog(
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 choices.forEach { name ->
-                    androidx.compose.foundation.layout.Row {
-                        Checkbox(
-                            checked = name in checked,
-                            onCheckedChange = { on ->
-                                checked = if (on) checked + name else checked - name
-                            },
-                        )
-                        Text(name, modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row(
+                            modifier = Modifier.weight(1f),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Checkbox(
+                                checked = name in checked,
+                                onCheckedChange = { on ->
+                                    checked = if (on) checked + name else checked - name
+                                },
+                            )
+                            Text(name)
+                        }
+                        val href = linkByLabel[name.lowercase()]
+                        if (!href.isNullOrBlank()) {
+                            TextButton(
+                                onClick = {
+                                    try {
+                                        uriHandler.openUri(href)
+                                    } catch (_: Exception) {
+                                    }
+                                },
+                            ) { Text("Search") }
+                        }
                     }
                 }
                 OutlinedTextField(

@@ -140,6 +140,10 @@ def test_catalog_detail_json(app, client, user):
     assert data['success'] is True
     assert data['item']['title'] == 'The Bear'
     assert data['item']['found_on'] == ['Hulu']
+    choice_links = data['item'].get('found_on_choice_links') or []
+    assert choice_links
+    hulu_choice = next((row for row in choice_links if row['label'] == 'Hulu'), None)
+    assert hulu_choice and 'hulu.com' in (hulu_choice.get('url') or '')
     assert data['homepage'] == 'https://fx.com/the-bear'
     assert data['imdb_url'] == 'https://www.imdb.com/title/tt14452776/'
     assert 'trakt.tv/shows/the-bear' in data['trakt_url']
@@ -207,6 +211,21 @@ def test_found_on_choices_v1(app, client, user):
     assert data['success'] is True
     assert isinstance(data['choices'], list)
     assert data['choices']
+    assert isinstance(data.get('choice_links'), list)
+    assert data['choice_links']
+    netflix = next((row for row in data['choice_links'] if row['label'] == 'Netflix'), None)
+    assert netflix is not None
+    assert netflix.get('url')
+
+    titled = client.get('/api/v1/found-on/choices?title=Silo&year=2023')
+    assert titled.status_code == 200
+    silo = next(
+        (row for row in titled.get_json()['choice_links'] if row['label'] == 'Netflix'),
+        None,
+    )
+    assert silo is not None
+    assert 'Silo' in (silo.get('url') or '')
+    assert '2023' in (silo.get('url') or '')
 
 
 def test_search_json_year_and_genre_filter(app, client, user):
@@ -247,6 +266,9 @@ def test_search_json_year_and_genre_filter(app, client, user):
     ids = [item['trakt_id'] for item in data['items']]
     assert 23 in ids
     assert 21 not in ids
+    drama = next(item for item in data['items'] if item['trakt_id'] == 23)
+    assert 'found_on' in drama
+    assert drama.get('found_on_choice_links')
 
 
 def test_widget_requires_login(client):

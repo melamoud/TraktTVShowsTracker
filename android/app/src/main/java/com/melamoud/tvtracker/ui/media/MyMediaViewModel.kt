@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.melamoud.tvtracker.data.api.dto.FilterListDto
 import com.melamoud.tvtracker.data.api.dto.ListMembershipDto
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
+import com.melamoud.tvtracker.data.api.dto.ServiceLinkDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,7 @@ data class ListsDialogState(
 data class FoundOnDialogState(
     val item: MediaItemDto,
     val choices: List<String>,
+    val choiceLinks: List<ServiceLinkDto> = emptyList(),
 )
 
 class MyMediaViewModel(
@@ -176,15 +178,20 @@ class MyMediaViewModel(
 
     fun openFoundOn(item: MediaItemDto) {
         val cached = _state.value.foundOnChoices
-        if (cached.isNotEmpty()) {
-            _state.value = _state.value.copy(foundOnDialog = FoundOnDialogState(item, cached))
+        val links = item.foundOnChoiceLinks
+        if (cached.isNotEmpty() && links.isNotEmpty()) {
+            _state.value = _state.value.copy(foundOnDialog = FoundOnDialogState(item, cached, links))
             return
         }
         viewModelScope.launch {
-            repo.foundOnChoices().onSuccess {
+            repo.foundOnChoices(item.title, item.year).onSuccess {
                 _state.value = _state.value.copy(
-                    foundOnChoices = it.choices,
-                    foundOnDialog = FoundOnDialogState(item, it.choices),
+                    foundOnChoices = it.choices.ifEmpty { cached },
+                    foundOnDialog = FoundOnDialogState(
+                        item,
+                        it.choices.ifEmpty { cached },
+                        it.choiceLinks.ifEmpty { links },
+                    ),
                 )
             }
         }

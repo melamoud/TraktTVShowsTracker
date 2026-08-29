@@ -203,6 +203,7 @@ fun DetailScreen(
         FoundOnDialog(
             selected = item.foundOn,
             choices = detail.foundOnChoices,
+            choiceLinks = item.foundOnChoiceLinks,
             onApply = viewModel::applyFoundOn,
             onDismiss = viewModel::dismissFoundOn,
         )

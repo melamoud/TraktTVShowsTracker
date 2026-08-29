@@ -7,8 +7,8 @@ Use **Search** in the top navigation to find movies and shows in Trakt’s datab
 1. Type a **title** (at least **2 characters**) in the top box
 2. Open **More filters** for **Actor** (name or favorite), **Year**, and **Genres** — Actor sits on the same row as Year
 3. Use the **Movies** / **Shows** pills (both on by default) — tap one to search that type only; tap again via the other pill to restore both
-4. Results use the same card layout as Latest: overview, genres, streaming lines, preference tags, watchlist/watched status
-5. **Set lists…** / **Mark watched** / **Rate…** / **Favorite** work the same as elsewhere; shows also link to **Progress**. Open a result for the **title page**; **← Back** there returns to this Search (browser **Back** does too).
+4. Results use the same card layout as Latest: overview, genres, streaming lines, **Found on**, preference tags, watchlist/watched status
+5. **Set lists…** / **Mark watched** / **Rate…** / **Favorite** / **Found on…** work the same as elsewhere; shows also link to **Progress**. Open a result for the **title page**; **← Back** there returns to this Search (browser **Back** does too).
 
 Exact title matches are listed before broader fuzzy hits. Actor search uses that person’s Trakt **cast** filmography (newest first; crew credits are skipped). Title + actor together keeps only that actor’s titles whose name matches the title box.
 

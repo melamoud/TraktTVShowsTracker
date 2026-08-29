@@ -153,8 +153,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
         runCatching { api.catalogDetail(mediaType, traktId) }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
-    suspend fun foundOnChoices(): Result<FoundOnChoicesResponse> =
-        runCatching { api.foundOnChoices() }
+    suspend fun foundOnChoices(title: String? = null, year: Int? = null): Result<FoundOnChoicesResponse> =
+        runCatching { api.foundOnChoices(title, year) }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
     suspend fun foundOn(mediaType: String, traktId: Int, labels: List<String>): Result<FoundOnResponse> =

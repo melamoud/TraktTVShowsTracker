@@ -13,7 +13,7 @@ Shown on **Latest** tiles (and detail pages) as **Streaming:**.
 
 ## Found on (your choice)
 
-Used on **My movies / My shows** (and detail).
+Used on **My movies / My shows**, **Search**, **Latest**, **Recommended**, and title pages.
 
 - Local only — never written to Trakt
 - Click **Found on…** (website cards, Android ⋮ menu, or the title page) and select **one or more** services (including your custom ones)

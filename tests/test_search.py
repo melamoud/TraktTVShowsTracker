@@ -70,6 +70,7 @@ def test_search_year_and_genre_filter_trakt_hits(app, client, user):
     assert 'data-trakt-id="23"' in html
     assert 'data-trakt-id="21"' not in html
     assert 'data-trakt-id="22"' not in html
+    assert 'data-action="found-on"' in html
 
 
 def test_search_remembers_year_and_genres(app, client, user):

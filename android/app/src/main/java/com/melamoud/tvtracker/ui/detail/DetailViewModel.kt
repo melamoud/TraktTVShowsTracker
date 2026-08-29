@@ -109,7 +109,28 @@ class DetailViewModel(
         }
     }
 
-    fun openFoundOn() { _state.value = _state.value.copy(foundOnOpen = true) }
+    fun openFoundOn() {
+        val current = item
+        if (current == null) return
+        if (current.foundOnChoiceLinks.isNotEmpty()) {
+            _state.value = _state.value.copy(foundOnOpen = true)
+            return
+        }
+        viewModelScope.launch {
+            repo.foundOnChoices(current.title, current.year).onSuccess { resp ->
+                val detail = _state.value.detail
+                val media = detail?.item
+                _state.value = _state.value.copy(
+                    foundOnOpen = true,
+                    detail = if (detail != null && media != null && resp.choiceLinks.isNotEmpty()) {
+                        detail.copy(item = media.copy(foundOnChoiceLinks = resp.choiceLinks))
+                    } else {
+                        detail
+                    },
+                )
+            }
+        }
+    }
     fun dismissFoundOn() { _state.value = _state.value.copy(foundOnOpen = false) }
     fun applyFoundOn(labels: List<String>) {
         _state.value = _state.value.copy(foundOnOpen = false)

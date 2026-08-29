@@ -197,6 +197,7 @@ fun MyMediaScreen(
         FoundOnDialog(
             selected = dialog.item.foundOn,
             choices = dialog.choices,
+            choiceLinks = dialog.choiceLinks.ifEmpty { dialog.item.foundOnChoiceLinks },
             onApply = viewModel::applyFoundOn,
             onDismiss = viewModel::dismissFoundOn,
         )

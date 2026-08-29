@@ -291,6 +291,11 @@ def test_normalize_streaming_provider_key_collapses_channels():
     assert normalize_streaming_provider_key('Starz Apple TV channel') == 'starz'
     assert normalize_streaming_provider_key('HBO Max Amazon Channel') == 'max'
     assert normalize_streaming_provider_key('Netflix') == 'netflix'
+    assert normalize_streaming_provider_key('Netflix Standard with Ads') == 'netflix'
+    assert normalize_streaming_provider_key('netflix standard') == 'netflix'
+    assert normalize_streaming_provider_key(
+        normalize_streaming_provider_key('Netflix Standard with Ads')
+    ) == 'netflix'
 
 
 def test_streaming_channel_rename_does_not_realert(app, user):
@@ -339,6 +344,79 @@ def test_streaming_channel_rename_does_not_realert(app, user):
         assert Notification.query.filter_by(
             user_id=user, alert_type=ALERT_NEW_STREAMING,
         ).count() == 0
+
+
+def test_netflix_ads_tier_does_not_unread_existing_card(app, user):
+    """Leftover ``netflix standard`` keys must not bump a read Netflix card."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=159815, title='Outer Banks', tmdb_id=100757,
+        ))
+        _watchlist(user, 'show', 159815)
+        for payload in (
+            'baseline:streaming',
+            'provider:netflix',
+            'provider:netflix standard',
+        ):
+            db.session.add(AlertEvent(
+                user_id=user, alert_type=ALERT_NEW_STREAMING, media_type='show',
+                trakt_id=159815, payload_key=payload,
+            ))
+        db.session.add(Notification(
+            user_id=user, alert_type=ALERT_NEW_STREAMING,
+            title='Now streaming: Outer Banks',
+            message='Netflix Standard with Ads',
+            media_type='show', trakt_id=159815, payload_key='providers',
+            is_read=True,
+        ))
+        db.session.add(AlertEvent(
+            user_id=user, alert_type=ALERT_SEASON_STREAMING, media_type='show',
+            trakt_id=159815, payload_key='baseline:seasonstream:5',
+        ))
+        for payload in (
+            'seasonstream:5:provider:netflix',
+            'seasonstream:5:provider:netflix standard',
+        ):
+            db.session.add(AlertEvent(
+                user_id=user, alert_type=ALERT_SEASON_STREAMING, media_type='show',
+                trakt_id=159815, payload_key=payload,
+            ))
+        db.session.add(Notification(
+            user_id=user, alert_type=ALERT_SEASON_STREAMING,
+            title='Season 5 on stream: Outer Banks',
+            message='Netflix Standard with Ads · 2026-08-26',
+            media_type='show', trakt_id=159815, payload_key='seasonstream:5',
+            is_read=True,
+        ))
+        db.session.add(UserCalendarEvent(
+            user_id=user, media_type='show', trakt_id=159815,
+            event_date=date.today() - timedelta(days=40),
+            season_number=5, episode_number=1,
+        ))
+        db.session.commit()
+
+        both = [
+            {'provider_name': 'Netflix', 'tmdb_provider_id': 8, 'offer_type': 'flatrate'},
+            {
+                'provider_name': 'Netflix Standard with Ads',
+                'tmdb_provider_id': 1796,
+                'offer_type': 'flatrate',
+            },
+        ]
+        with patch('services.alerts.tmdb_configured', return_value=True), patch(
+            'services.sync_jobs.tmdb_configured', return_value=True
+        ), patch('services.sync_jobs.get_watch_providers', return_value=both), patch(
+            'services.tmdb_client.get_season_watch_providers', return_value=both,
+        ), patch('services.alerts.ensure_user_calendar_fresh', return_value=True):
+            assert run_media_alerts(app) == 0
+
+        notes = Notification.query.filter(
+            Notification.user_id == user,
+            Notification.trakt_id == 159815,
+            Notification.alert_type.in_((ALERT_NEW_STREAMING, ALERT_SEASON_STREAMING)),
+        ).all()
+        assert notes
+        assert all(n.is_read for n in notes)
 
 
 def test_season_streaming_alerts_recent_season(app, user):

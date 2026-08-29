@@ -14,6 +14,7 @@ from flask_wtf.csrf import generate_csrf
 
 from models import MobileLoginToken, Notification, User, UserSession, db
 from services.mobile_payloads import (
+    found_on_choice_links,
     found_on_service_choices,
     serialize_alert_card,
     serialize_alert_entry,
@@ -223,9 +224,19 @@ def api_widget():
 @mobile_api_bp.route('/found-on/choices', methods=['GET'])
 @login_required
 def api_found_on_choices():
+    title = (request.args.get('title') or '').strip() or None
+    year = None
+    try:
+        raw_year = (request.args.get('year') or '').strip()
+        if raw_year:
+            year = int(raw_year)
+    except (TypeError, ValueError):
+        year = None
+    choices = found_on_service_choices(current_user)
     return jsonify({
         'success': True,
-        'choices': found_on_service_choices(current_user),
+        'choices': choices,
+        'choice_links': found_on_choice_links(title, year, choices),
     })
 
 

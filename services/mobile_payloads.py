@@ -124,6 +124,7 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
         'other_providers': other_providers,
         'found_on': found_on,
         'found_on_links': service_link_entries(found_on, title, year),
+        'found_on_choice_links': found_on_choice_links(title, year),
         'my_provider_links': service_link_entries(my_providers, title, year),
         'other_provider_links': service_link_entries(other_providers, title, year),
         'avail': {
@@ -160,6 +161,9 @@ def found_on_service_choices(user) -> list[str]:
 
     from models import StreamingService, UserStreamingService
 
+    if user is None:
+        return []
+
     owned = (
         UserStreamingService.query
         .options(joinedload(UserStreamingService.service))
@@ -175,6 +179,29 @@ def found_on_service_choices(user) -> list[str]:
             out.append(svc.name)
             seen.add(svc.name.lower())
     return out
+
+
+def _request_found_on_choices() -> list[str]:
+    """Service names for the Found on picker, cached on the request."""
+    try:
+        from flask import g, has_app_context
+        from flask_login import current_user
+        if has_app_context():
+            cached = getattr(g, '_found_on_choices', None)
+            if cached is None:
+                user = current_user if getattr(current_user, 'is_authenticated', False) else None
+                cached = found_on_service_choices(user)
+                g._found_on_choices = cached
+            return cached
+    except Exception:
+        pass
+    return []
+
+
+def found_on_choice_links(title=None, year=None, choices=None) -> list[dict]:
+    """[{label, url}] Search/open links for every Found on picker row."""
+    labels = choices if choices is not None else _request_found_on_choices()
+    return service_link_entries(labels, title, year)
 
 
 def serialize_media_detail(row: dict, media_type: str, cast: list, choices: list[str]) -> dict:

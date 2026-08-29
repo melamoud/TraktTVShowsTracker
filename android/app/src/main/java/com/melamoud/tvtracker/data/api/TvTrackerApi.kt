@@ -163,7 +163,10 @@ interface TvTrackerApi {
     ): MediaDetailResponse
 
     @GET("/api/v1/found-on/choices")
-    suspend fun foundOnChoices(): FoundOnChoicesResponse
+    suspend fun foundOnChoices(
+        @Query("title") title: String? = null,
+        @Query("year") year: Int? = null,
+    ): FoundOnChoicesResponse
 
     @POST("/api/v1/found-on/{mediaType}/{traktId}")
     suspend fun foundOn(

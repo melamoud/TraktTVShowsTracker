@@ -219,10 +219,14 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
             {% else %}
               <span class="muted">Add TMDB_API_KEY in .env to show where it’s streaming</span>
             {% endif %}
-          {% else %}
-            <span class="muted">Only listed on your services above</span>
-          {% endif %}
-        </div>
+            {% else %}
+              <span class="muted">Only listed on your services above</span>
+            {% endif %}
+          </div>
+        {% set found_on = row.found_on %}
+        {% set title = m.title %}
+        {% set year = m.year %}
+        {% include '_found_on_tags.html' %}
         {% if row.match.reasons %}
           <div class="meta">Match: {{ row.match.reasons|join(' · ') }}</div>
         {% endif %}
@@ -239,6 +243,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% else %}
             <button class="btn btn-small" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Mark watched</button>
           {% endif %}
+          {% set providers = row.providers %}
+          {% include '_found_on_button.html' %}
           <button class="btn btn-small btn-warn" type="button"
                   data-action="review-marker"
                   data-media-type="{{ media_type }}"

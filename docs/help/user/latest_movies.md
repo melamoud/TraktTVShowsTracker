@@ -55,7 +55,7 @@ Trakt’s `/updates` API **cannot** filter by genre/keyword server-side. Matches
 
 Filter and page-size choices are remembered for your account when you leave and return.
 
-Collection alerts (release day, new streaming, episodes) are automatic for Wishlist / list titles — see [Alerts](release_alerts). “Found on” is **not** on Latest — assign that on My movies/shows.
+Collection alerts (release day, new streaming, episodes) are automatic for Wishlist / list titles — see [Alerts](release_alerts). **Found on** chips and **Found on…** work here the same as on My / Search (local labels; Search in the picker opens the service for that title).
 
 ## Sync window
 

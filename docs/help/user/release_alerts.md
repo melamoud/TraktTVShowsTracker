@@ -9,7 +9,7 @@ This is separate from **Streaming vs Found on** (where a title plays / where you
 | Alert | Meaning |
 |-------|---------|
 | **Movie release date** | A listed movie’s release day arrives |
-| **Added to a streaming service** | A **new** service brand starts carrying that listed title. Multiple brands share **one** alert card listing every vendor. Marking it read, then a later new vendor, makes that same card unread again. Channel/tier renames like “Paramount Plus Apple TV channel” after Premium do **not** re-alert |
+| **Added to a streaming service** | A **new** service brand starts carrying that listed title. Multiple brands share **one** alert card listing every vendor. Marking it read, then a later new vendor, makes that same card unread again. Channel/tier renames like “Paramount Plus Apple TV channel” after Premium, or “Netflix Standard with Ads” after Netflix, do **not** re-alert |
 | **New season on a streaming service** | A season of a listed show shows up on TMDB streaming (or gains a new vendor) — e.g. Fauda S5 appearing on Netflix. Separate Preferences toggle. One card per season, vendors listed together. The card shows the date we first saw it on a service (or when a new vendor appeared), so old ones are easy to mark read. Does **not** fire if you already watched that season (or a later one) |
 | **New episode or season** | An episode aired; if a full season drops the same day, one season alert instead. A show premiere is announced by its S01E01 episode alert — there is no separate show “release” alert |
 | **Added to a list** | You add a movie or show to Wishlist or a personal list in this app (Set lists or Wishlist). Immediate — not the 4-hour schedule. Uncheck this type in Preferences to opt out |
