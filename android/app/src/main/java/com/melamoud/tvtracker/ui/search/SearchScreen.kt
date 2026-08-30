@@ -1,9 +1,11 @@
 package com.melamoud.tvtracker.ui.search
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,13 +23,16 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -42,6 +47,7 @@ import com.melamoud.tvtracker.ui.components.FilterMenuButton
 import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
+import com.melamoud.tvtracker.ui.components.MoreFiltersButton
 import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
@@ -69,9 +75,7 @@ fun SearchScreen(
         "show" -> "Shows"
         else -> "Type"
     }
-    val filterCount = listOf(state.hideWatched, state.hideLists).count { it } +
-        (if (state.year.isNotBlank()) 1 else 0) + state.genres.size
-    val filtersLabel = if (filterCount == 0) "Filters" else "Filters ($filterCount)"
+    val advancedCount = (if (state.year.isNotBlank()) 1 else 0) + state.genres.size
     ReloadOnResume(viewModel::reloadFromServer)
 
     Column(Modifier.fillMaxSize()) {
@@ -159,31 +163,20 @@ fun SearchScreen(
                     )
                 }
             }
-            FilterMenuButton(filtersLabel) { _ ->
-                CheckMenuItem("Not watched", state.hideWatched) { viewModel.setHideWatched(!state.hideWatched) }
-                CheckMenuItem("Not in lists", state.hideLists) { viewModel.setHideLists(!state.hideLists) }
-                OutlinedTextField(
-                    value = state.year,
-                    onValueChange = viewModel::setYear,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
-                    label = { Text("Year or range") },
-                    placeholder = { Text("2018 or 2015-2020") },
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                    keyboardActions = KeyboardActions(onDone = { viewModel.applyYear() }),
-                )
-                state.genreChoices.forEach { label ->
-                    CheckMenuItem(label.replaceFirstChar { it.uppercase() }, label in state.genres) {
-                        viewModel.toggleGenre(label)
-                    }
-                }
+            FilterChip(
+                selected = state.hideWatched,
+                onClick = { viewModel.setHideWatched(!state.hideWatched) },
+                label = { Text("Not watched") },
+            )
+            FilterChip(
+                selected = state.hideLists,
+                onClick = { viewModel.setHideLists(!state.hideLists) },
+                label = { Text("Not in lists") },
+            )
+            MoreFiltersButton(advancedCount) {
+                YearSection(state.year) { viewModel.setYear(it) }
+                GenreSection(state.genres, state.genreChoices) { viewModel.toggleGenre(it) }
             }
-            OutlinedButton(
-                onClick = viewModel::refreshFromTrakt,
-                enabled = !state.loading && canSearch(state),
-            ) { Text("Refresh Trakt") }
         }
         Text(
             "${state.total} results · page ${state.page}/${state.pages}",
@@ -272,5 +265,53 @@ fun SearchScreen(
     }
 }
 
-private fun canSearch(state: SearchUiState): Boolean =
-    state.query.trim().length >= 2 || state.actorId != null
+@Composable
+private fun YearSection(
+    value: String,
+    onChange: (String) -> Unit,
+) {
+    var text by remember(value) { mutableStateOf(value) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Year", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            label = { Text("Year or range") },
+            placeholder = { Text("2018 or 2015-2020") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onChange(text) }),
+        )
+        TextButton(onClick = { onChange(text) }, modifier = Modifier.align(Alignment.End)) { Text("Apply") }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GenreSection(
+    selected: Set<String>,
+    choices: List<String>,
+    onToggle: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Genres", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+        if (choices.isEmpty()) {
+            Text("No genres available", color = TextMuted)
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                choices.forEach { genre ->
+                    val active = selected.contains(genre)
+                    FilterChip(
+                        selected = active,
+                        onClick = { onToggle(genre) },
+                        label = { Text(genre.replaceFirstChar { it.uppercase() }) },
+                    )
+                }
+            }
+        }
+    }
+}

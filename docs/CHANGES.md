@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-08-30 — Compact filter toolbars with a "More filters" sheet
+
+- Android list screens (My, Latest, Recommended, Search) now keep the most-used filters on the main row and move year, genres, per-page, and refresh options into a **More** bottom sheet with an active-filter badge
+- Updated [Android help](help/user/android.md) to describe the new filter bar layout
+
 ## 2026-08-30 — Android app reaches full web parity
 
 - Latest Movies/Shows, Recommended Movies/Shows, and full Preferences are now in the Android app, with the same filters, review markers, list management, and external links as the website

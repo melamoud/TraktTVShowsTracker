@@ -15,6 +15,10 @@ The TV Tracker Android app connects to the same server as the website (`tvtracke
 - **Admin** (admin users only) — dashboard stats, release-check trigger, user management, streaming-service defaults, pending service suggestions, and scheduler editing (intervals, enabled toggles, timezone). Matches the web admin screen.
 - **Home-screen widget** — long-press the home screen → Widgets → **TV Tracker**. Resize it for more rows and width. The header shows the app icon and **TV Tracker ·** mode; the swap button cycles **Shows Progress** / **Movies** / **Alerts**. The list scrolls. Tap a title or poster to open that show, movie, or alert in the app. The checkmark asks before marking the next episode (Shows) or the movie (Movies) watched. Refresh on the widget reloads from the server (same cache as the app).
 
+## Filter bars
+
+The filter toolbar on each list is compact: the most-used choices stay on the main row, and the rest are under a **More** button. The badge on **More** shows how many extra filters are active. Tapping it opens a bottom sheet with year range, genre chips, per-page size, and the **Refresh Trakt** action. Each screen puts the choices you use most often in the main row.
+
 ## Refresh
 
 Pull down on any list, or tap the refresh icon. That reloads from the TV Tracker server (the same cache the website uses). A **Refresh Trakt** option on My pages, Recommended, and Progress forces a fresh Trakt pull for that data. Lists also reload when you return to them (including after Progress).

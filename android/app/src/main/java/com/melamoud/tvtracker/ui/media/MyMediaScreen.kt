@@ -6,6 +6,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
@@ -33,6 +35,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -64,6 +67,7 @@ import com.melamoud.tvtracker.ui.components.FilterMenuButton
 import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
+import com.melamoud.tvtracker.ui.components.MoreFiltersButton
 import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
@@ -96,7 +100,6 @@ fun MyMediaScreen(
         "monthly" -> "Monthly"
         else -> "List"
     }
-    val perPageLabel = "${state.perPage}/pg"
     val listsSelected = state.filterLists.count { it.selected }
     val listsLabel = if (listsSelected == 0) "Lists" else "Lists ($listsSelected)"
     ReloadOnResume(viewModel::reload)
@@ -117,6 +120,9 @@ fun MyMediaScreen(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { viewModel.applyQuery() }),
         )
+        val advancedCount = (if (state.perPage != 50) 1 else 0) +
+            (if (state.year.isNotBlank()) 1 else 0) +
+            state.genres.size
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -161,17 +167,17 @@ fun MyMediaScreen(
                     }
                 }
             }
-            FilterMenuButton(perPageLabel) { dismiss ->
-                listOf(10, 50, 100).forEach { n ->
-                    CheckMenuItem("$n / page", state.perPage == n) {
-                        viewModel.setPerPage(n)
-                        dismiss()
+            MoreFiltersButton(advancedCount) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    PerPageSection(state.perPage) { viewModel.setPerPage(it) }
+                    YearSection(state.year) { viewModel.setYear(it) }
+                    GenreSection(state.genres, state.genreChoices) { viewModel.toggleGenre(it) }
+                    TextButton(onClick = viewModel::refreshFromTrakt) {
+                        Icon(Icons.Default.Refresh, contentDescription = null)
+                        Text("Refresh Trakt", modifier = Modifier.padding(start = 8.dp))
                     }
                 }
             }
-            YearFilterField(state.year) { viewModel.setYear(it) }
-            GenreFilterButton(state.genres, state.genreChoices) { viewModel.toggleGenre(it) }
-            OutlinedButton(onClick = viewModel::refreshFromTrakt) { Text("Refresh Trakt", style = MaterialTheme.typography.labelSmall) }
         }
         if (displayMode in setOf("daily", "weekly", "monthly")) {
             CalendarHeader(state, viewModel)
@@ -484,34 +490,69 @@ private fun DayEventsDialog(
 }
 
 @Composable
-private fun YearFilterField(value: String, onChange: (String) -> Unit) {
-    var text by remember(value) { mutableStateOf(value) }
-    OutlinedTextField(
-        value = text,
-        onValueChange = { text = it },
-        label = { Text("Year", style = MaterialTheme.typography.labelSmall) },
-        singleLine = true,
-        modifier = Modifier.width(90.dp),
-        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-        keyboardActions = KeyboardActions(onDone = { onChange(text) }),
-    )
+private fun PerPageSection(
+    value: Int,
+    onChange: (Int) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Per page", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(10, 50, 100).forEach { size ->
+                FilterChip(
+                    selected = value == size,
+                    onClick = { onChange(size) },
+                    label = { Text(size.toString()) },
+                )
+            }
+        }
+    }
 }
 
 @Composable
-private fun GenreFilterButton(
+private fun YearSection(
+    value: String,
+    onChange: (String) -> Unit,
+) {
+    var text by remember(value) { mutableStateOf(value) }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Year", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+        OutlinedTextField(
+            value = text,
+            onValueChange = { text = it },
+            label = { Text("Year or range") },
+            placeholder = { Text("2018 or 2015-2020") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onChange(text) }),
+        )
+        TextButton(onClick = { onChange(text) }, modifier = Modifier.align(Alignment.End)) { Text("Apply") }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun GenreSection(
     selected: List<String>,
     choices: List<String>,
     onToggle: (String) -> Unit,
 ) {
-    val label = if (selected.isEmpty()) "Genres" else "Genres (${selected.size})"
-    FilterMenuButton(label) { dismiss ->
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Genres", style = MaterialTheme.typography.labelMedium, color = TextMuted)
         if (choices.isEmpty()) {
-            DropdownMenuItem(text = { Text("No genres") }, onClick = dismiss)
+            Text("No genres available", color = TextMuted)
         } else {
-            choices.forEach { genre ->
-                CheckMenuItem(genre, selected.contains(genre)) {
-                    onToggle(genre)
-                    dismiss()
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                choices.forEach { genre ->
+                    val active = selected.contains(genre)
+                    FilterChip(
+                        selected = active,
+                        onClick = { onToggle(genre) },
+                        label = { Text(genre.replaceFirstChar { it.uppercase() }) },
+                    )
                 }
             }
         }
