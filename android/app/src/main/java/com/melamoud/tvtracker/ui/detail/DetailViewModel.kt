@@ -90,6 +90,13 @@ class DetailViewModel(
         }
     }
 
+    fun hideRecommendation() {
+        viewModelScope.launch {
+            repo.hideRecommendation(mediaType, traktId)
+            reload()
+        }
+    }
+
     fun openLists() {
         viewModelScope.launch {
             repo.listsGet(mediaType, traktId).onSuccess {

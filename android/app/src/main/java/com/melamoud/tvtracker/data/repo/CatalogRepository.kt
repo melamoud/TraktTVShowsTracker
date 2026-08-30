@@ -70,6 +70,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
         persistGenres: Boolean = false,
         actor: Int? = null,
         actorQ: String? = null,
+        refresh: Boolean = false,
     ): Result<SearchResponse> = runCatching {
         api.search(
             query = query,
@@ -82,6 +83,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
             genresSet = if (persistGenres) 1 else null,
             actor = actor,
             actorQ = actorQ,
+            refresh = if (refresh) 1 else null,
         )
     }.recoverCatching { e ->
         throw IllegalStateException(AuthLog.userMessage(e), e)

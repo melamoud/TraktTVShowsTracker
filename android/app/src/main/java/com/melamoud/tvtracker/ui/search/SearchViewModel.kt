@@ -129,7 +129,20 @@ class SearchViewModel(
         return s.query.trim().length >= 2 || s.actorId != null
     }
 
-    private suspend fun load(s: SearchUiState) {
+    fun setPage(page: Int) {
+        _state.value = _state.value.copy(page = page)
+        search()
+    }
+
+    fun refreshFromTrakt() {
+        viewModelScope.launch {
+            val s = _state.value
+            _state.value = s.copy(loading = true, error = null)
+            load(s.copy(page = 1), refresh = true)
+        }
+    }
+
+    private suspend fun load(s: SearchUiState, refresh: Boolean = false) {
         val result = repo.search(
             query = s.query.trim(),
             type = s.type,
@@ -141,6 +154,7 @@ class SearchViewModel(
             persistGenres = persistGenres,
             actor = s.actorId,
             actorQ = s.actorName.takeIf { it.isNotBlank() },
+            refresh = refresh,
         )
         _state.value = result.fold(
             onSuccess = {

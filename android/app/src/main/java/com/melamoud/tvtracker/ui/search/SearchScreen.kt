@@ -21,8 +21,10 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -141,7 +143,16 @@ fun SearchScreen(
                     }
                 }
             }
+            OutlinedButton(
+                onClick = viewModel::refreshFromTrakt,
+                enabled = !state.loading && canSearch(state),
+            ) { Text("Refresh Trakt") }
         }
+        Text(
+            "${state.total} results · page ${state.page}/${state.pages}",
+            color = TextMuted,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+        )
         ServerRefreshBox(
             isRefreshing = state.loading && state.items.isNotEmpty(),
             onRefresh = viewModel::reloadFromServer,
@@ -173,6 +184,20 @@ fun SearchScreen(
                                 item.mediaType?.let { onOpenDetail(it, item.traktId) }
                             },
                         )
+                    }
+                    if (state.pages > 1) {
+                        item {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                TextButton(
+                                    onClick = { viewModel.setPage(state.page - 1) },
+                                    enabled = state.page > 1,
+                                ) { Text("Previous") }
+                                TextButton(
+                                    onClick = { viewModel.setPage(state.page + 1) },
+                                    enabled = state.page < state.pages,
+                                ) { Text("Next") }
+                            }
+                        }
                     }
                 }
             }
@@ -209,3 +234,6 @@ fun SearchScreen(
         )
     }
 }
+
+private fun canSearch(state: SearchUiState): Boolean =
+    state.query.trim().length >= 2 || state.actorId != null

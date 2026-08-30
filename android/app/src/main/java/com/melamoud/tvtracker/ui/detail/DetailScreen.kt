@@ -126,6 +126,7 @@ fun DetailScreen(
                             onReview = viewModel::openReview,
                             onWatch = viewModel::confirmWatch,
                             onFoundOn = viewModel::openFoundOn,
+                            onHideRecommendation = viewModel::hideRecommendation,
                             onProgress = {
                                 if (item.mediaType == "show") onProgress(item.traktId)
                             },
@@ -313,6 +314,7 @@ private fun DetailActions(
     onReview: () -> Unit,
     onWatch: () -> Unit,
     onFoundOn: () -> Unit,
+    onHideRecommendation: () -> Unit,
     onProgress: () -> Unit,
     onOpenUrl: (String) -> Unit,
 ) {
@@ -326,6 +328,7 @@ private fun DetailActions(
         ActionBtn("Write review…", onClick = onReview)
         ActionBtn(if (item.watched) "Unwatch" else "Mark watched", onClick = onWatch)
         ActionBtn("Found on…", onClick = onFoundOn)
+        ActionBtn("Hide recommendation", onClick = onHideRecommendation)
         if (mediaType == "show") {
             ActionBtn("Series progress", primary = true, onClick = onProgress)
         }

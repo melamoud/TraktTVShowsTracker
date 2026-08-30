@@ -76,6 +76,7 @@ interface TvTrackerApi {
         @Query("genres_set") genresSet: Int? = null,
         @Query("actor") actor: Int? = null,
         @Query("actor_q") actorQ: String? = null,
+        @Query("refresh") refresh: Int? = null,
     ): SearchResponse
 
     @GET("/api/v1/shows/{traktId}/progress")
