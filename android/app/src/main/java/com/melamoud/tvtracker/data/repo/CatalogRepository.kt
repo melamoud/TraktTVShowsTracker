@@ -13,6 +13,8 @@ import com.melamoud.tvtracker.data.api.dto.LatestMediaResponse
 import com.melamoud.tvtracker.data.api.dto.ListsResponse
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
+import com.melamoud.tvtracker.data.api.dto.PreferencesResponse
+import com.melamoud.tvtracker.data.api.dto.PreferencesSaveRequest
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.api.dto.RecommendedMediaResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
@@ -21,6 +23,13 @@ import com.melamoud.tvtracker.data.api.dto.SyncCatalogResponse
 import com.melamoud.tvtracker.data.api.dto.WidgetResponse
 
 class CatalogRepository(private val api: TvTrackerApi) {
+    suspend fun preferences(): Result<PreferencesResponse> =
+        runCatching { api.preferences() }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun savePreferences(body: PreferencesSaveRequest): Result<SimpleResponse> =
+        runCatching { api.savePreferences(body) }
+
     suspend fun myMedia(
         kind: String,
         filter: String? = null,

@@ -14,7 +14,9 @@
     <string name="latest_shows">Latest Shows</string>
     <string name="recommended_movies">Recommended Movies</string>
     <string name="recommended_shows">Recommended Shows</string>
+    <string name="preferences">Preferences</string>
     <string name="more">More</string>
+    <string name="save">Save</string>
     <string name="sync_catalog">Sync catalog</string>
     <string name="mark_reviewed">Mark reviewed</string>
     <string name="review_marker_clear">Clear marker</string>

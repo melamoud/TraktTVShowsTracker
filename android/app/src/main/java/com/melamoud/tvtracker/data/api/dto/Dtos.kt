@@ -157,6 +157,40 @@ data class SyncCatalogResponse(
     val count: Int? = null,
 )
 
+data class StreamingServiceDto(
+    val id: Int,
+    val name: String,
+    val selected: Boolean = false,
+)
+
+data class CustomServiceDto(
+    val id: Int = 0,
+    val name: String,
+    val url: String? = null,
+    @SerializedName("search_template") val searchTemplate: String? = null,
+    val note: String? = null,
+)
+
+data class PreferencesResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val defaults: List<StreamingServiceDto> = emptyList(),
+    val customs: List<CustomServiceDto> = emptyList(),
+    @SerializedName("common_genres") val commonGenres: List<String> = emptyList(),
+    val genres: List<String> = emptyList(),
+    val keywords: List<String> = emptyList(),
+    @SerializedName("excluded_genres") val excludedGenres: List<String> = emptyList(),
+)
+
+data class PreferencesSaveRequest(
+    @SerializedName("service_ids") val serviceIds: List<Int> = emptyList(),
+    @SerializedName("remove_custom_ids") val removeCustomIds: List<Int> = emptyList(),
+    @SerializedName("custom_services") val customServices: List<CustomServiceDto> = emptyList(),
+    val genres: List<String> = emptyList(),
+    val keywords: List<String> = emptyList(),
+    @SerializedName("excluded_genres") val excludedGenres: List<String> = emptyList(),
+)
+
 data class CategoryDto(
     val slug: String,
     val label: String,

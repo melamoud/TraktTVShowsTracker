@@ -12,7 +12,10 @@ from flask import Blueprint, current_app, jsonify, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 from flask_wtf.csrf import generate_csrf
 
-from models import MobileLoginToken, Notification, User, UserSession, db
+from models import (
+    MobileLoginToken, Notification, StreamingService, User, UserPreference,
+    UserSession, UserStreamingService, db,
+)
 from services.mobile_payloads import (
     found_on_choice_links,
     found_on_service_choices,
@@ -21,6 +24,12 @@ from services.mobile_payloads import (
     serialize_media_detail,
     serialize_media_item,
     serialize_progress,
+)
+from services.seed import COMMON_GENRES
+from services.streaming_matcher import (
+    get_user_excluded_genres,
+    get_user_genres_keywords,
+    serialize_prefs,
 )
 
 mobile_api_bp = Blueprint('mobile_api', __name__, url_prefix='/api/v1')
@@ -491,6 +500,141 @@ def api_recommendations(media_type):
         'filter_genres': ctx.get('filter_genres') or [],
         'year': ctx.get('year') or '',
     })
+
+
+@mobile_api_bp.route('/preferences', methods=['GET'])
+@login_required
+def api_preferences():
+    """Return the current user's minimal preferences for the Android client."""
+    prefs = current_user.preferences
+    defaults = StreamingService.query.filter_by(is_default=True).order_by(StreamingService.name).all()
+    owned = UserStreamingService.query.filter_by(user_id=current_user.id).all()
+    selected = {
+        row.streaming_service_id
+        for row in owned
+        if not row.is_custom and row.streaming_service_id
+    }
+    customs = [
+        {
+            'id': row.id,
+            'name': row.custom_name,
+            'url': row.custom_url,
+            'search_template': row.custom_search_template,
+            'note': row.custom_note,
+        }
+        for row in owned if row.is_custom
+    ]
+    user_genres, user_keywords = get_user_genres_keywords(current_user)
+    user_excluded = get_user_excluded_genres(current_user)
+    return jsonify({
+        'success': True,
+        'defaults': [
+            {'id': svc.id, 'name': svc.name, 'selected': svc.id in selected}
+            for svc in defaults
+        ],
+        'customs': customs,
+        'common_genres': COMMON_GENRES,
+        'genres': user_genres,
+        'keywords': user_keywords,
+        'excluded_genres': user_excluded,
+    })
+
+
+@mobile_api_bp.route('/preferences', methods=['POST'])
+@login_required
+def api_preferences_save():
+    """Save the current user's minimal preferences from the Android client."""
+    prefs = current_user.preferences
+    if not prefs:
+        prefs = UserPreference(user_id=current_user.id)
+        db.session.add(prefs)
+        db.session.commit()
+
+    data = _json_body()
+    import json
+
+    def _int_ids(key):
+        raw = data.get(key) or []
+        if not isinstance(raw, list):
+            return set()
+        out = set()
+        for x in raw:
+            if isinstance(x, int):
+                out.add(x)
+            elif isinstance(x, str) and x.isdigit():
+                out.add(int(x))
+        return out
+
+    selected_ids = _int_ids('service_ids')
+    UserStreamingService.query.filter_by(
+        user_id=current_user.id, is_custom=False,
+    ).delete(synchronize_session=False)
+    for sid in selected_ids:
+        db.session.add(UserStreamingService(
+            user_id=current_user.id, streaming_service_id=sid, is_custom=False,
+        ))
+
+    remove_custom_ids = _int_ids('remove_custom_ids')
+    if remove_custom_ids:
+        UserStreamingService.query.filter(
+            UserStreamingService.user_id == current_user.id,
+            UserStreamingService.is_custom.is_(True),
+            UserStreamingService.id.in_(remove_custom_ids),
+        ).delete(synchronize_session=False)
+
+    for custom in data.get('custom_services', []):
+        if not isinstance(custom, dict):
+            continue
+        name = (custom.get('name') or '').strip()
+        if not name:
+            continue
+        existing = UserStreamingService.query.filter_by(
+            user_id=current_user.id, is_custom=True, custom_name=name,
+        ).first()
+        if existing:
+            existing.custom_url = (custom.get('url') or '').strip() or None
+            existing.custom_search_template = (custom.get('search_template') or '').strip() or None
+            existing.custom_note = (custom.get('note') or '').strip() or None
+        else:
+            db.session.add(UserStreamingService(
+                user_id=current_user.id,
+                is_custom=True,
+                custom_name=name,
+                custom_url=(custom.get('url') or '').strip() or None,
+                custom_search_template=(custom.get('search_template') or '').strip() or None,
+                custom_note=(custom.get('note') or '').strip() or None,
+            ))
+
+    genres = [
+        g.strip() for g in data.get('genres', [])
+        if isinstance(g, str) and g.strip()
+    ]
+    keywords = [
+        k.strip() for k in data.get('keywords', [])
+        if isinstance(k, str) and k.strip()
+    ]
+    excluded = [
+        g.strip() for g in data.get('excluded_genres', [])
+        if isinstance(g, str) and g.strip()
+    ]
+    excluded_fold = {g.casefold() for g in excluded}
+    genres = [g for g in genres if g.casefold() not in excluded_fold]
+    g_json, k_json = serialize_prefs(genres, keywords)
+    excluded_json, _ = serialize_prefs(excluded, [])
+    prefs.genres_json = g_json
+    prefs.keywords_json = k_json
+    prefs.excluded_genres_json = excluded_json
+
+    if genres or keywords:
+        prefs.onboarding_completed_at = prefs.onboarding_completed_at or datetime.utcnow()
+        prefs.prefs_reminder_disabled = False
+        prefs.prefs_reminder_snooze_until = None
+
+    prefs.updated_at = datetime.utcnow()
+    db.session.commit()
+    db.session.expire(current_user)
+
+    return jsonify({'success': True})
 
 
 @mobile_api_bp.route('/review-marker/<media_type>/<int:trakt_id>', methods=['POST'])

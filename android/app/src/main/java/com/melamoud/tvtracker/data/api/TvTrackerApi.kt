@@ -16,6 +16,8 @@ import com.melamoud.tvtracker.data.api.dto.MeResponse
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
 import com.melamoud.tvtracker.data.api.dto.PinResponse
+import com.melamoud.tvtracker.data.api.dto.PreferencesResponse
+import com.melamoud.tvtracker.data.api.dto.PreferencesSaveRequest
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.api.dto.RatingResponse
 import com.melamoud.tvtracker.data.api.dto.RecommendedMediaResponse
@@ -196,6 +198,12 @@ interface TvTrackerApi {
         @Path("traktId") traktId: Int,
         @Body body: ActionRequest,
     ): CommentResponse
+
+    @GET("/api/v1/preferences")
+    suspend fun preferences(): PreferencesResponse
+
+    @POST("/api/v1/preferences")
+    suspend fun savePreferences(@Body body: PreferencesSaveRequest): SimpleResponse
 
     @GET("/api/v1/latest/{kind}")
     suspend fun latestMedia(

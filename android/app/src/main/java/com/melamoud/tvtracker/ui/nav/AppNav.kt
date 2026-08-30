@@ -53,6 +53,8 @@ import com.melamoud.tvtracker.ui.recommendations.RecommendedMediaScreen
 import com.melamoud.tvtracker.ui.recommendations.RecommendedMediaViewModel
 import com.melamoud.tvtracker.ui.login.LoginViewModel
 import com.melamoud.tvtracker.ui.media.MyMediaScreen
+import com.melamoud.tvtracker.ui.preferences.PreferencesScreen
+import com.melamoud.tvtracker.ui.preferences.PreferencesViewModel
 import com.melamoud.tvtracker.ui.media.MyMediaViewModel
 import com.melamoud.tvtracker.ui.progress.ProgressScreen
 import com.melamoud.tvtracker.ui.progress.ProgressViewModel
@@ -123,7 +125,7 @@ fun AppNav(
                 if (mt != null && id != null) navController.navigate("detail/$mt/$id")
             }
             "progress" -> open.traktId?.let { navController.navigate("progress/$it") }
-            "shows", "movies", "alerts", "search", "latest_movies", "latest_shows", "recommended_movies", "recommended_shows" -> {
+            "shows", "movies", "alerts", "search", "latest_movies", "latest_shows", "recommended_movies", "recommended_shows", "preferences" -> {
                 navController.navigate(open.dest) {
                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                     launchSingleTop = true
@@ -187,6 +189,17 @@ fun AppNav(
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("recommended_shows") {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.preferences)) },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("preferences") {
                                         popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
@@ -338,6 +351,12 @@ fun AppNav(
                     onOpenDetail = ::openDetail,
                 )
             }
+            composable("preferences") {
+                val vm: PreferencesViewModel = viewModel(
+                    factory = PreferencesViewModel.factory(container.catalogRepository),
+                )
+                PreferencesScreen(vm)
+            }
             composable(
                 "detail/{mediaType}/{traktId}",
                 arguments = listOf(
@@ -383,6 +402,7 @@ private fun screenTitle(route: String?): String {
         "latest_shows" -> stringResource(R.string.latest_shows)
         "recommended_movies" -> stringResource(R.string.recommended_movies)
         "recommended_shows" -> stringResource(R.string.recommended_shows)
+        "preferences" -> stringResource(R.string.preferences)
         else -> "TV Tracker"
     }
 }
