@@ -14,6 +14,7 @@ import com.melamoud.tvtracker.data.api.dto.ListsResponse
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
+import com.melamoud.tvtracker.data.api.dto.RecommendedMediaResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
 import com.melamoud.tvtracker.data.api.dto.SimpleResponse
 import com.melamoud.tvtracker.data.api.dto.SyncCatalogResponse
@@ -211,6 +212,32 @@ class CatalogRepository(private val api: TvTrackerApi) {
             recentYears = recentYears?.let { if (it) 1 else 0 },
             perPage = perPage,
             loadOlder = loadOlder?.let { if (it) 1 else 0 },
+        )
+    }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun recommendations(
+        kind: String,
+        query: String? = null,
+        page: Int = 1,
+        avail: String? = null,
+        category: String? = null,
+        hideWatched: Boolean? = null,
+        hideWishlist: Boolean? = null,
+        onMyServices: Boolean? = null,
+        matchOnly: Boolean? = null,
+        perPage: Int? = null,
+    ): Result<RecommendedMediaResponse> = runCatching {
+        api.recommendations(
+            kind = kind,
+            query = query?.takeIf { it.length >= 2 },
+            page = page,
+            avail = avail,
+            category = category,
+            hideWatched = hideWatched?.let { if (it) 1 else 0 },
+            hideWishlist = hideWishlist?.let { if (it) 1 else 0 },
+            onMyServices = onMyServices?.let { if (it) 1 else 0 },
+            matchOnly = matchOnly?.let { if (it) 1 else 0 },
+            perPage = perPage,
         )
     }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 

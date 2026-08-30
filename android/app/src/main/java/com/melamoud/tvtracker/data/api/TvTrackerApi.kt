@@ -18,6 +18,7 @@ import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
 import com.melamoud.tvtracker.data.api.dto.PinResponse
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.api.dto.RatingResponse
+import com.melamoud.tvtracker.data.api.dto.RecommendedMediaResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
 import com.melamoud.tvtracker.data.api.dto.SimpleResponse
 import com.melamoud.tvtracker.data.api.dto.SyncCatalogResponse
@@ -230,6 +231,20 @@ interface TvTrackerApi {
     suspend fun syncCatalog(
         @Path("mediaType") mediaType: String,
     ): SyncCatalogResponse
+
+    @GET("/api/v1/recommendations/{kind}")
+    suspend fun recommendations(
+        @Path("kind") kind: String,
+        @Query("q") query: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("avail") avail: String? = null,
+        @Query("category") category: String? = null,
+        @Query("hide_watched") hideWatched: Int? = null,
+        @Query("hide_wishlist") hideWishlist: Int? = null,
+        @Query("on_my_services") onMyServices: Int? = null,
+        @Query("match_only") matchOnly: Int? = null,
+        @Query("per_page") perPage: Int? = null,
+    ): RecommendedMediaResponse
 
     @POST("/api/v1/recommendations/{mediaType}/{traktId}/hide")
     suspend fun hideRecommendation(

@@ -633,8 +633,8 @@ def recommended_shows():
     return _recommendations_page('show')
 
 
-def _recommendations_page(media_type: str):
-    """Shared recommended-movies / recommended-shows listing."""
+def _recommendations_page_data(media_type: str) -> dict:
+    """Shared recommended-movies / recommended-shows data for HTML or JSON."""
     from services.streaming_matcher import (
         genre_to_trakt_slug,
         get_user_genres_keywords,
@@ -809,36 +809,40 @@ def _recommendations_page(media_type: str):
     for slug, label in sorted(category_slugs.items(), key=lambda kv: kv[1].lower()):
         categories.append({'slug': slug, 'label': label})
 
-    return render_template(
-        'recommendations_media.html',
-        media_type=media_type,
-        rows=rows,
-        page=page,
-        pages=pages,
-        page_links=_pagination_pages(page, pages),
-        per_page=per_page,
-        total=total,
-        total_before_services=total_before_services,
-        hide_watched=hide_watched,
-        hide_wishlist=hide_wishlist,
-        on_my_services=on_my_services,
-        match_only=match_only,
-        category=category,
-        categories=categories,
-        has_match_prefs=bool(user_genres or _keywords),
-        user_service_names=list(
+    return {
+        'media_type': media_type,
+        'rows': rows,
+        'page': page,
+        'pages': pages,
+        'page_links': _pagination_pages(page, pages),
+        'per_page': per_page,
+        'total': total,
+        'total_before_services': total_before_services,
+        'hide_watched': hide_watched,
+        'hide_wishlist': hide_wishlist,
+        'on_my_services': on_my_services,
+        'match_only': match_only,
+        'category': category,
+        'categories': categories,
+        'has_match_prefs': bool(user_genres or _keywords),
+        'user_service_names': list(
             dict.fromkeys(
                 (r.display_name for r in current_user.streaming_services if r.display_name)
             )
         ),
-        tmdb_configured=tmdb_is_configured(),
-        streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
-        fetch_error=fetch_error,
-        search_q=search_q,
-        avail=avail,
+        'tmdb_configured': tmdb_is_configured(),
+        'streaming_region': current_app.config.get('STREAMING_REGION', 'US'),
+        'fetch_error': fetch_error,
+        'search_q': search_q,
+        'avail': avail,
         **advanced_context(year, filter_genres),
-        title='Recommended Movies' if media_type == 'movie' else 'Recommended Shows',
-    )
+        'title': 'Recommended Movies' if media_type == 'movie' else 'Recommended Shows',
+    }
+
+
+def _recommendations_page(media_type: str):
+    """Web handler for recommended-movies / recommended-shows pages."""
+    return render_template('recommendations_media.html', **_recommendations_page_data(media_type))
 
 
 def _latest_feed_query(media_type: str):

@@ -49,6 +49,8 @@ import com.melamoud.tvtracker.ui.detail.DetailViewModel
 import com.melamoud.tvtracker.ui.latest.LatestMediaScreen
 import com.melamoud.tvtracker.ui.latest.LatestMediaViewModel
 import com.melamoud.tvtracker.ui.login.LoginScreen
+import com.melamoud.tvtracker.ui.recommendations.RecommendedMediaScreen
+import com.melamoud.tvtracker.ui.recommendations.RecommendedMediaViewModel
 import com.melamoud.tvtracker.ui.login.LoginViewModel
 import com.melamoud.tvtracker.ui.media.MyMediaScreen
 import com.melamoud.tvtracker.ui.media.MyMediaViewModel
@@ -121,7 +123,7 @@ fun AppNav(
                 if (mt != null && id != null) navController.navigate("detail/$mt/$id")
             }
             "progress" -> open.traktId?.let { navController.navigate("progress/$it") }
-            "shows", "movies", "alerts", "search", "latest_movies", "latest_shows" -> {
+            "shows", "movies", "alerts", "search", "latest_movies", "latest_shows", "recommended_movies", "recommended_shows" -> {
                 navController.navigate(open.dest) {
                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                     launchSingleTop = true
@@ -163,6 +165,28 @@ fun AppNav(
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("latest_shows") {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.recommended_movies)) },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("recommended_movies") {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.recommended_shows)) },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("recommended_shows") {
                                         popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
@@ -296,6 +320,24 @@ fun AppNav(
                     onOpenDetail = ::openDetail,
                 )
             }
+            composable("recommended_movies") {
+                val vm: RecommendedMediaViewModel = viewModel(
+                    factory = RecommendedMediaViewModel.factory("movies", container.catalogRepository, onUnread),
+                )
+                RecommendedMediaScreen(
+                    vm, container.baseUrl, isShows = false,
+                    onOpenDetail = ::openDetail,
+                )
+            }
+            composable("recommended_shows") {
+                val vm: RecommendedMediaViewModel = viewModel(
+                    factory = RecommendedMediaViewModel.factory("shows", container.catalogRepository, onUnread),
+                )
+                RecommendedMediaScreen(
+                    vm, container.baseUrl, isShows = true,
+                    onOpenDetail = ::openDetail,
+                )
+            }
             composable(
                 "detail/{mediaType}/{traktId}",
                 arguments = listOf(
@@ -339,6 +381,8 @@ private fun screenTitle(route: String?): String {
         "alerts" -> stringResource(R.string.alerts)
         "latest_movies" -> stringResource(R.string.latest_movies)
         "latest_shows" -> stringResource(R.string.latest_shows)
+        "recommended_movies" -> stringResource(R.string.recommended_movies)
+        "recommended_shows" -> stringResource(R.string.recommended_shows)
         else -> "TV Tracker"
     }
 }

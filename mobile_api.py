@@ -455,6 +455,44 @@ def api_latest_media(media_type):
     })
 
 
+@mobile_api_bp.route('/recommendations/<media_type>', methods=['GET'])
+@login_required
+def api_recommendations(media_type):
+    """Personalized Trakt recommendations for the Android client."""
+    if media_type not in ('movies', 'shows'):
+        return jsonify({'success': False, 'message': 'Use movies or shows'}), 400
+    from routes.catalog_routes import _recommendations_page_data
+
+    singular = 'movie' if media_type == 'movies' else 'show'
+    ctx = _recommendations_page_data(singular)
+    items = [
+        serialize_media_item(row, singular) for row in (ctx.get('rows') or [])
+    ]
+    return jsonify({
+        'success': True,
+        'media_type': singular,
+        'items': items,
+        'page': ctx.get('page') or 1,
+        'pages': ctx.get('pages') or 1,
+        'per_page': ctx.get('per_page') or 50,
+        'total': ctx.get('total') or 0,
+        'q': ctx.get('search_q') or '',
+        'avail': ctx.get('avail') or '',
+        'title': ctx.get('title'),
+        'found_on_choices': found_on_service_choices(current_user),
+        'categories': ctx.get('categories') or [],
+        'category': ctx.get('category') or 'all',
+        'hide_watched': ctx.get('hide_watched'),
+        'hide_wishlist': ctx.get('hide_wishlist'),
+        'on_my_services': ctx.get('on_my_services'),
+        'match_only': ctx.get('match_only'),
+        'has_match_prefs': ctx.get('has_match_prefs'),
+        'user_service_names': ctx.get('user_service_names') or [],
+        'filter_genres': ctx.get('filter_genres') or [],
+        'year': ctx.get('year') or '',
+    })
+
+
 @mobile_api_bp.route('/review-marker/<media_type>/<int:trakt_id>', methods=['POST'])
 @login_required
 def api_review_marker(media_type, trakt_id):

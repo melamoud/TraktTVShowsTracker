@@ -157,6 +157,36 @@ data class SyncCatalogResponse(
     val count: Int? = null,
 )
 
+data class CategoryDto(
+    val slug: String,
+    val label: String,
+)
+
+data class RecommendedMediaResponse(
+    val success: Boolean,
+    val message: String? = null,
+    @SerializedName("media_type") val mediaType: String? = null,
+    val items: List<MediaItemDto> = emptyList(),
+    val page: Int = 1,
+    val pages: Int = 1,
+    @SerializedName("per_page") val perPage: Int = 50,
+    val total: Int = 0,
+    val q: String? = null,
+    val avail: String? = null,
+    val title: String? = null,
+    @SerializedName("found_on_choices") val foundOnChoices: List<String> = emptyList(),
+    val categories: List<CategoryDto> = emptyList(),
+    val category: String = "all",
+    @SerializedName("hide_watched") val hideWatched: Boolean = true,
+    @SerializedName("hide_wishlist") val hideWishlist: Boolean = true,
+    @SerializedName("on_my_services") val onMyServices: Boolean = false,
+    @SerializedName("match_only") val matchOnly: Boolean = false,
+    @SerializedName("has_match_prefs") val hasMatchPrefs: Boolean = false,
+    @SerializedName("user_service_names") val userServiceNames: List<String> = emptyList(),
+    val genres: List<String> = emptyList(),
+    val year: String? = null,
+)
+
 data class SearchResponse(
     val success: Boolean,
     val message: String? = null,
