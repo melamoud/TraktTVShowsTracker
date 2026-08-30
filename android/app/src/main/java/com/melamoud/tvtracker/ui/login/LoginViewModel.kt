@@ -15,6 +15,7 @@ data class LoginUiState(
     val authorizeUrl: String? = null,
     val loggedIn: Boolean = false,
     val username: String? = null,
+    val isAdmin: Boolean = false,
     val unreadAlerts: Int = 0,
 )
 
@@ -49,6 +50,7 @@ class LoginViewModel(
                         loading = false,
                         loggedIn = true,
                         username = it.username,
+                        isAdmin = it.isAdmin,
                         unreadAlerts = it.unreadAlerts,
                     )
                 },

@@ -281,4 +281,13 @@ class CatalogRepository(private val api: TvTrackerApi) {
     suspend fun hideRecommendation(mediaType: String, traktId: Int) = runCatching {
         api.hideRecommendation(mediaType, traktId)
     }
+
+    suspend fun adminDashboard() = runCatching { api.adminDashboard() }
+    suspend fun adminRunReleaseCheck() = runCatching { api.adminRunReleaseCheck() }
+    suspend fun adminUsers() = runCatching { api.adminUsers() }
+    suspend fun adminToggleActive(userId: Int) = runCatching { api.adminToggleActive(userId) }
+    suspend fun adminToggleAdmin(userId: Int) = runCatching { api.adminToggleAdmin(userId) }
+    suspend fun adminRevokeSessions(userId: Int) = runCatching { api.adminRevokeSessions(userId) }
+    suspend fun adminDeleteLocal(userId: Int) = runCatching { api.adminDeleteLocal(userId) }
+    suspend fun adminScheduler() = runCatching { api.adminScheduler() }
 }

@@ -768,3 +768,129 @@ def api_create_list():
 def api_delete_list(list_id):
     from routes.user_routes import api_delete_trakt_list as impl
     return impl(list_id)
+
+
+@mobile_api_bp.route('/admin/dashboard', methods=['GET'])
+@login_required
+def api_admin_dashboard():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    from models import AlertEvent, User
+    from services.tmdb_client import is_configured as tmdb_is_configured
+    return jsonify({
+        'success': True,
+        'stats': {
+            'users': User.query.count(),
+            'active_users': User.query.filter_by(is_active_account=True).count(),
+            'pending_suggestions': StreamingServiceSuggestion.query.filter_by(status='pending').count(),
+            'services': StreamingService.query.count(),
+            'alert_events': AlertEvent.query.count(),
+            'tmdb_configured': tmdb_is_configured(),
+        },
+    })
+
+
+@mobile_api_bp.route('/admin/run-release-check', methods=['POST'])
+@login_required
+def api_admin_run_release_check():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    from services.alerts import run_media_alerts
+    from services.trakt_client import trakt_call_source
+    try:
+        with trakt_call_source('admin run-release-check'):
+            notified = run_media_alerts(current_app._get_current_object())
+        return jsonify({'success': True, 'notified': notified})
+    except Exception as exc:
+        current_app.logger.exception('Manual alert check failed: %s', exc)
+        return jsonify({'success': False, 'message': str(exc)}), 500
+
+
+@mobile_api_bp.route('/admin/users', methods=['GET'])
+@login_required
+def api_admin_users():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    users = User.query.order_by(User.username).all()
+    return jsonify({
+        'success': True,
+        'users': [
+            {
+                'id': u.id,
+                'username': u.username,
+                'is_admin': u.is_admin,
+                'is_active_account': u.is_active_account,
+                'created_at': u.created_at.isoformat() if u.created_at else None,
+                'last_login_at': u.last_login_at.isoformat() if u.last_login_at else None,
+            }
+            for u in users
+        ],
+    })
+
+
+@mobile_api_bp.route('/admin/users/<int:user_id>/toggle-active', methods=['POST'])
+@login_required
+def api_admin_toggle_active(user_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    if user_id == current_user.id:
+        return jsonify({'success': False, 'message': 'Cannot disable your own account'}), 400
+    user = User.query.get_or_404(user_id)
+    user.is_active_account = not user.is_active_account
+    db.session.commit()
+    return jsonify({'success': True, 'is_active_account': user.is_active_account})
+
+
+@mobile_api_bp.route('/admin/users/<int:user_id>/toggle-admin', methods=['POST'])
+@login_required
+def api_admin_toggle_admin(user_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    user = User.query.get_or_404(user_id)
+    if user.is_admin and User.query.filter_by(is_admin=True).count() <= 1:
+        return jsonify({'success': False, 'message': 'Cannot demote the last admin'}), 400
+    user.is_admin = not user.is_admin
+    db.session.commit()
+    return jsonify({'success': True, 'is_admin': user.is_admin})
+
+
+@mobile_api_bp.route('/admin/users/<int:user_id>/revoke-sessions', methods=['POST'])
+@login_required
+def api_admin_revoke_sessions(user_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    user = User.query.get_or_404(user_id)
+    now = datetime.utcnow()
+    for s in UserSession.query.filter_by(user_id=user.id, revoked=False).all():
+        s.revoked = True
+        s.ended_at = now
+    user.access_token_enc = None
+    user.refresh_token_enc = None
+    user.token_expires_at = None
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@mobile_api_bp.route('/admin/users/<int:user_id>/delete-local', methods=['POST'])
+@login_required
+def api_admin_delete_local(user_id):
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    if user_id == current_user.id:
+        return jsonify({'success': False, 'message': 'Cannot delete your own account'}), 400
+    user = User.query.get_or_404(user_id)
+    if user.is_admin and User.query.filter_by(is_admin=True).count() <= 1:
+        return jsonify({'success': False, 'message': 'Cannot delete the last admin'}), 400
+    username = user.username
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'success': True, 'username': username})
+
+
+@mobile_api_bp.route('/admin/scheduler', methods=['GET'])
+@login_required
+def api_admin_scheduler():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    from services.sync_jobs import get_scheduler_status
+    return jsonify({'success': True, 'status': get_scheduler_status(current_app._get_current_object())})

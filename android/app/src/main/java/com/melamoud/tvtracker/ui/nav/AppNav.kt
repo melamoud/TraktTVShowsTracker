@@ -51,6 +51,8 @@ import com.melamoud.tvtracker.ui.latest.LatestMediaViewModel
 import com.melamoud.tvtracker.ui.login.LoginScreen
 import com.melamoud.tvtracker.ui.recommendations.RecommendedMediaScreen
 import com.melamoud.tvtracker.ui.recommendations.RecommendedMediaViewModel
+import com.melamoud.tvtracker.ui.admin.AdminScreen
+import com.melamoud.tvtracker.ui.admin.AdminViewModel
 import com.melamoud.tvtracker.ui.login.LoginViewModel
 import com.melamoud.tvtracker.ui.media.MyMediaScreen
 import com.melamoud.tvtracker.ui.help.HelpScreen
@@ -70,10 +72,11 @@ fun AppNav(
     container: AppContainer,
     loggedIn: Boolean,
     username: String?,
+    isAdmin: Boolean,
     onOpenLoginUrl: (String) -> Unit,
     onOauthToken: String?,
     onOauthConsumed: () -> Unit,
-    onLoggedIn: (String, Int) -> Unit,
+    onLoggedIn: (String, Boolean, Int) -> Unit,
     onLogout: () -> Unit,
 ) {
     if (!loggedIn) {
@@ -218,6 +221,19 @@ fun AppNav(
                                     }
                                 },
                             )
+                            if (isAdmin) {
+                                DropdownMenuItem(
+                                    text = { Text("Admin") },
+                                    onClick = {
+                                        menuOpen = false
+                                        navController.navigate("admin") {
+                                            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                            launchSingleTop = true
+                                            restoreState = true
+                                        }
+                                    },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.logout)) },
                                 onClick = { menuOpen = false; onLogout() },
@@ -379,6 +395,15 @@ fun AppNav(
                     onBack = { navController.popBackStack() },
                 )
             }
+            composable("admin") {
+                val vm: AdminViewModel = viewModel(
+                    factory = AdminViewModel.factory(container.catalogRepository),
+                )
+                AdminScreen(
+                    vm,
+                    onBack = { navController.popBackStack() },
+                )
+            }
             composable(
                 "detail/{mediaType}/{traktId}",
                 arguments = listOf(
@@ -426,6 +451,7 @@ private fun screenTitle(route: String?): String {
         "recommended_shows" -> stringResource(R.string.recommended_shows)
         "preferences" -> stringResource(R.string.preferences)
         "help" -> "Help"
+        "admin" -> "Admin"
         else -> "TV Tracker"
     }
 }

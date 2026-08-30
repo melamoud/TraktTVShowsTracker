@@ -33,12 +33,14 @@ class MainActivity : ComponentActivity() {
                 var checking by remember { mutableStateOf(true) }
                 var loggedIn by remember { mutableStateOf(false) }
                 var username by remember { mutableStateOf<String?>(null) }
+                var isAdmin by remember { mutableStateOf(false) }
                 val oauthToken by oauthTokenState
 
                 LaunchedEffect(Unit) {
                     val user = container.authRepository.restoreSession()
                     loggedIn = user != null
                     username = user?.username
+                    isAdmin = user?.isAdmin ?: false
                     container.setUnreadAlerts(user?.unreadAlerts ?: 0)
                     if (user != null) TrackerWidgetProvider.requestRefresh(this@MainActivity)
                     checking = false
@@ -49,12 +51,14 @@ class MainActivity : ComponentActivity() {
                         container = container,
                         loggedIn = loggedIn,
                         username = username,
+                        isAdmin = isAdmin,
                         onOpenLoginUrl = ::openCustomTab,
                         onOauthToken = oauthToken,
                         onOauthConsumed = { oauthTokenState.value = null },
-                        onLoggedIn = { name, unreadCount ->
+                        onLoggedIn = { name, admin, unreadCount ->
                             loggedIn = true
                             username = name
+                            isAdmin = admin
                             container.setUnreadAlerts(unreadCount)
                             TrackerWidgetProvider.requestRefresh(this@MainActivity)
                         },
@@ -63,6 +67,7 @@ class MainActivity : ComponentActivity() {
                                 container.authRepository.logout()
                                 loggedIn = false
                                 username = null
+                                isAdmin = false
                                 container.setUnreadAlerts(0)
                             }
                         },

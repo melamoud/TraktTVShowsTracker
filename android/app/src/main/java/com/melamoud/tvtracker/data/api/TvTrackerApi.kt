@@ -1,6 +1,9 @@
 package com.melamoud.tvtracker.data.api
 
 import com.melamoud.tvtracker.data.api.dto.ActionRequest
+import com.melamoud.tvtracker.data.api.dto.AdminActionResponse
+import com.melamoud.tvtracker.data.api.dto.AdminDashboardResponse
+import com.melamoud.tvtracker.data.api.dto.AdminUsersResponse
 import com.melamoud.tvtracker.data.api.dto.AlertsResponse
 import com.melamoud.tvtracker.data.api.dto.AuthCompleteRequest
 import com.melamoud.tvtracker.data.api.dto.AuthStartResponse
@@ -268,4 +271,28 @@ interface TvTrackerApi {
         @Path("mediaType") mediaType: String,
         @Path("traktId") traktId: Int,
     ): SimpleResponse
+
+    @GET("/api/v1/admin/dashboard")
+    suspend fun adminDashboard(): AdminDashboardResponse
+
+    @POST("/api/v1/admin/run-release-check")
+    suspend fun adminRunReleaseCheck(): AdminActionResponse
+
+    @GET("/api/v1/admin/users")
+    suspend fun adminUsers(): AdminUsersResponse
+
+    @POST("/api/v1/admin/users/{userId}/toggle-active")
+    suspend fun adminToggleActive(@Path("userId") userId: Int): AdminActionResponse
+
+    @POST("/api/v1/admin/users/{userId}/toggle-admin")
+    suspend fun adminToggleAdmin(@Path("userId") userId: Int): AdminActionResponse
+
+    @POST("/api/v1/admin/users/{userId}/revoke-sessions")
+    suspend fun adminRevokeSessions(@Path("userId") userId: Int): AdminActionResponse
+
+    @POST("/api/v1/admin/users/{userId}/delete-local")
+    suspend fun adminDeleteLocal(@Path("userId") userId: Int): AdminActionResponse
+
+    @GET("/api/v1/admin/scheduler")
+    suspend fun adminScheduler(): AdminActionResponse
 }

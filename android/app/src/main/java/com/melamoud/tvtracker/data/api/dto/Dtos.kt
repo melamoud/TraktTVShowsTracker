@@ -563,3 +563,43 @@ data class CalendarDto(
 data class CreateListRequest(
     val name: String,
 )
+
+data class AdminStatsDto(
+    val users: Int = 0,
+    @SerializedName("active_users") val activeUsers: Int = 0,
+    @SerializedName("pending_suggestions") val pendingSuggestions: Int = 0,
+    val services: Int = 0,
+    @SerializedName("alert_events") val alertEvents: Int = 0,
+    @SerializedName("tmdb_configured") val tmdbConfigured: Boolean = false,
+)
+
+data class AdminDashboardResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val stats: AdminStatsDto = AdminStatsDto(),
+)
+
+data class AdminUserDto(
+    val id: Int,
+    val username: String,
+    @SerializedName("is_admin") val isAdmin: Boolean = false,
+    @SerializedName("is_active_account") val isActiveAccount: Boolean = true,
+    @SerializedName("created_at") val createdAt: String? = null,
+    @SerializedName("last_login_at") val lastLoginAt: String? = null,
+)
+
+data class AdminUsersResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val users: List<AdminUserDto> = emptyList(),
+)
+
+data class AdminActionResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val status: Map<String, Any>? = null,
+    @SerializedName("is_active_account") val isActiveAccount: Boolean? = null,
+    @SerializedName("is_admin") val isAdmin: Boolean? = null,
+    val username: String? = null,
+    val notified: Int? = null,
+)

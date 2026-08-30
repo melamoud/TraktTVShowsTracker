@@ -44,11 +44,11 @@ import com.melamoud.tvtracker.ui.theme.TextMuted
 fun LoginScreen(
     viewModel: LoginViewModel,
     onOpenUrl: (String) -> Unit,
-    onLoggedIn: (String, Int) -> Unit,
+    onLoggedIn: (String, Boolean, Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(state.loggedIn, state.username, state.unreadAlerts) {
-        if (state.loggedIn) onLoggedIn(state.username.orEmpty(), state.unreadAlerts)
+    LaunchedEffect(state.loggedIn, state.username, state.isAdmin, state.unreadAlerts) {
+        if (state.loggedIn) onLoggedIn(state.username.orEmpty(), state.isAdmin, state.unreadAlerts)
     }
     LaunchedEffect(state.authorizeUrl) {
         val url = state.authorizeUrl ?: return@LaunchedEffect
