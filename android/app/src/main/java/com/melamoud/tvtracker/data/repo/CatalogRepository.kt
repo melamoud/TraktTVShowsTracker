@@ -9,11 +9,14 @@ import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
 import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
 import com.melamoud.tvtracker.data.api.dto.FoundOnChoicesResponse
 import com.melamoud.tvtracker.data.api.dto.FoundOnResponse
+import com.melamoud.tvtracker.data.api.dto.LatestMediaResponse
 import com.melamoud.tvtracker.data.api.dto.ListsResponse
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
+import com.melamoud.tvtracker.data.api.dto.SimpleResponse
+import com.melamoud.tvtracker.data.api.dto.SyncCatalogResponse
 import com.melamoud.tvtracker.data.api.dto.WidgetResponse
 
 class CatalogRepository(private val api: TvTrackerApi) {
@@ -184,4 +187,50 @@ class CatalogRepository(private val api: TvTrackerApi) {
                 ActionRequest(comment = text, spoiler = spoiler, commentId = commentId),
             )
         }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun latestMedia(
+        kind: String,
+        query: String? = null,
+        page: Int = 1,
+        avail: String? = null,
+        hideWatched: Boolean? = null,
+        hideLists: Boolean? = null,
+        matchOnly: Boolean? = null,
+        recentYears: Boolean? = null,
+        perPage: Int? = null,
+        loadOlder: Boolean? = null,
+    ): Result<LatestMediaResponse> = runCatching {
+        api.latestMedia(
+            kind = kind,
+            query = query?.takeIf { it.length >= 2 },
+            page = page,
+            avail = avail,
+            hideWatched = hideWatched?.let { if (it) 1 else 0 },
+            hideLists = hideLists?.let { if (it) 1 else 0 },
+            matchOnly = matchOnly?.let { if (it) 1 else 0 },
+            recentYears = recentYears?.let { if (it) 1 else 0 },
+            perPage = perPage,
+            loadOlder = loadOlder?.let { if (it) 1 else 0 },
+        )
+    }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun reviewMarkerSet(mediaType: String, traktId: Int) = runCatching {
+        api.reviewMarkerSet(mediaType, traktId)
+    }
+
+    suspend fun reviewMarkerClear(mediaType: String) = runCatching {
+        api.reviewMarkerClear(mediaType)
+    }
+
+    suspend fun reviewMarkerCaughtUp(mediaType: String) = runCatching {
+        api.reviewMarkerCaughtUp(mediaType)
+    }
+
+    suspend fun syncCatalog(mediaType: String) = runCatching {
+        api.syncCatalog(mediaType)
+    }
+
+    suspend fun hideRecommendation(mediaType: String, traktId: Int) = runCatching {
+        api.hideRecommendation(mediaType, traktId)
+    }
 }

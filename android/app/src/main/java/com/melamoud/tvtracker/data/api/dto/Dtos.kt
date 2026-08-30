@@ -92,6 +92,8 @@ data class MediaItemDto(
     val slug: String? = null,
     val network: String? = null,
     val runtime: Int? = null,
+    @SerializedName("is_marker") val isMarker: Boolean = false,
+    @SerializedName("older_than_marker") val olderThanMarker: Boolean = false,
 )
 
 data class FilterListDto(
@@ -119,6 +121,40 @@ data class MyMediaResponse(
     val display: String? = null,
     val title: String? = null,
     @SerializedName("found_on_choices") val foundOnChoices: List<String> = emptyList(),
+)
+
+data class ReviewMarkerDto(
+    @SerializedName("trakt_id") val traktId: Int,
+    val title: String,
+    @SerializedName("listed_at") val listedAt: String? = null,
+)
+
+data class LatestMediaResponse(
+    val success: Boolean,
+    val message: String? = null,
+    @SerializedName("media_type") val mediaType: String? = null,
+    val items: List<MediaItemDto> = emptyList(),
+    val page: Int = 1,
+    val pages: Int = 1,
+    @SerializedName("per_page") val perPage: Int = 50,
+    val total: Int = 0,
+    val q: String? = null,
+    val avail: String? = null,
+    val title: String? = null,
+    @SerializedName("found_on_choices") val foundOnChoices: List<String> = emptyList(),
+    @SerializedName("hide_watched") val hideWatched: Boolean = true,
+    @SerializedName("hide_lists") val hideLists: Boolean = true,
+    @SerializedName("match_only") val matchOnly: Boolean = false,
+    @SerializedName("recent_years") val recentYears: Boolean = true,
+    @SerializedName("has_more_older") val hasMoreOlder: Boolean = false,
+    val marker: ReviewMarkerDto? = null,
+    @SerializedName("marker_page") val markerPage: Int? = null,
+)
+
+data class SyncCatalogResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val count: Int? = null,
 )
 
 data class SearchResponse(

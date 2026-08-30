@@ -10,6 +10,13 @@
     <string name="search">Search</string>
     <string name="alerts">Alerts</string>
     <string name="progress">Progress</string>
+    <string name="latest_movies">Latest Movies</string>
+    <string name="latest_shows">Latest Shows</string>
+    <string name="more">More</string>
+    <string name="sync_catalog">Sync catalog</string>
+    <string name="mark_reviewed">Mark reviewed</string>
+    <string name="review_marker_clear">Clear marker</string>
+    <string name="review_marker_caught_up">Mark all caught up</string>
     <string name="search_hint">Search Trakt titles…</string>
     <string name="list_search_hint">Search titles in this list…</string>
     <string name="empty_search">Type at least 2 characters to search Trakt.</string>

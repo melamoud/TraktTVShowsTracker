@@ -38,8 +38,10 @@ import coil.compose.AsyncImage
 import com.melamoud.tvtracker.data.api.absoluteUrl
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.ui.theme.AccentGold
+import com.melamoud.tvtracker.ui.theme.Danger
 import com.melamoud.tvtracker.ui.theme.Ok
 import com.melamoud.tvtracker.ui.theme.Primary
+import com.melamoud.tvtracker.ui.theme.Surface
 import com.melamoud.tvtracker.ui.theme.SurfaceAlt
 import com.melamoud.tvtracker.ui.theme.TextMuted
 
@@ -49,6 +51,10 @@ fun MediaCard(
     baseUrl: String,
     showProgress: Boolean,
     showNewestAired: Boolean = false,
+    showPin: Boolean = true,
+    setListsInline: Boolean = false,
+    watchInOverflow: Boolean = false,
+    hideRecommendationInline: Boolean = false,
     onPin: () -> Unit,
     onLists: () -> Unit,
     onFoundOn: () -> Unit,
@@ -56,6 +62,11 @@ fun MediaCard(
     onRate: () -> Unit,
     onFavorite: () -> Unit,
     onProgress: (() -> Unit)? = null,
+    onReviewMarker: (() -> Unit)? = null,
+    onHideRecommendation: (() -> Unit)? = null,
+    onImdb: (() -> Unit)? = null,
+    onTrailer: (() -> Unit)? = null,
+    onTrakt: (() -> Unit)? = null,
     onOpen: (() -> Unit)? = null,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
@@ -63,7 +74,9 @@ fun MediaCard(
         modifier = Modifier.fillMaxWidth().then(
             if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier
         ),
-        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
+        colors = CardDefaults.cardColors(
+            containerColor = if (item.olderThanMarker) Surface else SurfaceAlt,
+        ),
         shape = RoundedCornerShape(10.dp),
     ) {
         Row(Modifier.padding(10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -154,6 +167,13 @@ fun MediaCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
+                    if (setListsInline) {
+                        OutlinedButton(
+                            onClick = onLists,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(32.dp),
+                        ) { Text("Set lists") }
+                    }
                     if (onProgress != null) {
                         OutlinedButton(
                             onClick = onProgress,
@@ -161,23 +181,42 @@ fun MediaCard(
                             modifier = Modifier.height(32.dp),
                         ) { Text("Progress", color = AccentGold) }
                     }
-                    OutlinedButton(
-                        onClick = onWatched,
-                        contentPadding = PaddingValues(horizontal = 10.dp),
-                        modifier = Modifier.height(32.dp),
-                    ) { Text(if (item.watched) "Unwatch" else "Watch") }
+                    if (!watchInOverflow) {
+                        OutlinedButton(
+                            onClick = onWatched,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(32.dp),
+                        ) { Text(if (item.watched) "Unwatch" else "Watch") }
+                    }
+                    if (hideRecommendationInline && onHideRecommendation != null) {
+                        OutlinedButton(
+                            onClick = onHideRecommendation,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(32.dp),
+                        ) { Text("Hide", color = Danger) }
+                    }
                     IconButton(onClick = { menuOpen = true }, modifier = Modifier.height(32.dp)) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More")
                     }
                     DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        DropdownMenuItem(
-                            text = { Text(if (item.pinned) "Unpin" else "Pin") },
-                            onClick = { menuOpen = false; onPin() },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Set lists…") },
-                            onClick = { menuOpen = false; onLists() },
-                        )
+                        if (watchInOverflow) {
+                            DropdownMenuItem(
+                                text = { Text(if (item.watched) "Unwatch" else "Watch") },
+                                onClick = { menuOpen = false; onWatched() },
+                            )
+                        }
+                        if (showPin) {
+                            DropdownMenuItem(
+                                text = { Text(if (item.pinned) "Unpin" else "Pin") },
+                                onClick = { menuOpen = false; onPin() },
+                            )
+                        }
+                        if (!setListsInline) {
+                            DropdownMenuItem(
+                                text = { Text("Set lists…") },
+                                onClick = { menuOpen = false; onLists() },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text("Found on…") },
                             onClick = { menuOpen = false; onFoundOn() },
@@ -190,6 +229,36 @@ fun MediaCard(
                             text = { Text(if (item.favorited) "Unfavorite" else "Favorite") },
                             onClick = { menuOpen = false; onFavorite() },
                         )
+                        if (onReviewMarker != null) {
+                            DropdownMenuItem(
+                                text = { Text("Reviewed older than this") },
+                                onClick = { menuOpen = false; onReviewMarker() },
+                            )
+                        }
+                        if (onHideRecommendation != null && !hideRecommendationInline) {
+                            DropdownMenuItem(
+                                text = { Text("Hide recommendation") },
+                                onClick = { menuOpen = false; onHideRecommendation() },
+                            )
+                        }
+                        if (onImdb != null) {
+                            DropdownMenuItem(
+                                text = { Text("IMDb") },
+                                onClick = { menuOpen = false; onImdb() },
+                            )
+                        }
+                        if (onTrailer != null) {
+                            DropdownMenuItem(
+                                text = { Text("Trailer") },
+                                onClick = { menuOpen = false; onTrailer() },
+                            )
+                        }
+                        if (onTrakt != null) {
+                            DropdownMenuItem(
+                                text = { Text("Trakt") },
+                                onClick = { menuOpen = false; onTrakt() },
+                            )
+                        }
                     }
                 }
             }

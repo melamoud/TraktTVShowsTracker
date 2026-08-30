@@ -406,3 +406,85 @@ def api_favorite(media_type, trakt_id):
 def api_lists_membership(media_type, trakt_id):
     from routes.catalog_routes import api_lists_membership as impl
     return impl(media_type, trakt_id)
+
+
+@mobile_api_bp.route('/latest/<media_type>', methods=['GET'])
+@login_required
+def api_latest_media(media_type):
+    """Latest movies or shows feed (Trakt DB updates) for the Android client."""
+    if media_type not in ('movies', 'shows'):
+        return jsonify({'success': False, 'message': 'Use movies or shows'}), 400
+    from routes.catalog_routes import _ensure_latest_catalog, _latest_page_data
+
+    singular = 'movie' if media_type == 'movies' else 'show'
+    _ensure_latest_catalog(singular, load_older=(request.args.get('load_older') == '1'))
+    ctx = _latest_page_data(singular)
+    items = [
+        serialize_media_item(row, singular) for row in (ctx.get('rows') or [])
+    ]
+    marker = ctx.get('marker')
+    marker_payload = None
+    if marker:
+        marker_payload = {
+            'trakt_id': marker.trakt_id,
+            'title': marker.title,
+            'listed_at': (
+                marker.trakt_listed_at.isoformat()
+                if marker.trakt_listed_at else None
+            ),
+        }
+    return jsonify({
+        'success': True,
+        'media_type': singular,
+        'items': items,
+        'page': ctx.get('page') or 1,
+        'pages': ctx.get('pages') or 1,
+        'per_page': ctx.get('per_page') or 50,
+        'total': ctx.get('total') or 0,
+        'q': ctx.get('search_q') or '',
+        'avail': ctx.get('avail') or '',
+        'title': ctx.get('title'),
+        'found_on_choices': found_on_service_choices(current_user),
+        'hide_watched': ctx.get('hide_watched'),
+        'hide_lists': ctx.get('hide_lists'),
+        'match_only': ctx.get('match_only'),
+        'recent_years': ctx.get('recent_years'),
+        'has_more_older': ctx.get('has_more_older'),
+        'marker': marker_payload,
+        'marker_page': ctx.get('marker_page'),
+    })
+
+
+@mobile_api_bp.route('/review-marker/<media_type>/<int:trakt_id>', methods=['POST'])
+@login_required
+def api_review_marker(media_type, trakt_id):
+    from routes.catalog_routes import api_review_marker as impl
+    return impl(media_type, trakt_id)
+
+
+@mobile_api_bp.route('/review-marker/<media_type>/clear', methods=['POST'])
+@login_required
+def api_review_marker_clear(media_type):
+    from routes.catalog_routes import api_review_marker_clear as impl
+    return impl(media_type)
+
+
+@mobile_api_bp.route('/review-marker/<media_type>/caught-up', methods=['POST'])
+@login_required
+def api_review_marker_caught_up(media_type):
+    from routes.catalog_routes import api_review_marker_caught_up as impl
+    return impl(media_type)
+
+
+@mobile_api_bp.route('/sync-catalog/<media_type>', methods=['POST'])
+@login_required
+def api_sync_catalog(media_type):
+    from routes.catalog_routes import api_sync_catalog as impl
+    return impl(media_type)
+
+
+@mobile_api_bp.route('/recommendations/<media_type>/<int:trakt_id>/hide', methods=['POST'])
+@login_required
+def api_hide_recommendation(media_type, trakt_id):
+    from routes.catalog_routes import api_hide_recommendation as impl
+    return impl(media_type, trakt_id)

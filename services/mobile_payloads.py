@@ -140,6 +140,8 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
         'slug': media.slug if media else None,
         'network': media.network if media else None,
         'runtime': media.runtime if media else None,
+        'is_marker': bool(row.get('is_marker')),
+        'older_than_marker': bool(row.get('older_than_marker')),
     }
 
 

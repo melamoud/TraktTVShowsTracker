@@ -143,7 +143,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
 {% endif %}
 
 {% if marker %}
-  <p class="meta">Review marker: <strong>{{ marker.title }}</strong>
+  <p class="meta">Reviewed up to: <strong>{{ marker.title }}</strong>
     ({{ marker.trakt_listed_at }}) — items at/older than this are dimmed.
     <button class="btn btn-small" type="button" data-action="review-marker-clear" data-media-type="{{ media_type }}" data-trakt-id="0">Clear marker</button>
   </p>

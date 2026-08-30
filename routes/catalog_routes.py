@@ -910,8 +910,29 @@ def _latest_visible_rows(
     return rows_all, stats
 
 
-def _latest_page(media_type: str):
-    """Shared latest-movies / latest-shows listing (Trakt DB updates feed)."""
+def _ensure_latest_catalog(media_type: str, *, load_older: bool = False):
+    """Ensure the Latest catalog is synced up to the marker; optionally load older pages."""
+    if load_older:
+        try:
+            ensure_catalog_for_offset(media_type)
+        except Exception as exc:
+            current_app.logger.warning('Manual older catalog fetch failed: %s', exc)
+            flash('Could not load an older Trakt page right now.', 'warning')
+    try:
+        if feed_count(media_type) == 0:
+            from services.sync_jobs import bootstrap_catalog_initial
+            bootstrap_catalog_initial(media_type)
+        else:
+            ensure_catalog_through_marker(media_type, current_user)
+    except Exception as exc:
+        current_app.logger.warning('On-demand catalog sync failed: %s', exc)
+        # Cached list still renders; avoid alarming on transient Trakt 429s.
+        if '429' not in str(exc):
+            flash('Could not refresh catalog from Trakt right now. Showing cached items.', 'warning')
+
+
+def _latest_page_data(media_type: str) -> dict:
+    """Shared latest-movies / latest-shows data for HTML or JSON."""
     from services.streaming_matcher import discovery_year_cutoff, user_has_match_prefs
 
     from services import view_prefs
@@ -946,32 +967,6 @@ def _latest_page(media_type: str):
         current_user, view, 'recent_years', 'recent_years', default=True,
     )
     min_year = discovery_year_cutoff() if recent_years else None
-
-    # Explicit older-page load only (never invent empty UI pages).
-    if request.args.get('load_older') == '1':
-        try:
-            ensure_catalog_for_offset(media_type)
-        except Exception as exc:
-            current_app.logger.warning('Manual older catalog fetch failed: %s', exc)
-            flash('Could not load an older Trakt page right now.', 'warning')
-        args = request.args.to_dict(flat=True)
-        args.pop('load_older', None)
-        return redirect(url_for(
-            'catalog.latest_movies' if media_type == 'movie' else 'catalog.latest_shows',
-            **args,
-        ))
-
-    try:
-        if feed_count(media_type) == 0:
-            from services.sync_jobs import bootstrap_catalog_initial
-            bootstrap_catalog_initial(media_type)
-        else:
-            ensure_catalog_through_marker(media_type, current_user)
-    except Exception as exc:
-        current_app.logger.warning('On-demand catalog sync failed: %s', exc)
-        # Cached list still renders; avoid alarming on transient Trakt 429s.
-        if '429' not in str(exc):
-            flash('Could not refresh catalog from Trakt right now. Showing cached items.', 'warning')
 
     # Hide-watched uses local watched cache — keep it aligned with Trakt activity.
     try:
@@ -1074,32 +1069,51 @@ def _latest_page(media_type: str):
         pages,
     )
 
-    return render_template(
-        'latest_media.html',
-        media_type=media_type,
-        rows=rows,
-        page=page,
-        pages=pages,
-        page_links=_pagination_pages(page, pages),
-        per_page=per_page,
-        total=total,
-        filter_stats=filter_stats,
-        marker=marker,
-        marker_page=marker_page,
-        hide_watched=hide_watched,
-        hide_lists=hide_lists,
-        match_only=match_only,
-        recent_years=recent_years,
-        min_discovery_year=min_year,
-        has_match_prefs=has_match_prefs,
-        has_more_older=has_more_older,
-        search_q=search_q,
-        avail=avail,
+    return {
+        'media_type': media_type,
+        'rows': rows,
+        'page': page,
+        'pages': pages,
+        'page_links': _pagination_pages(page, pages),
+        'per_page': per_page,
+        'total': total,
+        'filter_stats': filter_stats,
+        'marker': marker,
+        'marker_page': marker_page,
+        'hide_watched': hide_watched,
+        'hide_lists': hide_lists,
+        'match_only': match_only,
+        'recent_years': recent_years,
+        'min_discovery_year': min_year,
+        'has_match_prefs': has_match_prefs,
+        'has_more_older': has_more_older,
+        'search_q': search_q,
+        'avail': avail,
         **advanced_context(year, filter_genres),
-        tmdb_configured=tmdb_is_configured(),
-        streaming_region=current_app.config.get('STREAMING_REGION', 'US'),
-        title='Latest Movies' if media_type == 'movie' else 'Latest Shows',
-    )
+        'tmdb_configured': tmdb_is_configured(),
+        'streaming_region': current_app.config.get('STREAMING_REGION', 'US'),
+        'title': 'Latest Movies' if media_type == 'movie' else 'Latest Shows',
+    }
+
+
+def _latest_page(media_type: str):
+    """Web handler for latest-movies / latest-shows pages."""
+    # Explicit older-page load only (never invent empty UI pages).
+    if request.args.get('load_older') == '1':
+        try:
+            ensure_catalog_for_offset(media_type)
+        except Exception as exc:
+            current_app.logger.warning('Manual older catalog fetch failed: %s', exc)
+            flash('Could not load an older Trakt page right now.', 'warning')
+        args = request.args.to_dict(flat=True)
+        args.pop('load_older', None)
+        return redirect(url_for(
+            'catalog.latest_movies' if media_type == 'movie' else 'catalog.latest_shows',
+            **args,
+        ))
+    _ensure_latest_catalog(media_type)
+    return render_template('latest_media.html', **_latest_page_data(media_type))
+
 
 def load_media_detail(media_type: str, trakt_id: int) -> dict:
     """Load one title for the HTML page or Android JSON API.

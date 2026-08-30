@@ -10,6 +10,7 @@ import com.melamoud.tvtracker.data.api.dto.FavoriteResponse
 import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
 import com.melamoud.tvtracker.data.api.dto.FoundOnChoicesResponse
 import com.melamoud.tvtracker.data.api.dto.FoundOnResponse
+import com.melamoud.tvtracker.data.api.dto.LatestMediaResponse
 import com.melamoud.tvtracker.data.api.dto.ListsResponse
 import com.melamoud.tvtracker.data.api.dto.MeResponse
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
@@ -19,6 +20,7 @@ import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.api.dto.RatingResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
 import com.melamoud.tvtracker.data.api.dto.SimpleResponse
+import com.melamoud.tvtracker.data.api.dto.SyncCatalogResponse
 import com.melamoud.tvtracker.data.api.dto.WatchedResponse
 import com.melamoud.tvtracker.data.api.dto.WidgetResponse
 import retrofit2.http.Body
@@ -193,4 +195,45 @@ interface TvTrackerApi {
         @Path("traktId") traktId: Int,
         @Body body: ActionRequest,
     ): CommentResponse
+
+    @GET("/api/v1/latest/{kind}")
+    suspend fun latestMedia(
+        @Path("kind") kind: String,
+        @Query("q") query: String? = null,
+        @Query("page") page: Int = 1,
+        @Query("avail") avail: String? = null,
+        @Query("hide_watched") hideWatched: Int? = null,
+        @Query("hide_lists") hideLists: Int? = null,
+        @Query("match_only") matchOnly: Int? = null,
+        @Query("recent_years") recentYears: Int? = null,
+        @Query("per_page") perPage: Int? = null,
+        @Query("load_older") loadOlder: Int? = null,
+    ): LatestMediaResponse
+
+    @POST("/api/v1/review-marker/{mediaType}/{traktId}")
+    suspend fun reviewMarkerSet(
+        @Path("mediaType") mediaType: String,
+        @Path("traktId") traktId: Int,
+    ): SimpleResponse
+
+    @POST("/api/v1/review-marker/{mediaType}/clear")
+    suspend fun reviewMarkerClear(
+        @Path("mediaType") mediaType: String,
+    ): SimpleResponse
+
+    @POST("/api/v1/review-marker/{mediaType}/caught-up")
+    suspend fun reviewMarkerCaughtUp(
+        @Path("mediaType") mediaType: String,
+    ): SimpleResponse
+
+    @POST("/api/v1/sync-catalog/{mediaType}")
+    suspend fun syncCatalog(
+        @Path("mediaType") mediaType: String,
+    ): SyncCatalogResponse
+
+    @POST("/api/v1/recommendations/{mediaType}/{traktId}/hide")
+    suspend fun hideRecommendation(
+        @Path("mediaType") mediaType: String,
+        @Path("traktId") traktId: Int,
+    ): SimpleResponse
 }

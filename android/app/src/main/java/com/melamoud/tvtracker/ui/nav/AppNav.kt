@@ -3,13 +3,17 @@ package com.melamoud.tvtracker.ui.nav
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Movie
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tv
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
@@ -21,6 +25,9 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
@@ -39,6 +46,8 @@ import com.melamoud.tvtracker.ui.alerts.AlertsScreen
 import com.melamoud.tvtracker.ui.alerts.AlertsViewModel
 import com.melamoud.tvtracker.ui.detail.DetailScreen
 import com.melamoud.tvtracker.ui.detail.DetailViewModel
+import com.melamoud.tvtracker.ui.latest.LatestMediaScreen
+import com.melamoud.tvtracker.ui.latest.LatestMediaViewModel
 import com.melamoud.tvtracker.ui.login.LoginScreen
 import com.melamoud.tvtracker.ui.login.LoginViewModel
 import com.melamoud.tvtracker.ui.media.MyMediaScreen
@@ -112,7 +121,7 @@ fun AppNav(
                 if (mt != null && id != null) navController.navigate("detail/$mt/$id")
             }
             "progress" -> open.traktId?.let { navController.navigate("progress/$it") }
-            "shows", "movies", "alerts", "search" -> {
+            "shows", "movies", "alerts", "search", "latest_movies", "latest_shows" -> {
                 navController.navigate(open.dest) {
                     popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                     launchSingleTop = true
@@ -127,11 +136,43 @@ fun AppNav(
         topBar = {
             if (showChrome) {
                 TopAppBar(
-                    title = { Text("TV Tracker", color = Color.White) },
+                    title = { Text(screenTitle(currentRoute), color = Color.White) },
                     actions = {
                         Text(username.orEmpty(), color = Color.White.copy(alpha = 0.85f))
-                        TextButton(onClick = onLogout) {
-                            Text(stringResource(R.string.logout), color = Color.White)
+                        var menuOpen by remember { mutableStateOf(false) }
+                        IconButton(onClick = { menuOpen = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
+                        }
+                        DropdownMenu(
+                            expanded = menuOpen,
+                            onDismissRequest = { menuOpen = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.latest_movies)) },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("latest_movies") {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.latest_shows)) },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("latest_shows") {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.logout)) },
+                                onClick = { menuOpen = false; onLogout() },
+                            )
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -237,6 +278,24 @@ fun AppNav(
                     onOpenDetail = ::openDetail,
                 )
             }
+            composable("latest_movies") {
+                val vm: LatestMediaViewModel = viewModel(
+                    factory = LatestMediaViewModel.factory("movies", container.catalogRepository, onUnread),
+                )
+                LatestMediaScreen(
+                    vm, container.baseUrl, isShows = false,
+                    onOpenDetail = ::openDetail,
+                )
+            }
+            composable("latest_shows") {
+                val vm: LatestMediaViewModel = viewModel(
+                    factory = LatestMediaViewModel.factory("shows", container.catalogRepository, onUnread),
+                )
+                LatestMediaScreen(
+                    vm, container.baseUrl, isShows = true,
+                    onOpenDetail = ::openDetail,
+                )
+            }
             composable(
                 "detail/{mediaType}/{traktId}",
                 arguments = listOf(
@@ -268,6 +327,19 @@ fun AppNav(
                 ProgressScreen(vm, onBack = { navController.popBackStack() })
             }
         }
+    }
+}
+
+@Composable
+private fun screenTitle(route: String?): String {
+    return when (route) {
+        "shows" -> stringResource(R.string.my_shows)
+        "movies" -> stringResource(R.string.my_movies)
+        "search" -> stringResource(R.string.search)
+        "alerts" -> stringResource(R.string.alerts)
+        "latest_movies" -> stringResource(R.string.latest_movies)
+        "latest_shows" -> stringResource(R.string.latest_shows)
+        else -> "TV Tracker"
     }
 }
 
