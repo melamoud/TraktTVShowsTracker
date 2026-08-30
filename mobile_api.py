@@ -565,6 +565,7 @@ def api_preferences():
     ]
     user_genres, user_keywords = get_user_genres_keywords(current_user)
     user_excluded = get_user_excluded_genres(current_user)
+    from services.cast_service import list_favorite_actors
     return jsonify({
         'success': True,
         'defaults': [
@@ -576,6 +577,21 @@ def api_preferences():
         'genres': user_genres,
         'keywords': user_keywords,
         'excluded_genres': user_excluded,
+        'alerts': {
+            'release_day': bool(getattr(prefs, 'alert_release_day', True)),
+            'new_streaming': bool(getattr(prefs, 'alert_new_streaming', True)),
+            'episode_aired': bool(getattr(prefs, 'alert_episode_aired', True)),
+            'list_add': bool(getattr(prefs, 'alert_list_add', True)),
+            'season_streaming': bool(getattr(prefs, 'alert_season_streaming', True)),
+            'favorite_actor': bool(getattr(prefs, 'alert_favorite_actor', True)),
+            'favorite_actor_match_only': bool(getattr(prefs, 'alert_favorite_actor_match_only', True)),
+            'new_user_login': bool(getattr(prefs, 'alert_new_user_login', True)) if current_user.is_admin else False,
+        },
+        'favorite_actors': [
+            {'trakt_id': p.trakt_id, 'name': p.name, 'headshot_url': p.headshot_url}
+            for p in list_favorite_actors(current_user)
+        ],
+        'prefs_reminder_disabled': bool(getattr(prefs, 'prefs_reminder_disabled', False)),
     })
 
 
@@ -668,6 +684,35 @@ def api_preferences_save():
         prefs.onboarding_completed_at = prefs.onboarding_completed_at or datetime.utcnow()
         prefs.prefs_reminder_disabled = False
         prefs.prefs_reminder_snooze_until = None
+
+    alerts = data.get('alerts')
+    if isinstance(alerts, dict):
+        prefs.alert_release_day = bool(alerts.get('release_day', prefs.alert_release_day))
+        prefs.alert_new_streaming = bool(alerts.get('new_streaming', prefs.alert_new_streaming))
+        prefs.alert_episode_aired = bool(alerts.get('episode_aired', prefs.alert_episode_aired))
+        prefs.alert_list_add = bool(alerts.get('list_add', prefs.alert_list_add))
+        prefs.alert_season_streaming = bool(alerts.get('season_streaming', prefs.alert_season_streaming))
+        prefs.alert_favorite_actor = bool(alerts.get('favorite_actor', prefs.alert_favorite_actor))
+        prefs.alert_favorite_actor_match_only = bool(alerts.get('favorite_actor_match_only', prefs.alert_favorite_actor_match_only))
+        if current_user.is_admin:
+            prefs.alert_new_user_login = bool(alerts.get('new_user_login', prefs.alert_new_user_login))
+
+    remove_actor_ids = _int_ids('remove_favorite_actor_ids')
+    if remove_actor_ids:
+        from models import CachedPerson, UserFavoriteActor
+        person_ids = [
+            p.id for p in CachedPerson.query.filter(
+                CachedPerson.trakt_id.in_(remove_actor_ids)
+            ).all()
+        ]
+        if person_ids:
+            UserFavoriteActor.query.filter(
+                UserFavoriteActor.user_id == current_user.id,
+                UserFavoriteActor.person_id.in_(person_ids),
+            ).delete(synchronize_session=False)
+
+    if 'prefs_reminder_disabled' in data:
+        prefs.prefs_reminder_disabled = bool(data.get('prefs_reminder_disabled'))
 
     prefs.updated_at = datetime.utcnow()
     db.session.commit()

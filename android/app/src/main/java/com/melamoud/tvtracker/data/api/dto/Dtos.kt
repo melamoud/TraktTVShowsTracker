@@ -181,6 +181,26 @@ data class PreferencesResponse(
     val genres: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     @SerializedName("excluded_genres") val excludedGenres: List<String> = emptyList(),
+    val alerts: AlertPrefsDto? = null,
+    @SerializedName("favorite_actors") val favoriteActors: List<FavoriteActorDto> = emptyList(),
+    @SerializedName("prefs_reminder_disabled") val prefsReminderDisabled: Boolean = false,
+)
+
+data class AlertPrefsDto(
+    @SerializedName("release_day") val releaseDay: Boolean = true,
+    @SerializedName("new_streaming") val newStreaming: Boolean = true,
+    @SerializedName("episode_aired") val episodeAired: Boolean = true,
+    @SerializedName("list_add") val listAdd: Boolean = true,
+    @SerializedName("season_streaming") val seasonStreaming: Boolean = true,
+    @SerializedName("favorite_actor") val favoriteActor: Boolean = true,
+    @SerializedName("favorite_actor_match_only") val favoriteActorMatchOnly: Boolean = true,
+    @SerializedName("new_user_login") val newUserLogin: Boolean = false,
+)
+
+data class FavoriteActorDto(
+    @SerializedName("trakt_id") val traktId: Int,
+    val name: String,
+    @SerializedName("headshot_url") val headshotUrl: String? = null,
 )
 
 data class PreferencesSaveRequest(
@@ -190,6 +210,9 @@ data class PreferencesSaveRequest(
     val genres: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     @SerializedName("excluded_genres") val excludedGenres: List<String> = emptyList(),
+    val alerts: AlertPrefsDto? = null,
+    @SerializedName("remove_favorite_actor_ids") val removeFavoriteActorIds: List<Int> = emptyList(),
+    @SerializedName("prefs_reminder_disabled") val prefsReminderDisabled: Boolean? = null,
 )
 
 data class CategoryDto(

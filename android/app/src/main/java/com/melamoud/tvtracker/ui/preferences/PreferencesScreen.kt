@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -42,7 +43,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.melamoud.tvtracker.R
+import com.melamoud.tvtracker.data.api.absoluteUrl
 import com.melamoud.tvtracker.ui.theme.Danger
 import com.melamoud.tvtracker.ui.theme.Ok
 import com.melamoud.tvtracker.ui.theme.SurfaceAlt
@@ -50,7 +53,11 @@ import com.melamoud.tvtracker.ui.theme.TextMuted
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun PreferencesScreen(viewModel: PreferencesViewModel) {
+fun PreferencesScreen(
+    viewModel: PreferencesViewModel,
+    baseUrl: String,
+    onHelp: () -> Unit,
+) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     if (state.loading && state.defaults.isEmpty()) {
@@ -193,6 +200,57 @@ fun PreferencesScreen(viewModel: PreferencesViewModel) {
             }
         }
 
+        ExpandableSection("Alerts") {
+            Text("Choose which in-app notifications you receive.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+            AlertToggle("Release day reminders", "release_day", state.alerts.releaseDay, viewModel::setAlert)
+            AlertToggle("New streaming availability", "new_streaming", state.alerts.newStreaming, viewModel::setAlert)
+            AlertToggle("New episode aired", "episode_aired", state.alerts.episodeAired, viewModel::setAlert)
+            AlertToggle("Title added to a list", "list_add", state.alerts.listAdd, viewModel::setAlert)
+            AlertToggle("Season now streaming", "season_streaming", state.alerts.seasonStreaming, viewModel::setAlert)
+            AlertToggle("Favorite actor appearance", "favorite_actor", state.alerts.favoriteActor, viewModel::setAlert)
+            AlertToggle("Only when actor title matches prefs", "favorite_actor_match_only", state.alerts.favoriteActorMatchOnly, viewModel::setAlert)
+        }
+
+        ExpandableSection("Favorite actors") {
+            Text("Actors marked as favorite on title detail pages. Tap to remove.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+            if (state.favoriteActors.isEmpty()) {
+                Text("No favorite actors yet. Add them from a title's cast list.", color = TextMuted)
+            } else {
+                state.favoriteActors.forEach { actor ->
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        AsyncImage(
+                            model = absoluteUrl(baseUrl, actor.headshotUrl),
+                            contentDescription = actor.name,
+                            modifier = Modifier.size(40.dp),
+                        )
+                        Text(actor.name, modifier = Modifier.weight(1f))
+                        IconButton(
+                            onClick = { viewModel.removeFavoriteActor(actor.traktId) },
+                            enabled = !state.actorBusy,
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Danger)
+                        }
+                    }
+                }
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Disable preferences reminder", style = MaterialTheme.typography.bodyMedium)
+            Checkbox(
+                checked = state.prefsReminderDisabled,
+                onCheckedChange = viewModel::setPrefsReminderDisabled,
+            )
+        }
+
         Button(
             onClick = viewModel::save,
             enabled = !state.saving,
@@ -204,6 +262,10 @@ fun PreferencesScreen(viewModel: PreferencesViewModel) {
                 Text(stringResource(R.string.save))
             }
         }
+        OutlinedButton(
+            onClick = onHelp,
+            modifier = Modifier.fillMaxWidth(),
+        ) { Text("Help") }
     }
 }
 
@@ -310,6 +372,21 @@ private fun AddCustomServiceDialog(onAdd: (String, String, String, String) -> Un
                 ) { Text("Add") }
             },
             dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@Composable
+private fun AlertToggle(label: String, key: String, checked: Boolean, onToggle: (String, Boolean) -> Unit) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium)
+        Checkbox(
+            checked = checked,
+            onCheckedChange = { onToggle(key, it) },
         )
     }
 }

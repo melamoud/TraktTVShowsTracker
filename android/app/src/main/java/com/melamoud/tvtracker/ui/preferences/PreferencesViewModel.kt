@@ -3,7 +3,9 @@ package com.melamoud.tvtracker.ui.preferences
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.melamoud.tvtracker.data.api.dto.AlertPrefsDto
 import com.melamoud.tvtracker.data.api.dto.CustomServiceDto
+import com.melamoud.tvtracker.data.api.dto.FavoriteActorDto
 import com.melamoud.tvtracker.data.api.dto.PreferencesSaveRequest
 import com.melamoud.tvtracker.data.api.dto.StreamingServiceDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
@@ -24,6 +26,10 @@ data class PreferencesUiState(
     val genres: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     val excludedGenres: List<String> = emptyList(),
+    val alerts: AlertPrefsDto = AlertPrefsDto(),
+    val favoriteActors: List<FavoriteActorDto> = emptyList(),
+    val prefsReminderDisabled: Boolean = false,
+    val actorBusy: Boolean = false,
 )
 
 class PreferencesViewModel(
@@ -48,6 +54,9 @@ class PreferencesViewModel(
                         genres = it.genres,
                         keywords = it.keywords,
                         excludedGenres = it.excludedGenres,
+                        alerts = it.alerts ?: AlertPrefsDto(),
+                        favoriteActors = it.favoriteActors,
+                        prefsReminderDisabled = it.prefsReminderDisabled,
                     )
                 },
                 onFailure = { _state.value = _state.value.copy(loading = false, error = it.message) },
@@ -160,6 +169,41 @@ class PreferencesViewModel(
         )
     }
 
+    fun setAlert(key: String, value: Boolean) {
+        val current = _state.value.alerts
+        val updated = when (key) {
+            "release_day" -> current.copy(releaseDay = value)
+            "new_streaming" -> current.copy(newStreaming = value)
+            "episode_aired" -> current.copy(episodeAired = value)
+            "list_add" -> current.copy(listAdd = value)
+            "season_streaming" -> current.copy(seasonStreaming = value)
+            "favorite_actor" -> current.copy(favoriteActor = value)
+            "favorite_actor_match_only" -> current.copy(favoriteActorMatchOnly = value)
+            "new_user_login" -> current.copy(newUserLogin = value)
+            else -> current
+        }
+        _state.value = _state.value.copy(alerts = updated, saved = false)
+    }
+
+    fun setPrefsReminderDisabled(value: Boolean) {
+        _state.value = _state.value.copy(prefsReminderDisabled = value, saved = false)
+    }
+
+    fun removeFavoriteActor(traktId: Int) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(actorBusy = true)
+            repo.favoriteActor(traktId, false).onSuccess {
+                _state.value = _state.value.copy(
+                    favoriteActors = _state.value.favoriteActors.filter { it.traktId != traktId },
+                    actorBusy = false,
+                    saved = false,
+                )
+            }.onFailure {
+                _state.value = _state.value.copy(actorBusy = false, saveError = it.message)
+            }
+        }
+    }
+
     fun save() {
         viewModelScope.launch {
             val s = _state.value
@@ -171,6 +215,9 @@ class PreferencesViewModel(
                 genres = s.genres,
                 keywords = s.keywords,
                 excludedGenres = s.excludedGenres,
+                alerts = s.alerts,
+                removeFavoriteActorIds = emptyList(),
+                prefsReminderDisabled = s.prefsReminderDisabled,
             )
             repo.savePreferences(body).fold(
                 onSuccess = { _state.value = _state.value.copy(saving = false, saveError = null, saved = true) },

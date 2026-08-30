@@ -53,6 +53,7 @@ import com.melamoud.tvtracker.ui.recommendations.RecommendedMediaScreen
 import com.melamoud.tvtracker.ui.recommendations.RecommendedMediaViewModel
 import com.melamoud.tvtracker.ui.login.LoginViewModel
 import com.melamoud.tvtracker.ui.media.MyMediaScreen
+import com.melamoud.tvtracker.ui.help.HelpScreen
 import com.melamoud.tvtracker.ui.preferences.PreferencesScreen
 import com.melamoud.tvtracker.ui.preferences.PreferencesViewModel
 import com.melamoud.tvtracker.ui.media.MyMediaViewModel
@@ -200,6 +201,17 @@ fun AppNav(
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("preferences") {
+                                        popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Help") },
+                                onClick = {
+                                    menuOpen = false
+                                    navController.navigate("help") {
                                         popUpTo(navController.graph.findStartDestination().id) { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
@@ -355,7 +367,17 @@ fun AppNav(
                 val vm: PreferencesViewModel = viewModel(
                     factory = PreferencesViewModel.factory(container.catalogRepository),
                 )
-                PreferencesScreen(vm)
+                PreferencesScreen(
+                    vm,
+                    baseUrl = container.baseUrl,
+                    onHelp = { navController.navigate("help") },
+                )
+            }
+            composable("help") {
+                HelpScreen(
+                    baseUrl = container.baseUrl,
+                    onBack = { navController.popBackStack() },
+                )
             }
             composable(
                 "detail/{mediaType}/{traktId}",
@@ -403,6 +425,7 @@ private fun screenTitle(route: String?): String {
         "recommended_movies" -> stringResource(R.string.recommended_movies)
         "recommended_shows" -> stringResource(R.string.recommended_shows)
         "preferences" -> stringResource(R.string.preferences)
+        "help" -> "Help"
         else -> "TV Tracker"
     }
 }
