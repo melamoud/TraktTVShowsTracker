@@ -54,6 +54,7 @@ fun MediaCard(
     showPin: Boolean = true,
     setListsInline: Boolean = false,
     watchInOverflow: Boolean = false,
+    foundOnInline: Boolean = false,
     hideRecommendationInline: Boolean = false,
     onPin: () -> Unit,
     onLists: () -> Unit,
@@ -174,6 +175,13 @@ fun MediaCard(
                             modifier = Modifier.height(32.dp),
                         ) { Text("Set lists") }
                     }
+                    if (foundOnInline) {
+                        OutlinedButton(
+                            onClick = onFoundOn,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(32.dp),
+                        ) { Text("Found on") }
+                    }
                     if (onProgress != null) {
                         OutlinedButton(
                             onClick = onProgress,
@@ -217,10 +225,12 @@ fun MediaCard(
                                 onClick = { menuOpen = false; onLists() },
                             )
                         }
-                        DropdownMenuItem(
-                            text = { Text("Found on…") },
-                            onClick = { menuOpen = false; onFoundOn() },
-                        )
+                        if (!foundOnInline) {
+                            DropdownMenuItem(
+                                text = { Text("Found on…") },
+                                onClick = { menuOpen = false; onFoundOn() },
+                            )
+                        }
                         DropdownMenuItem(
                             text = { Text(if (item.rating != null) "Rate ${item.rating}/10" else "Rate…") },
                             onClick = { menuOpen = false; onRate() },
