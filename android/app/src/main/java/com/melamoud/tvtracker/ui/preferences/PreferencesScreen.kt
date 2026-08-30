@@ -41,11 +41,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.data.api.absoluteUrl
+import com.melamoud.tvtracker.data.api.dto.CustomServiceDto
 import com.melamoud.tvtracker.ui.theme.Danger
 import com.melamoud.tvtracker.ui.theme.Ok
 import com.melamoud.tvtracker.ui.theme.SurfaceAlt
@@ -112,9 +114,16 @@ fun PreferencesScreen(
                     }
                 }
             }
-            AddCustomServiceDialog(onAdd = { name, url, template, note ->
-                viewModel.addCustom(name, url, template, note)
-            })
+            AddCustomServiceDialog(onAdd = viewModel::addCustom)
+            if (state.customs.isNotEmpty()) {
+                Spacer(Modifier.height(8.dp))
+                Text("Custom services:", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                state.customs.forEach { custom ->
+                    CustomServiceRow(custom, onUpdate = { template, note, suggest ->
+                        viewModel.updateCustom(custom.id, template, note, suggest)
+                    }, onRemove = { viewModel.removeCustom(custom.id) })
+                }
+            }
         }
 
         ExpandableSection("Genres") {
@@ -209,6 +218,35 @@ fun PreferencesScreen(
             AlertToggle("Season now streaming", "season_streaming", state.alerts.seasonStreaming, viewModel::setAlert)
             AlertToggle("Favorite actor appearance", "favorite_actor", state.alerts.favoriteActor, viewModel::setAlert)
             AlertToggle("Only when actor title matches prefs", "favorite_actor_match_only", state.alerts.favoriteActorMatchOnly, viewModel::setAlert)
+            if (state.isAdmin) {
+                AlertToggle("New user login", "new_user_login", state.alerts.newUserLogin, viewModel::setAlert)
+            }
+        }
+
+        ExpandableSection("Lists") {
+            Text(
+                "Choose which Trakt lists appear, which are pre-selected in Set lists, and which generate alerts.",
+                color = TextMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            state.listsError?.let { Text(it, color = Danger) }
+            state.lists.forEach { list ->
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(list.name, modifier = Modifier.weight(1f))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Show", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        Checkbox(checked = !list.hidden, onCheckedChange = { viewModel.toggleListHidden(list.id) })
+                        Text("Default", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        Checkbox(checked = list.defaultSelected, onCheckedChange = { viewModel.toggleListDefault(list.id) })
+                        Text("Alert", style = MaterialTheme.typography.labelSmall, color = TextMuted)
+                        Checkbox(checked = list.alertEnabled, onCheckedChange = { viewModel.toggleListAlert(list.id) })
+                    }
+                }
+            }
         }
 
         ExpandableSection("Favorite actors") {
@@ -239,16 +277,55 @@ fun PreferencesScreen(
             }
         }
 
-        Row(
-            Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Disable preferences reminder", style = MaterialTheme.typography.bodyMedium)
-            Checkbox(
-                checked = state.prefsReminderDisabled,
-                onCheckedChange = viewModel::setPrefsReminderDisabled,
+        ExpandableSection("Review markers") {
+            Text(
+                "Review markers dim older titles in the Latest feeds. Use the Latest screens to set a new marker, or clear/catch up here.",
+                color = TextMuted,
+                style = MaterialTheme.typography.bodySmall,
             )
+            listOf("movie" to "Movies", "show" to "Shows").forEach { (mediaType, label) ->
+                val marker = if (mediaType == "movie") state.markers.movie else state.markers.show
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        if (marker != null) "$label: up to ${marker.title}" else "$label: no marker",
+                        modifier = Modifier.weight(1f),
+                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        TextButton(onClick = { viewModel.markerClear(mediaType) }) { Text("Clear") }
+                        TextButton(onClick = { viewModel.markerCaughtUp(mediaType) }) { Text("Caught up") }
+                    }
+                }
+            }
+        }
+
+        ExpandableSection("Preferences reminder") {
+            Text(
+                "Control the banner that reminds you to fill preferences. Snooze hides it for 24 hours.",
+                color = TextMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Disable reminder permanently", style = MaterialTheme.typography.bodyMedium)
+                Checkbox(
+                    checked = state.prefsReminderDisabled,
+                    onCheckedChange = viewModel::setPrefsReminderDisabled,
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = viewModel::snoozeReminder) { Text("Snooze 24h") }
+                OutlinedButton(onClick = viewModel::enableReminder) { Text("Enable now") }
+            }
+            state.prefsReminderSnoozeUntil?.let {
+                Text("Snoozed until $it", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+            }
         }
 
         Button(
@@ -334,12 +411,13 @@ private fun InputChipWithRemove(label: String, onRemove: () -> Unit) {
 }
 
 @Composable
-private fun AddCustomServiceDialog(onAdd: (String, String, String, String) -> Unit) {
+private fun AddCustomServiceDialog(onAdd: (String, String, String, String, Boolean) -> Unit) {
     var open by remember { mutableStateOf(false) }
     var name by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
     var template by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
+    var suggest by remember { mutableStateOf(false) }
 
     OutlinedButton(
         onClick = { open = true },
@@ -356,16 +434,21 @@ private fun AddCustomServiceDialog(onAdd: (String, String, String, String) -> Un
                     OutlinedTextField(value = url, onValueChange = { url = it }, label = { Text("URL (optional)") }, singleLine = true)
                     OutlinedTextField(value = template, onValueChange = { template = it }, label = { Text("Search template (optional)") }, singleLine = true)
                     OutlinedTextField(value = note, onValueChange = { note = it }, label = { Text("Note (optional)") }, singleLine = true)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = suggest, onCheckedChange = { suggest = it })
+                        Text("Suggest as default service", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        onAdd(name, url, template, note)
+                        onAdd(name, url, template, note, suggest)
                         name = ""
                         url = ""
                         template = ""
                         note = ""
+                        suggest = false
                         open = false
                     },
                     enabled = name.isNotBlank(),
@@ -373,6 +456,39 @@ private fun AddCustomServiceDialog(onAdd: (String, String, String, String) -> Un
             },
             dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun CustomServiceRow(
+    custom: CustomServiceDto,
+    onUpdate: (String, String, Boolean) -> Unit,
+    onRemove: () -> Unit,
+) {
+    var template by remember(custom.id) { mutableStateOf(custom.searchTemplate.orEmpty()) }
+    var note by remember(custom.id) { mutableStateOf(custom.note.orEmpty()) }
+    var suggest by remember(custom.id) { mutableStateOf(custom.suggestDefault) }
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(custom.name, fontWeight = FontWeight.SemiBold)
+        OutlinedTextField(
+            value = template,
+            onValueChange = { template = it; onUpdate(template, note, suggest) },
+            label = { Text("Search template") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        OutlinedTextField(
+            value = note,
+            onValueChange = { note = it; onUpdate(template, note, suggest) },
+            label = { Text("Note") },
+            singleLine = true,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Checkbox(checked = suggest, onCheckedChange = { suggest = it; onUpdate(template, note, suggest) })
+            Text("Suggest as default", style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
+            IconButton(onClick = onRemove) { Icon(Icons.Default.Delete, contentDescription = "Remove", tint = Danger) }
+        }
     }
 }
 

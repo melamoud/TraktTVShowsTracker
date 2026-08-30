@@ -5,6 +5,9 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.melamoud.tvtracker.data.api.dto.AlertEntryDto
 import com.melamoud.tvtracker.data.api.dto.AlertItemDto
+import com.melamoud.tvtracker.data.api.dto.MediaItemDto
+import com.melamoud.tvtracker.ui.media.FoundOnDialogState
+import com.melamoud.tvtracker.ui.media.ListsDialogState
 import com.melamoud.tvtracker.data.repo.CatalogRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +24,11 @@ data class AlertsUiState(
     val sort: String = "desc",
     val groupShows: Boolean = true,
     val expandedKeys: Set<String> = emptySet(),
+    val foundOnChoices: List<String> = emptyList(),
+    val rateTarget: AlertItemDto? = null,
+    val listsDialog: ListsDialogState? = null,
+    val foundOnDialog: FoundOnDialogState? = null,
+    val watchConfirm: AlertItemDto? = null,
 )
 
 class AlertsViewModel(
@@ -109,6 +117,99 @@ class AlertsViewModel(
     fun runReleaseCheck() {
         viewModelScope.launch {
             repo.adminRunReleaseCheck()
+            reload()
+        }
+    }
+
+    fun confirmWatch(item: AlertItemDto) { _state.value = _state.value.copy(watchConfirm = item) }
+    fun dismissWatch() { _state.value = _state.value.copy(watchConfirm = null) }
+    fun applyWatch() {
+        val item = _state.value.watchConfirm ?: return
+        _state.value = _state.value.copy(watchConfirm = null)
+        val mt = item.mediaType ?: return
+        val tid = item.traktId ?: return
+        viewModelScope.launch {
+            repo.watched(mt, tid, true)
+            onUnread(repo.unreadAlerts())
+            reload()
+        }
+    }
+
+    fun openRate(item: AlertItemDto) { _state.value = _state.value.copy(rateTarget = item) }
+    fun dismissRate() { _state.value = _state.value.copy(rateTarget = null) }
+    fun applyRate(score: Int?) {
+        val item = _state.value.rateTarget ?: return
+        _state.value = _state.value.copy(rateTarget = null)
+        val mt = item.mediaType ?: return
+        val tid = item.traktId ?: return
+        viewModelScope.launch {
+            repo.rating(mt, tid, score)
+            reload()
+        }
+    }
+
+    fun openLists(item: AlertItemDto) {
+        val mt = item.mediaType ?: return
+        val tid = item.traktId ?: return
+        viewModelScope.launch {
+            repo.listsGet(mt, tid).onSuccess {
+                _state.value = _state.value.copy(
+                    listsDialog = ListsDialogState(
+                        MediaItemDto(
+                            mediaType = mt,
+                            traktId = tid,
+                            title = item.mediaTitle ?: item.title,
+                            year = item.year,
+                        ),
+                        it.lists,
+                        it.defaults,
+                    ),
+                )
+            }
+        }
+    }
+    fun dismissLists() { _state.value = _state.value.copy(listsDialog = null) }
+    fun applyLists(selected: List<String>) {
+        val dialog = _state.value.listsDialog ?: return
+        _state.value = _state.value.copy(listsDialog = null)
+        viewModelScope.launch {
+            repo.listsSet(dialog.item.mediaType ?: "movie", dialog.item.traktId, selected)
+            reload()
+        }
+    }
+
+    fun openFoundOn(item: AlertItemDto) {
+        val choices = item.foundOn
+        val links = item.foundOnLinks
+        _state.value = _state.value.copy(
+            foundOnDialog = FoundOnDialogState(
+                MediaItemDto(
+                    mediaType = item.mediaType ?: "movie",
+                    traktId = item.traktId ?: 0,
+                    title = item.mediaTitle ?: item.title,
+                    year = item.year,
+                    foundOn = item.foundOn,
+                    foundOnChoiceLinks = item.foundOnLinks,
+                ),
+                choices = choices.ifEmpty { _state.value.foundOnChoices },
+                choiceLinks = links,
+            ),
+        )
+        if (_state.value.foundOnChoices.isEmpty()) {
+            viewModelScope.launch {
+                repo.foundOnChoices(item.mediaTitle ?: item.title, item.year).onSuccess {
+                    _state.value = _state.value.copy(foundOnChoices = it.choices)
+                }
+            }
+        }
+    }
+    fun dismissFoundOn() { _state.value = _state.value.copy(foundOnDialog = null) }
+    fun applyFoundOn(labels: List<String>) {
+        val dialog = _state.value.foundOnDialog ?: return
+        val item = dialog.item
+        _state.value = _state.value.copy(foundOnDialog = null)
+        viewModelScope.launch {
+            repo.foundOn(item.mediaType ?: "movie", item.traktId, labels)
             reload()
         }
     }

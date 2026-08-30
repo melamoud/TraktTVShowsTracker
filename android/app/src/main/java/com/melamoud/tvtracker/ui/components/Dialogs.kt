@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -23,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.unit.dp
 import com.melamoud.tvtracker.data.api.dto.ListMembershipDto
 import com.melamoud.tvtracker.data.api.dto.ServiceLinkDto
 
@@ -85,6 +87,63 @@ fun RateDialog(
             }
         },
         confirmButton = { TextButton(onClick = { onSave(value) }) { Text("Save") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ReviewDialog(
+    currentRating: Int?,
+    currentComment: String?,
+    onSave: (Int?, String, Boolean) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var rating by remember { mutableStateOf(currentRating) }
+    var comment by remember { mutableStateOf(currentComment.orEmpty()) }
+    var spoiler by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rate / Review") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                    OutlinedTextField(
+                        value = rating?.toString() ?: "Clear rating",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Rating 1–10") },
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth(),
+                    )
+                    ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                        DropdownMenuItem(text = { Text("Clear rating") }, onClick = {
+                            rating = null
+                            expanded = false
+                        })
+                        (1..10).forEach { score ->
+                            DropdownMenuItem(text = { Text(score.toString()) }, onClick = {
+                                rating = score
+                                expanded = false
+                            })
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = comment,
+                    onValueChange = { comment = it },
+                    label = { Text("Review (optional)") },
+                    modifier = Modifier.fillMaxWidth().height(120.dp),
+                    maxLines = 5,
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = spoiler, onCheckedChange = { spoiler = it })
+                    Text("Spoiler")
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(rating, comment, spoiler) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

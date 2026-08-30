@@ -3,6 +3,8 @@ package com.melamoud.tvtracker.data.repo
 import com.melamoud.tvtracker.data.api.AuthLog
 import com.melamoud.tvtracker.data.api.TvTrackerApi
 import com.melamoud.tvtracker.data.api.dto.ActionRequest
+import com.melamoud.tvtracker.data.api.dto.AdminSchedulerSaveRequest
+import com.melamoud.tvtracker.data.api.dto.AdminStreamingServiceActionRequest
 import com.melamoud.tvtracker.data.api.dto.AlertsResponse
 import com.melamoud.tvtracker.data.api.dto.CommentResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
@@ -13,8 +15,10 @@ import com.melamoud.tvtracker.data.api.dto.LatestMediaResponse
 import com.melamoud.tvtracker.data.api.dto.ListsResponse
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
+import com.melamoud.tvtracker.data.api.dto.PeopleSearchResponse
 import com.melamoud.tvtracker.data.api.dto.PreferencesResponse
 import com.melamoud.tvtracker.data.api.dto.PreferencesSaveRequest
+import com.melamoud.tvtracker.data.api.dto.PrefsReminderRequest
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.api.dto.RecommendedMediaResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
@@ -30,6 +34,9 @@ class CatalogRepository(private val api: TvTrackerApi) {
     suspend fun savePreferences(body: PreferencesSaveRequest): Result<SimpleResponse> =
         runCatching { api.savePreferences(body) }
 
+    suspend fun prefsReminder(action: String): Result<SimpleResponse> =
+        runCatching { api.prefsReminder(PrefsReminderRequest(action)) }
+
     suspend fun myMedia(
         kind: String,
         filter: String? = null,
@@ -41,6 +48,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
         page: Int = 1,
         refresh: Boolean = false,
         lists: List<String>? = null,
+        year: String? = null,
+        genres: List<String>? = null,
     ): Result<MyMediaResponse> = runCatching {
         api.myMedia(
             kind = kind,
@@ -54,10 +63,17 @@ class CatalogRepository(private val api: TvTrackerApi) {
             refresh = if (refresh) 1 else null,
             listsSet = if (lists != null) 1 else null,
             lists = lists,
+            year = year,
+            genres = genres,
+            genresSet = if (genres != null) 1 else null,
         )
     }.recoverCatching { e ->
         throw IllegalStateException(AuthLog.userMessage(e), e)
     }
+
+    suspend fun peopleSearch(query: String): Result<PeopleSearchResponse> = runCatching {
+        api.peopleSearch(query)
+    }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
     suspend fun search(
         query: String,
@@ -221,6 +237,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
         recentYears: Boolean? = null,
         perPage: Int? = null,
         loadOlder: Boolean? = null,
+        year: String? = null,
+        genres: List<String>? = null,
     ): Result<LatestMediaResponse> = runCatching {
         api.latestMedia(
             kind = kind,
@@ -233,6 +251,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
             recentYears = recentYears?.let { if (it) 1 else 0 },
             perPage = perPage,
             loadOlder = loadOlder?.let { if (it) 1 else 0 },
+            year = year,
+            genres = genres?.takeIf { it.isNotEmpty() },
         )
     }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
@@ -247,6 +267,9 @@ class CatalogRepository(private val api: TvTrackerApi) {
         onMyServices: Boolean? = null,
         matchOnly: Boolean? = null,
         perPage: Int? = null,
+        refresh: Boolean = false,
+        year: String? = null,
+        genres: List<String>? = null,
     ): Result<RecommendedMediaResponse> = runCatching {
         api.recommendations(
             kind = kind,
@@ -259,6 +282,9 @@ class CatalogRepository(private val api: TvTrackerApi) {
             onMyServices = onMyServices?.let { if (it) 1 else 0 },
             matchOnly = matchOnly?.let { if (it) 1 else 0 },
             perPage = perPage,
+            refresh = if (refresh) 1 else null,
+            year = year,
+            genres = genres?.takeIf { it.isNotEmpty() },
         )
     }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
@@ -290,4 +316,14 @@ class CatalogRepository(private val api: TvTrackerApi) {
     suspend fun adminRevokeSessions(userId: Int) = runCatching { api.adminRevokeSessions(userId) }
     suspend fun adminDeleteLocal(userId: Int) = runCatching { api.adminDeleteLocal(userId) }
     suspend fun adminScheduler() = runCatching { api.adminScheduler() }
+
+    suspend fun adminSchedulerSave(body: AdminSchedulerSaveRequest) = runCatching {
+        api.adminSchedulerSave(body)
+    }
+
+    suspend fun adminStreamingServices() = runCatching { api.adminStreamingServices() }
+
+    suspend fun adminStreamingServicesAction(body: AdminStreamingServiceActionRequest) = runCatching {
+        api.adminStreamingServicesAction(body)
+    }
 }

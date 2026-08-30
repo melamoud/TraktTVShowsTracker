@@ -1,17 +1,24 @@
 package com.melamoud.tvtracker.ui.media
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -25,8 +32,11 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -37,8 +47,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
@@ -55,6 +68,7 @@ import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
 import com.melamoud.tvtracker.ui.theme.Danger
+import com.melamoud.tvtracker.ui.theme.SurfaceAlt
 import com.melamoud.tvtracker.ui.theme.TextMuted
 
 @Composable
@@ -155,6 +169,9 @@ fun MyMediaScreen(
                     }
                 }
             }
+            YearFilterField(state.year) { viewModel.setYear(it) }
+            GenreFilterButton(state.genres, state.genreChoices) { viewModel.toggleGenre(it) }
+            OutlinedButton(onClick = viewModel::refreshFromTrakt) { Text("Refresh Trakt", style = MaterialTheme.typography.labelSmall) }
         }
         if (displayMode in setOf("daily", "weekly", "monthly")) {
             CalendarHeader(state, viewModel)
@@ -173,9 +190,8 @@ fun MyMediaScreen(
             when {
                 state.loading && state.items.isEmpty() && state.calendar == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 state.error != null && state.items.isEmpty() && state.calendar == null -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
-                displayMode in setOf("daily", "weekly", "monthly") -> CalendarListView(
+                displayMode in setOf("daily", "weekly", "monthly") -> CalendarGridView(
                     calendar = state.calendar,
-                    baseUrl = baseUrl,
                     onOpen = onOpenDetail,
                 )
                 state.items.isEmpty() -> Text(stringResource(R.string.empty_list), color = TextMuted, modifier = Modifier.padding(24.dp))
@@ -356,9 +372,8 @@ private fun CalendarHeader(state: MyMediaUiState, viewModel: MyMediaViewModel) {
 }
 
 @Composable
-private fun CalendarListView(
+private fun CalendarGridView(
     calendar: com.melamoud.tvtracker.data.api.dto.CalendarDto?,
-    baseUrl: String,
     onOpen: (String, Int) -> Unit,
 ) {
     if (calendar == null) {
@@ -372,46 +387,132 @@ private fun CalendarListView(
         }
         return
     }
-    LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        calendar.days.forEach { day ->
-            if (day.events.isEmpty()) return@forEach
-            item(key = "header-${day.date}") {
+    var selectedDay by remember { mutableStateOf<com.melamoud.tvtracker.data.api.dto.CalendarDayDto?>(null) }
+    Column(Modifier.fillMaxSize().padding(12.dp)) {
+        Row(Modifier.fillMaxWidth()) {
+            calendar.weekdays.forEach { dayName ->
                 Text(
-                    day.date ?: "",
+                    dayName.take(1),
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center,
                     color = TextMuted,
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                    style = MaterialTheme.typography.labelSmall,
                 )
             }
-            items(day.events, key = { "${day.date}-${it.traktId}-${it.label}" }) { ev ->
-                CalendarEventCard(ev, baseUrl, onOpen)
+        }
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(7),
+            modifier = Modifier.weight(1f),
+        ) {
+            items(calendar.days, key = { it.date ?: it.hashCode() }) { day ->
+                CalendarDayCell(day, onClick = { if (day.events.isNotEmpty()) selectedDay = day })
+            }
+        }
+    }
+    selectedDay?.let { day ->
+        DayEventsDialog(day, onOpen) { selectedDay = null }
+    }
+}
+
+@Composable
+private fun CalendarDayCell(
+    day: com.melamoud.tvtracker.data.api.dto.CalendarDayDto,
+    onClick: () -> Unit,
+) {
+    val eventCount = day.events.size
+    Box(
+        modifier = Modifier
+            .padding(2.dp)
+            .aspectRatio(1f)
+            .clip(RoundedCornerShape(4.dp))
+            .background(
+                if (day.isToday) MaterialTheme.colorScheme.primaryContainer
+                else if (day.inMonth) SurfaceAlt
+                else androidx.compose.ui.graphics.Color.Transparent
+            )
+            .clickable(enabled = eventCount > 0, onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                day.date?.substringAfterLast("-") ?: "",
+                color = if (day.isToday) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                fontWeight = if (day.isToday) FontWeight.Bold else FontWeight.Normal,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            if (eventCount > 0) {
+                Text(
+                    "$eventCount",
+                    color = MaterialTheme.colorScheme.primary,
+                    style = MaterialTheme.typography.labelSmall,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun CalendarEventCard(
-    event: com.melamoud.tvtracker.data.api.dto.CalendarEventDto,
-    baseUrl: String,
+private fun DayEventsDialog(
+    day: com.melamoud.tvtracker.data.api.dto.CalendarDayDto,
     onOpen: (String, Int) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    Card(
-        onClick = { onOpen(event.mediaType ?: "show", event.traktId) },
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            AsyncImage(
-                model = absoluteUrl(baseUrl, event.posterUrl),
-                contentDescription = event.title,
-                modifier = Modifier.width(40.dp).height(60.dp),
-            )
-            Column(Modifier.weight(1f)) {
-                Text(event.title, maxLines = 2)
-                event.label?.let { Text(it, color = TextMuted, maxLines = 1) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(day.date ?: "Events") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (day.events.isEmpty()) {
+                    Text("No events", color = TextMuted)
+                } else {
+                    day.events.forEach { ev ->
+                        TextButton(
+                            onClick = {
+                                onDismiss()
+                                onOpen(ev.mediaType ?: "show", ev.traktId)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("${ev.title} ${ev.label?.let { "($it)" } ?: ""}")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } },
+    )
+}
+
+@Composable
+private fun YearFilterField(value: String, onChange: (String) -> Unit) {
+    var text by remember(value) { mutableStateOf(value) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it },
+        label = { Text("Year", style = MaterialTheme.typography.labelSmall) },
+        singleLine = true,
+        modifier = Modifier.width(90.dp),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onChange(text) }),
+    )
+}
+
+@Composable
+private fun GenreFilterButton(
+    selected: List<String>,
+    choices: List<String>,
+    onToggle: (String) -> Unit,
+) {
+    val label = if (selected.isEmpty()) "Genres" else "Genres (${selected.size})"
+    FilterMenuButton(label) { dismiss ->
+        if (choices.isEmpty()) {
+            DropdownMenuItem(text = { Text("No genres") }, onClick = dismiss)
+        } else {
+            choices.forEach { genre ->
+                CheckMenuItem(genre, selected.contains(genre)) {
+                    onToggle(genre)
+                    dismiss()
+                }
             }
         }
     }

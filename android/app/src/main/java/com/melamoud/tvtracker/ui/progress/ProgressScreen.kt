@@ -11,8 +11,11 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -24,7 +27,9 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -33,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
+import com.melamoud.tvtracker.ui.components.ReviewDialog
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
 import com.melamoud.tvtracker.ui.theme.Ok
 import com.melamoud.tvtracker.ui.theme.Primary
@@ -47,6 +53,7 @@ fun ProgressScreen(
     val state by viewModel.state.collectAsStateWithLifecycle()
     val open = remember { mutableStateMapOf<Int, Boolean>() }
     val data = state.data
+    var menuExpanded by remember { mutableStateOf(false) }
     ReloadOnResume(viewModel::reload)
 
     Column(Modifier.fillMaxSize()) {
@@ -58,6 +65,20 @@ fun ProgressScreen(
             actions = {
                 IconButton(onClick = viewModel::reload) {
                     Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                }
+                Box {
+                    IconButton(onClick = { menuExpanded = true }) {
+                        Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Refresh from Trakt") },
+                            onClick = { menuExpanded = false; viewModel.refreshFromTrakt() },
+                        )
+                    }
                 }
             },
         )
@@ -131,6 +152,10 @@ fun ProgressScreen(
                                             onClick = { viewModel.toggleEpisode(ep, season.number) },
                                             enabled = !state.busy && ep.aired,
                                         ) { Text(if (ep.watched) "Watched" else "Watch") }
+                                        TextButton(
+                                            onClick = { viewModel.openReview(ep) },
+                                            enabled = !state.busy,
+                                        ) { Text("Rate") }
                                     }
                                 }
                             }
@@ -139,5 +164,13 @@ fun ProgressScreen(
                 }
             }
         }
+    }
+    state.reviewTarget?.let { ep ->
+        ReviewDialog(
+            currentRating = null,
+            currentComment = null,
+            onSave = { rating, comment, spoiler -> viewModel.applyReview(rating, comment, spoiler) },
+            onDismiss = viewModel::dismissReview,
+        )
     }
 }

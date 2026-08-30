@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -18,13 +19,19 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalUriHandler
@@ -109,6 +116,9 @@ fun RecommendedMediaScreen(
             }
             BooleanFilterButton("Match only", state.matchOnly) { viewModel.setMatchOnly(it) }
             PerPageFilterButton(state.perPage) { viewModel.setPerPage(it) }
+            YearFilterField(state.year) { viewModel.setYear(it) }
+            GenreFilterButton(state.genres, state.genreChoices) { viewModel.toggleGenre(it) }
+            OutlinedButton(onClick = viewModel::setRefresh) { Text("Refresh Trakt", style = MaterialTheme.typography.labelSmall) }
         }
         if (state.matchOnly && !state.hasMatchPrefs) {
             Text(
@@ -237,6 +247,41 @@ private fun PerPageFilterButton(
     FilterMenuButton("$value/page") { dismiss ->
         listOf(10, 50, 100).forEach { size ->
             CheckMenuItem(size.toString(), value == size) { onChange(size); dismiss() }
+        }
+    }
+}
+
+@Composable
+private fun YearFilterField(value: String, onChange: (String) -> Unit) {
+    var text by remember(value) { mutableStateOf(value) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it },
+        label = { Text("Year", style = MaterialTheme.typography.labelSmall) },
+        singleLine = true,
+        modifier = Modifier.width(90.dp),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onChange(text) }),
+    )
+}
+
+@Composable
+private fun GenreFilterButton(
+    selected: List<String>,
+    choices: List<String>,
+    onToggle: (String) -> Unit,
+) {
+    val label = if (selected.isEmpty()) "Genres" else "Genres (${selected.size})"
+    FilterMenuButton(label) { dismiss ->
+        if (choices.isEmpty()) {
+            DropdownMenuItem(text = { Text("No genres") }, onClick = dismiss)
+        } else {
+            choices.forEach { genre ->
+                CheckMenuItem(genre, selected.contains(genre)) {
+                    onToggle(genre)
+                    dismiss()
+                }
+            }
         }
     }
 }

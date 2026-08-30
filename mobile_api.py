@@ -13,8 +13,9 @@ from flask_login import current_user, login_required, login_user, logout_user
 from flask_wtf.csrf import generate_csrf
 
 from models import (
-    MobileLoginToken, Notification, StreamingService, User, UserPreference,
-    UserSession, UserStreamingService, db,
+    AlertEvent, CachedPerson, MobileLoginToken, Notification, ReviewMarker,
+    StreamingService, StreamingServiceSuggestion, User, UserFavoriteActor,
+    UserPreference, UserSession, UserStreamingService, db,
 )
 from services.mobile_payloads import (
     found_on_choice_links,
@@ -27,6 +28,9 @@ from services.mobile_payloads import (
 )
 from services.seed import COMMON_GENRES
 from services.streaming_matcher import (
+    get_alert_enabled_list_ids,
+    get_default_selected_list_ids,
+    get_hidden_list_ids,
     get_user_excluded_genres,
     get_user_genres_keywords,
     serialize_prefs,
@@ -159,6 +163,30 @@ def api_auth_complete():
     return jsonify({'success': True, 'user': _user_payload()})
 
 
+@mobile_api_bp.route('/prefs-reminder', methods=['POST'])
+@login_required
+def api_prefs_reminder():
+    from routes.user_routes import _ensure_prefs
+    prefs = _ensure_prefs()
+    payload = request.json or {}
+    action = (payload.get('action') or '').strip()
+    if action == 'snooze':
+        prefs.prefs_reminder_snooze_until = datetime.utcnow() + timedelta(days=1)
+        db.session.commit()
+        return jsonify({'success': True, 'action': 'snooze'})
+    if action == 'disable':
+        prefs.prefs_reminder_disabled = True
+        prefs.onboarding_completed_at = prefs.onboarding_completed_at or datetime.utcnow()
+        db.session.commit()
+        return jsonify({'success': True, 'action': 'disable'})
+    if action == 'enable':
+        prefs.prefs_reminder_disabled = False
+        prefs.prefs_reminder_snooze_until = None
+        db.session.commit()
+        return jsonify({'success': True, 'action': 'enable'})
+    return jsonify({'success': False, 'message': 'action must be snooze, disable, or enable'}), 400
+
+
 @mobile_api_bp.route('/logout', methods=['POST'])
 @login_required
 def api_logout():
@@ -209,7 +237,40 @@ def api_my_media(media_type):
         'calendar': _serialize_calendar(ctx.get('calendar')),
         'title': ctx.get('title'),
         'found_on_choices': found_on_service_choices(current_user),
+        'year': ctx.get('year') or '',
+        'genres': ctx.get('filter_genres') or [],
+        'genre_choices': ctx.get('genre_choices') or [],
     })
+
+
+@mobile_api_bp.route('/people/search', methods=['GET'])
+@login_required
+def api_people_search():
+    """Search Trakt people by name for actor search."""
+    q = (request.args.get('q') or '').strip()
+    if len(q) < 2:
+        return jsonify({'success': False, 'message': 'Query must be at least 2 characters'}), 400
+    from services.trakt_client import search_people
+    from services.cast_service import upsert_person_from_trakt
+    people = []
+    try:
+        for row in search_people(current_user, q, limit=10):
+            person = row.get('person')
+            if not isinstance(person, dict):
+                continue
+            p = upsert_person_from_trakt(person)
+            if p:
+                people.append({
+                    'trakt_id': p.trakt_id,
+                    'name': p.name,
+                    'headshot_url': p.headshot_url,
+                })
+        db.session.commit()
+    except Exception as exc:
+        db.session.rollback()
+        current_app.logger.warning('People search failed: %s', exc)
+        return jsonify({'success': False, 'message': 'Could not search people right now'}), 502
+    return jsonify({'success': True, 'people': people})
 
 
 @mobile_api_bp.route('/search', methods=['GET'])
@@ -500,6 +561,9 @@ def api_latest_media(media_type):
         'has_more_older': ctx.get('has_more_older'),
         'marker': marker_payload,
         'marker_page': ctx.get('marker_page'),
+        'year': ctx.get('year') or '',
+        'genres': ctx.get('filter_genres') or [],
+        'genre_choices': ctx.get('genre_choices') or [],
     })
 
 
@@ -538,6 +602,7 @@ def api_recommendations(media_type):
         'user_service_names': ctx.get('user_service_names') or [],
         'filter_genres': ctx.get('filter_genres') or [],
         'year': ctx.get('year') or '',
+        'genre_choices': ctx.get('genre_choices') or [],
     })
 
 
@@ -566,8 +631,29 @@ def api_preferences():
     user_genres, user_keywords = get_user_genres_keywords(current_user)
     user_excluded = get_user_excluded_genres(current_user)
     from services.cast_service import list_favorite_actors
+    from routes.user_routes import _personal_lists, WATCHLIST_LIST_ID
+    hidden_list_ids = set(get_hidden_list_ids(current_user))
+    default_selected_list_ids = set(get_default_selected_list_ids(current_user))
+    alert_enabled_list_ids = set(get_alert_enabled_list_ids(current_user))
+    trakt_lists = []
+    trakt_lists_error = None
+    try:
+        trakt_lists = _personal_lists(current_user)
+    except Exception as exc:
+        current_app.logger.warning('Could not load Trakt lists for preferences: %s', exc)
+        trakt_lists_error = str(exc)
+    all_lists = [{'id': WATCHLIST_LIST_ID, 'name': 'Wishlist', 'kind': 'watchlist'}]
+    all_lists.extend([
+        {'id': lst['id'], 'name': lst['name'], 'kind': 'list', 'slug': lst.get('slug', '')}
+        for lst in trakt_lists
+    ])
+    markers = {
+        'movie': ReviewMarker.query.filter_by(user_id=current_user.id, media_type='movie').first(),
+        'show': ReviewMarker.query.filter_by(user_id=current_user.id, media_type='show').first(),
+    }
     return jsonify({
         'success': True,
+        'is_admin': current_user.is_admin,
         'defaults': [
             {'id': svc.id, 'name': svc.name, 'selected': svc.id in selected}
             for svc in defaults
@@ -577,6 +663,18 @@ def api_preferences():
         'genres': user_genres,
         'keywords': user_keywords,
         'excluded_genres': user_excluded,
+        'lists': [
+            {
+                'id': lst['id'],
+                'name': lst['name'],
+                'kind': lst.get('kind', 'list'),
+                'hidden': lst['id'] in hidden_list_ids,
+                'default_selected': lst['id'] in default_selected_list_ids,
+                'alert_enabled': lst['id'] in alert_enabled_list_ids,
+            }
+            for lst in all_lists
+        ],
+        'lists_error': trakt_lists_error,
         'alerts': {
             'release_day': bool(getattr(prefs, 'alert_release_day', True)),
             'new_streaming': bool(getattr(prefs, 'alert_new_streaming', True)),
@@ -592,6 +690,15 @@ def api_preferences():
             for p in list_favorite_actors(current_user)
         ],
         'prefs_reminder_disabled': bool(getattr(prefs, 'prefs_reminder_disabled', False)),
+        'prefs_reminder_snooze_until': (
+            prefs.prefs_reminder_snooze_until.isoformat()
+            if getattr(prefs, 'prefs_reminder_snooze_until', None)
+            else None
+        ),
+        'markers': {
+            'movie': {'trakt_id': markers['movie'].trakt_id, 'title': markers['movie'].title} if markers['movie'] else None,
+            'show': {'trakt_id': markers['show'].trakt_id, 'title': markers['show'].title} if markers['show'] else None,
+        },
     })
 
 
@@ -607,6 +714,8 @@ def api_preferences_save():
 
     data = _json_body()
     import json
+
+    from routes.user_routes import WATCHLIST_LIST_ID
 
     def _int_ids(key):
         raw = data.get(key) or []
@@ -643,22 +752,50 @@ def api_preferences_save():
         name = (custom.get('name') or '').strip()
         if not name:
             continue
-        existing = UserStreamingService.query.filter_by(
-            user_id=current_user.id, is_custom=True, custom_name=name,
-        ).first()
+        custom_id = custom.get('id')
+        existing = None
+        if custom_id:
+            existing = UserStreamingService.query.filter_by(
+                id=custom_id, user_id=current_user.id, is_custom=True,
+            ).first()
+        if not existing:
+            existing = UserStreamingService.query.filter_by(
+                user_id=current_user.id, is_custom=True, custom_name=name,
+            ).first()
         if existing:
+            existing.custom_name = name
             existing.custom_url = (custom.get('url') or '').strip() or None
             existing.custom_search_template = (custom.get('search_template') or '').strip() or None
             existing.custom_note = (custom.get('note') or '').strip() or None
         else:
-            db.session.add(UserStreamingService(
+            existing = UserStreamingService(
                 user_id=current_user.id,
                 is_custom=True,
                 custom_name=name,
                 custom_url=(custom.get('url') or '').strip() or None,
                 custom_search_template=(custom.get('search_template') or '').strip() or None,
                 custom_note=(custom.get('note') or '').strip() or None,
-            ))
+            )
+            db.session.add(existing)
+        if custom.get('suggest_default'):
+            already = StreamingServiceSuggestion.query.filter_by(
+                user_id=current_user.id, name=name, status='pending'
+            ).first()
+            if not already:
+                db.session.add(StreamingServiceSuggestion(
+                    user_id=current_user.id,
+                    name=name,
+                    url=existing.custom_url,
+                    note=existing.custom_note,
+                ))
+                for admin in User.query.filter_by(is_admin=True, is_active_account=True).all():
+                    db.session.add(Notification(
+                        user_id=admin.id,
+                        alert_type='service_suggestion',
+                        title='New streaming service suggestion',
+                        message=f'{current_user.username} suggested "{name}" as a default service.',
+                        link='/admin/streaming-services',
+                    ))
 
     genres = [
         g.strip() for g in data.get('genres', [])
@@ -685,6 +822,25 @@ def api_preferences_save():
         prefs.prefs_reminder_disabled = False
         prefs.prefs_reminder_snooze_until = None
 
+    list_prefs = data.get('lists_prefs')
+    if isinstance(list_prefs, dict):
+        all_known = {
+            str(lst.get('id')) for lst in (data.get('lists') or [])
+            if isinstance(lst, dict) and lst.get('id')
+        }
+        shown_raw = set(str(x) for x in (list_prefs.get('shown_ids') or []))
+        shown_ids = shown_raw & all_known
+        hidden_ids = sorted(all_known - shown_ids)
+        allowed_defaults = {WATCHLIST_LIST_ID} | shown_ids
+        default_raw = set(str(x) for x in (list_prefs.get('default_ids') or []))
+        alert_raw = set(str(x) for x in (list_prefs.get('alert_ids') or []))
+        default_ids = sorted(lid for lid in default_raw if lid in allowed_defaults)
+        alert_ids = sorted(lid for lid in alert_raw if lid in allowed_defaults)
+        prefs.hidden_list_ids_json = json.dumps(hidden_ids)
+        prefs.default_selected_list_ids_json = json.dumps(default_ids)
+        prefs.alert_enabled_list_ids_json = json.dumps(alert_ids)
+        prefs.onboarding_completed_at = prefs.onboarding_completed_at or datetime.utcnow()
+
     alerts = data.get('alerts')
     if isinstance(alerts, dict):
         prefs.alert_release_day = bool(alerts.get('release_day', prefs.alert_release_day))
@@ -699,7 +855,6 @@ def api_preferences_save():
 
     remove_actor_ids = _int_ids('remove_favorite_actor_ids')
     if remove_actor_ids:
-        from models import CachedPerson, UserFavoriteActor
         person_ids = [
             p.id for p in CachedPerson.query.filter(
                 CachedPerson.trakt_id.in_(remove_actor_ids)
@@ -713,6 +868,19 @@ def api_preferences_save():
 
     if 'prefs_reminder_disabled' in data:
         prefs.prefs_reminder_disabled = bool(data.get('prefs_reminder_disabled'))
+
+    marker_actions = data.get('marker_actions') or {}
+    if isinstance(marker_actions, dict):
+        for media_type, action_spec in marker_actions.items():
+            if media_type not in ('movie', 'show') or not isinstance(action_spec, dict):
+                continue
+            action = action_spec.get('action')
+            if action == 'clear':
+                from routes.catalog_routes import api_review_marker_clear
+                api_review_marker_clear(media_type)
+            elif action == 'caught_up':
+                from routes.catalog_routes import api_review_marker_caught_up
+                api_review_marker_caught_up(media_type)
 
     prefs.updated_at = datetime.utcnow()
     db.session.commit()
@@ -806,6 +974,220 @@ def api_admin_run_release_check():
         return jsonify({'success': False, 'message': str(exc)}), 500
 
 
+@mobile_api_bp.route('/admin/streaming-services', methods=['GET'])
+@login_required
+def api_admin_streaming_services():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    services = StreamingService.query.order_by(StreamingService.name).all()
+    pending = StreamingServiceSuggestion.query.filter_by(status='pending').order_by(
+        StreamingServiceSuggestion.created_at.desc()
+    ).all()
+    return jsonify({
+        'success': True,
+        'services': [
+            {
+                'id': s.id,
+                'name': s.name,
+                'url': s.url,
+                'note': s.note,
+                'is_default': s.is_default,
+            }
+            for s in services
+        ],
+        'pending': [
+            {
+                'id': s.id,
+                'name': s.name,
+                'url': s.url,
+                'note': s.note,
+                'user_id': s.user_id,
+                'created_at': s.created_at.isoformat() if s.created_at else None,
+            }
+            for s in pending
+        ],
+    })
+
+
+@mobile_api_bp.route('/admin/streaming-services', methods=['POST'])
+@login_required
+def api_admin_streaming_services_save():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    data = _json_body() or {}
+    action = (data.get('action') or '').strip()
+    if action == 'add':
+        name = (data.get('name') or '').strip()
+        if name and not StreamingService.query.filter_by(name=name).first():
+            db.session.add(StreamingService(
+                name=name,
+                url=(data.get('url') or '').strip() or None,
+                note=(data.get('note') or '').strip() or None,
+                is_default=True,
+            ))
+            db.session.commit()
+            return jsonify({'success': True, 'message': f'Added service {name}.'})
+        return jsonify({'success': False, 'message': 'Name missing or already exists.'}), 400
+    if action == 'approve':
+        sug_id = int(data.get('suggestion_id') or 0)
+        sug = StreamingServiceSuggestion.query.get_or_404(sug_id)
+        if not StreamingService.query.filter_by(name=sug.name).first():
+            db.session.add(StreamingService(name=sug.name, url=sug.url, note=sug.note, is_default=True))
+        sug.status = 'approved'
+        sug.resolved_at = datetime.utcnow()
+        sug.resolved_by_user_id = current_user.id
+        db.session.add(Notification(
+            user_id=sug.user_id,
+            alert_type='service_suggestion',
+            title='Streaming service approved',
+            message=f'"{sug.name}" was added to the default streaming services list.',
+        ))
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Suggestion approved.'})
+    if action == 'reject':
+        sug_id = int(data.get('suggestion_id') or 0)
+        sug = StreamingServiceSuggestion.query.get_or_404(sug_id)
+        sug.status = 'rejected'
+        sug.resolved_at = datetime.utcnow()
+        sug.resolved_by_user_id = current_user.id
+        db.session.commit()
+        return jsonify({'success': True, 'message': 'Suggestion rejected.'})
+    return jsonify({'success': False, 'message': 'action must be add, approve, or reject'}), 400
+
+
+@mobile_api_bp.route('/admin/scheduler', methods=['GET'])
+@login_required
+def api_admin_scheduler():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    from services.sync_jobs import get_scheduler_status
+    raw = get_scheduler_status(current_app._get_current_object())
+    config = raw.get('config')
+    status = {'config': _scheduler_config_dict(config)}
+    status['running'] = bool(raw.get('running'))
+    for job_id in ('catalog_sync', 'media_alerts'):
+        job = raw.get(job_id)
+        status[job_id] = {
+            'exists': bool(job.get('exists')) if isinstance(job, dict) else False,
+            'next_run_time': getattr(job, 'next_run_time', None) if not isinstance(job, dict) else job.get('next_run_time'),
+        }
+    return jsonify({'success': True, 'status': status})
+
+
+def _scheduler_config_dict(config):
+    if not config:
+        return {}
+    return {
+        'catalog_sync_enabled': bool(getattr(config, 'catalog_sync_enabled', False)),
+        'catalog_sync_mode': getattr(config, 'catalog_sync_mode', 'interval'),
+        'catalog_sync_interval_minutes': int(getattr(config, 'catalog_sync_interval_minutes', 60)),
+        'catalog_sync_cron_time': getattr(config, 'catalog_sync_cron_time', '08:00'),
+        'media_alerts_enabled': bool(getattr(config, 'media_alerts_enabled', False)),
+        'media_alerts_mode': getattr(config, 'media_alerts_mode', 'interval'),
+        'media_alerts_interval_hours': float(getattr(config, 'media_alerts_interval_hours', 4)),
+        'media_alerts_cron_time': getattr(config, 'media_alerts_cron_time', '08:00'),
+        'media_alerts_timezone': getattr(config, 'media_alerts_timezone', 'America/New_York'),
+        'trakt_read_cache_hours': float(getattr(config, 'trakt_read_cache_hours', 2)),
+    }
+
+
+@mobile_api_bp.route('/admin/scheduler', methods=['POST'])
+@login_required
+def api_admin_scheduler_save():
+    if not current_user.is_admin:
+        return jsonify({'success': False, 'message': 'Admin required'}), 403
+    from services.sync_jobs import (
+        MIN_ALERTS_INTERVAL_HOURS,
+        MIN_CATALOG_SYNC_MINUTES,
+        MIN_TRAKT_READ_CACHE_HOURS,
+        apply_scheduler_config,
+        get_or_create_scheduler_config,
+        get_scheduler_status,
+    )
+    data = _json_body() or {}
+    if data.get('action') == 'reset':
+        from services.sync_jobs import DEFAULT_SCHEDULER_CONFIG
+        row = get_or_create_scheduler_config(current_app._get_current_object())
+        for key, value in DEFAULT_SCHEDULER_CONFIG.items():
+            setattr(row, key, value)
+        db.session.commit()
+        apply_scheduler_config(current_app._get_current_object())
+        return jsonify({'success': True, 'message': 'Scheduler reset to defaults.'})
+
+    errors = []
+    row = get_or_create_scheduler_config(current_app._get_current_object())
+
+    row.catalog_sync_enabled = bool(data.get('catalog_sync_enabled'))
+    row.catalog_sync_mode = (data.get('catalog_sync_mode') or 'interval').strip()
+    if row.catalog_sync_mode not in ('interval', 'cron'):
+        errors.append('Catalog schedule mode must be interval or cron.')
+
+    try:
+        row.catalog_sync_interval_minutes = int(data.get('catalog_sync_interval_minutes', 60))
+    except (TypeError, ValueError):
+        errors.append('Catalog interval must be a whole number of minutes.')
+    else:
+        if row.catalog_sync_interval_minutes < MIN_CATALOG_SYNC_MINUTES:
+            errors.append(f'Catalog interval must be at least {MIN_CATALOG_SYNC_MINUTES} minutes.')
+
+    row.catalog_sync_cron_time = (data.get('catalog_sync_cron_time') or '08:00').strip()
+    try:
+        hour, minute = row.catalog_sync_cron_time.split(':')
+        if not (0 <= int(hour) <= 23 and 0 <= int(minute) <= 59):
+            raise ValueError
+    except ValueError:
+        errors.append('Catalog time must be HH:MM in 24-hour format.')
+
+    row.media_alerts_enabled = bool(data.get('media_alerts_enabled'))
+    row.media_alerts_mode = (data.get('media_alerts_mode') or 'interval').strip()
+    if row.media_alerts_mode not in ('interval', 'cron'):
+        errors.append('Alerts schedule mode must be interval or cron.')
+
+    try:
+        row.media_alerts_interval_hours = float(data.get('media_alerts_interval_hours', 4))
+    except (TypeError, ValueError):
+        errors.append('Alerts interval must be a number of hours.')
+    else:
+        if row.media_alerts_interval_hours < MIN_ALERTS_INTERVAL_HOURS:
+            errors.append(f'Alerts interval must be at least {MIN_ALERTS_INTERVAL_HOURS} hour.')
+
+    row.media_alerts_cron_time = (data.get('media_alerts_cron_time') or '08:00').strip()
+    try:
+        hour, minute = row.media_alerts_cron_time.split(':')
+        if not (0 <= int(hour) <= 23 and 0 <= int(minute) <= 59):
+            raise ValueError
+    except ValueError:
+        errors.append('Alerts time must be HH:MM in 24-hour format.')
+
+    row.media_alerts_timezone = (data.get('media_alerts_timezone') or 'America/New_York').strip() or 'America/New_York'
+    try:
+        from zoneinfo import ZoneInfo
+        ZoneInfo(row.media_alerts_timezone)
+    except Exception:
+        errors.append('Alerts timezone must be a valid IANA name (e.g. America/New_York).')
+
+    try:
+        row.trakt_read_cache_hours = float(data.get('trakt_read_cache_hours', 2))
+    except (TypeError, ValueError):
+        errors.append('Trakt read cache TTL must be a number of hours.')
+    else:
+        if row.trakt_read_cache_hours < MIN_TRAKT_READ_CACHE_HOURS:
+            errors.append(f'Trakt read cache TTL must be at least {MIN_TRAKT_READ_CACHE_HOURS} hours.')
+        elif row.trakt_read_cache_hours > 168:
+            errors.append('Trakt read cache TTL must be at most 168 hours (1 week).')
+
+    if errors:
+        return jsonify({'success': False, 'errors': errors}), 400
+
+    db.session.commit()
+    apply_scheduler_config(current_app._get_current_object())
+    return jsonify({
+        'success': True,
+        'message': 'Scheduler settings saved and applied.',
+        'status': get_scheduler_status(current_app._get_current_object()),
+    })
+
+
 @mobile_api_bp.route('/admin/users', methods=['GET'])
 @login_required
 def api_admin_users():
@@ -887,10 +1269,3 @@ def api_admin_delete_local(user_id):
     return jsonify({'success': True, 'username': username})
 
 
-@mobile_api_bp.route('/admin/scheduler', methods=['GET'])
-@login_required
-def api_admin_scheduler():
-    if not current_user.is_admin:
-        return jsonify({'success': False, 'message': 'Admin required'}), 403
-    from services.sync_jobs import get_scheduler_status
-    return jsonify({'success': True, 'status': get_scheduler_status(current_app._get_current_object())})

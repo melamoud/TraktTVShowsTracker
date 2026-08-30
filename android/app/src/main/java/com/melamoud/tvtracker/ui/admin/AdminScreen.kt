@@ -21,6 +21,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -31,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.data.api.dto.AdminUserDto
@@ -74,18 +76,15 @@ fun AdminScreen(viewModel: AdminViewModel, onBack: () -> Unit) {
                 ) { Text("Run release check now") }
             }
             item {
-                if (state.scheduler.isNotBlank()) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
-                    ) {
-                        Column(Modifier.padding(12.dp).verticalScroll(rememberScrollState())) {
-                            Text("Scheduler", style = MaterialTheme.typography.titleMedium)
-                            Text(state.scheduler, color = TextMuted, style = MaterialTheme.typography.bodySmall)
-                        }
-                    }
-                }
+                SchedulerCard(
+                    state = state,
+                    onSetConfig = viewModel::setSchedulerConfig,
+                    onSave = viewModel::saveScheduler,
+                    onReset = viewModel::resetScheduler,
+                    enabled = !state.actionBusy,
+                )
             }
+            item { StreamingServicesSection(state, viewModel, enabled = !state.actionBusy) }
             item { Text("Users", style = MaterialTheme.typography.titleMedium) }
             items(state.users, key = { it.id }) { user ->
                 UserCard(
@@ -128,6 +127,177 @@ private fun StatRow(label: String, value: String) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, color = TextMuted)
         Text(value)
+    }
+}
+
+@Composable
+private fun SchedulerCard(
+    state: AdminUiState,
+    onSetConfig: (String, Any) -> Unit,
+    onSave: () -> Unit,
+    onReset: () -> Unit,
+    enabled: Boolean,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Scheduler", style = MaterialTheme.typography.titleMedium)
+            Text(
+                if (state.schedulerRunning) "Running" else "Not running",
+                color = TextMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            val config = state.schedulerConfig
+            if (config != null) {
+                SchedulerToggle("Catalog sync enabled", "catalog_sync_enabled", config, onSetConfig)
+                SchedulerTextField("Catalog sync mode", "catalog_sync_mode", config, onSetConfig)
+                SchedulerTextField("Catalog interval (min)", "catalog_sync_interval_minutes", config, onSetConfig)
+                SchedulerTextField("Catalog cron time (HH:MM)", "catalog_sync_cron_time", config, onSetConfig)
+                SchedulerToggle("Media alerts enabled", "media_alerts_enabled", config, onSetConfig)
+                SchedulerTextField("Media alerts mode", "media_alerts_mode", config, onSetConfig)
+                SchedulerTextField("Media alerts interval (hours)", "media_alerts_interval_hours", config, onSetConfig)
+                SchedulerTextField("Media alerts cron time (HH:MM)", "media_alerts_cron_time", config, onSetConfig)
+                SchedulerTextField("Media alerts timezone", "media_alerts_timezone", config, onSetConfig)
+                SchedulerTextField("Trakt read cache (hours)", "trakt_read_cache_hours", config, onSetConfig)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = onSave, enabled = enabled) { Text("Save") }
+                    OutlinedButton(onClick = onReset, enabled = enabled) { Text("Reset") }
+                }
+            }
+            if (state.scheduler.isNotBlank()) {
+                Text(state.scheduler, color = TextMuted, style = MaterialTheme.typography.bodySmall)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SchedulerTextField(
+    label: String,
+    key: String,
+    config: Map<String, Any>,
+    onSetConfig: (String, Any) -> Unit,
+) {
+    val value = when (val v = config[key]) {
+        is Number -> v.toString()
+        is String -> v
+        else -> ""
+    }
+    OutlinedTextField(
+        value = value,
+        onValueChange = { raw ->
+            val current = config[key]
+            val parsed: Any = when (current) {
+                is Number -> raw.toDoubleOrNull() ?: current.toDouble()
+                else -> raw
+            }
+            onSetConfig(key, parsed)
+        },
+        label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun SchedulerToggle(
+    label: String,
+    key: String,
+    config: Map<String, Any>,
+    onSetConfig: (String, Any) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(
+            checked = config[key] as? Boolean ?: false,
+            onCheckedChange = { onSetConfig(key, it) },
+        )
+        Text(label)
+    }
+}
+
+@Composable
+private fun StreamingServicesSection(
+    state: AdminUiState,
+    viewModel: AdminViewModel,
+    enabled: Boolean,
+) {
+    if (state.addServiceDialog) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissAddServiceDialog,
+            title = { Text("Add default service") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = state.newServiceName,
+                        onValueChange = viewModel::setNewServiceName,
+                        label = { Text("Name") },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = state.newServiceUrl,
+                        onValueChange = viewModel::setNewServiceUrl,
+                        label = { Text("URL") },
+                        singleLine = true,
+                    )
+                    OutlinedTextField(
+                        value = state.newServiceNote,
+                        onValueChange = viewModel::setNewServiceNote,
+                        label = { Text("Note") },
+                        singleLine = true,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.dismissAddServiceDialog()
+                        viewModel.addService()
+                    },
+                    enabled = state.newServiceName.isNotBlank(),
+                ) { Text("Add") }
+            },
+            dismissButton = { TextButton(onClick = viewModel::dismissAddServiceDialog) { Text("Cancel") } },
+        )
+    }
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Streaming services", style = MaterialTheme.typography.titleMedium)
+            if (state.services.isEmpty()) {
+                Text("No default services", color = TextMuted)
+            } else {
+                state.services.forEach { svc ->
+                    Column {
+                        Text(svc.name, fontWeight = FontWeight.SemiBold)
+                        svc.note?.let { Text(it, color = TextMuted, style = MaterialTheme.typography.bodySmall) }
+                    }
+                }
+            }
+            HorizontalDivider()
+            Text("Pending suggestions", style = MaterialTheme.typography.titleSmall)
+            if (state.pendingSuggestions.isEmpty()) {
+                Text("No pending suggestions", color = TextMuted)
+            } else {
+                state.pendingSuggestions.forEach { sug ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(sug.name, fontWeight = FontWeight.SemiBold)
+                            sug.note?.let { Text(it, color = TextMuted, style = MaterialTheme.typography.bodySmall) }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                            TextButton(onClick = { viewModel.approveSuggestion(sug.id) }, enabled = enabled) { Text("Approve") }
+                            TextButton(onClick = { viewModel.rejectSuggestion(sug.id) }, enabled = enabled) { Text("Reject") }
+                        }
+                    }
+                }
+            }
+            OutlinedButton(onClick = viewModel::showAddServiceDialog, enabled = enabled) { Text("Add service") }
+        }
     }
 }
 

@@ -16,6 +16,7 @@ data class ProgressUiState(
     val error: String? = null,
     val data: ProgressResponse? = null,
     val busy: Boolean = false,
+    val reviewTarget: EpisodeDto? = null,
 )
 
 class ProgressViewModel(
@@ -58,6 +59,34 @@ class ProgressViewModel(
             _state.value = _state.value.copy(busy = true)
             repo.seasonWatched(traktId, season, watched)
             onUnread(repo.unreadAlerts())
+            _state.value = _state.value.copy(busy = false)
+            reload()
+        }
+    }
+
+    fun refreshFromTrakt() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(loading = true, error = null)
+            val result = repo.progress(traktId, refresh = true)
+            _state.value = result.fold(
+                onSuccess = { _state.value.copy(loading = false, data = it) },
+                onFailure = { _state.value.copy(loading = false, error = it.message) },
+            )
+        }
+    }
+
+    fun openReview(ep: EpisodeDto) { _state.value = _state.value.copy(reviewTarget = ep) }
+    fun dismissReview() { _state.value = _state.value.copy(reviewTarget = null) }
+    fun applyReview(rating: Int?, comment: String, spoiler: Boolean) {
+        val ep = _state.value.reviewTarget ?: return
+        _state.value = _state.value.copy(reviewTarget = null, busy = true)
+        viewModelScope.launch {
+            ep.traktId?.let { epId ->
+                repo.rating("episode", epId, rating)
+                if (comment.isNotBlank()) {
+                    repo.comment("episode", epId, comment, spoiler, null)
+                }
+            }
             _state.value = _state.value.copy(busy = false)
             reload()
         }

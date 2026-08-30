@@ -90,6 +90,43 @@ fun SearchScreen(
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
             keyboardActions = KeyboardActions(onSearch = { viewModel.search() }),
         )
+        if (state.actorName.isBlank()) {
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                OutlinedTextField(
+                    value = state.actorSearchQuery,
+                    onValueChange = viewModel::onActorQueryChange,
+                    modifier = Modifier.weight(1f),
+                    placeholder = { Text("Search actor…") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { viewModel.searchActors() }),
+                )
+                IconButton(onClick = viewModel::searchActors) {
+                    Icon(Icons.Default.Search, contentDescription = "Search actors")
+                }
+            }
+            if (state.actorSearchResults.isNotEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    state.actorSearchResults.forEach { person ->
+                        FilterChip(
+                            selected = false,
+                            onClick = { viewModel.selectActor(person) },
+                            label = { Text(person.name) },
+                        )
+                    }
+                }
+            }
+            if (state.actorSearchLoading) {
+                CircularProgressIndicator(modifier = Modifier.padding(horizontal = 16.dp))
+            }
+        }
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),

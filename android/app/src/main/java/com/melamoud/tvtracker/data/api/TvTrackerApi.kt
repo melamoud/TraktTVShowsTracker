@@ -2,6 +2,9 @@ package com.melamoud.tvtracker.data.api
 
 import com.melamoud.tvtracker.data.api.dto.ActionRequest
 import com.melamoud.tvtracker.data.api.dto.AdminActionResponse
+import com.melamoud.tvtracker.data.api.dto.AdminSchedulerSaveRequest
+import com.melamoud.tvtracker.data.api.dto.AdminStreamingServiceActionRequest
+import com.melamoud.tvtracker.data.api.dto.AdminStreamingServicesResponse
 import com.melamoud.tvtracker.data.api.dto.AdminDashboardResponse
 import com.melamoud.tvtracker.data.api.dto.AdminUsersResponse
 import com.melamoud.tvtracker.data.api.dto.AlertsResponse
@@ -22,9 +25,11 @@ import com.melamoud.tvtracker.data.api.dto.MyMediaResponse
 import com.melamoud.tvtracker.data.api.dto.PinResponse
 import com.melamoud.tvtracker.data.api.dto.PreferencesResponse
 import com.melamoud.tvtracker.data.api.dto.PreferencesSaveRequest
+import com.melamoud.tvtracker.data.api.dto.PrefsReminderRequest
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.api.dto.RatingResponse
 import com.melamoud.tvtracker.data.api.dto.RecommendedMediaResponse
+import com.melamoud.tvtracker.data.api.dto.PeopleSearchResponse
 import com.melamoud.tvtracker.data.api.dto.SearchResponse
 import com.melamoud.tvtracker.data.api.dto.SimpleResponse
 import com.melamoud.tvtracker.data.api.dto.SyncCatalogResponse
@@ -65,7 +70,13 @@ interface TvTrackerApi {
         @Query("refresh") refresh: Int? = null,
         @Query("lists_set") listsSet: Int? = null,
         @Query("lists") lists: List<String>? = null,
+        @Query("year") year: String? = null,
+        @Query("genre") genres: List<String>? = null,
+        @Query("genres_set") genresSet: Int? = null,
     ): MyMediaResponse
+
+    @GET("/api/v1/people/search")
+    suspend fun peopleSearch(@Query("q") query: String): PeopleSearchResponse
 
     @GET("/api/v1/search")
     suspend fun search(
@@ -217,6 +228,9 @@ interface TvTrackerApi {
     @POST("/api/v1/preferences")
     suspend fun savePreferences(@Body body: PreferencesSaveRequest): SimpleResponse
 
+    @POST("/api/v1/prefs-reminder")
+    suspend fun prefsReminder(@Body body: PrefsReminderRequest): SimpleResponse
+
     @GET("/api/v1/latest/{kind}")
     suspend fun latestMedia(
         @Path("kind") kind: String,
@@ -229,6 +243,8 @@ interface TvTrackerApi {
         @Query("recent_years") recentYears: Int? = null,
         @Query("per_page") perPage: Int? = null,
         @Query("load_older") loadOlder: Int? = null,
+        @Query("year") year: String? = null,
+        @Query("genre") genres: List<String>? = null,
     ): LatestMediaResponse
 
     @POST("/api/v1/review-marker/{mediaType}/{traktId}")
@@ -264,6 +280,9 @@ interface TvTrackerApi {
         @Query("on_my_services") onMyServices: Int? = null,
         @Query("match_only") matchOnly: Int? = null,
         @Query("per_page") perPage: Int? = null,
+        @Query("refresh") refresh: Int? = null,
+        @Query("year") year: String? = null,
+        @Query("genre") genres: List<String>? = null,
     ): RecommendedMediaResponse
 
     @POST("/api/v1/recommendations/{mediaType}/{traktId}/hide")
@@ -295,4 +314,13 @@ interface TvTrackerApi {
 
     @GET("/api/v1/admin/scheduler")
     suspend fun adminScheduler(): AdminActionResponse
+
+    @POST("/api/v1/admin/scheduler")
+    suspend fun adminSchedulerSave(@Body body: AdminSchedulerSaveRequest): AdminActionResponse
+
+    @GET("/api/v1/admin/streaming-services")
+    suspend fun adminStreamingServices(): AdminStreamingServicesResponse
+
+    @POST("/api/v1/admin/streaming-services")
+    suspend fun adminStreamingServicesAction(@Body body: AdminStreamingServiceActionRequest): AdminActionResponse
 }

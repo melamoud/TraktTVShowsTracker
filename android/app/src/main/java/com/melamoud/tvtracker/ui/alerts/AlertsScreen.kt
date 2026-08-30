@@ -55,6 +55,10 @@ import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.data.api.absoluteUrl
 import com.melamoud.tvtracker.data.api.dto.AlertEntryDto
 import com.melamoud.tvtracker.data.api.dto.AlertItemDto
+import com.melamoud.tvtracker.ui.components.ConfirmDialog
+import com.melamoud.tvtracker.ui.components.FoundOnDialog
+import com.melamoud.tvtracker.ui.components.ListsDialog
+import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
 import com.melamoud.tvtracker.ui.components.ServiceLinksLine
@@ -141,21 +145,25 @@ fun AlertsScreen(
                             }
                             if (expanded) {
                                 items(entry.items, key = { "child-${it.id}" }) { item ->
-                                    AlertItemCard(
-                                        item = item,
-                                        baseUrl = baseUrl,
-                                        nested = true,
-                                        onProgress = onProgress,
-                                        onOpenDetail = onOpenDetail,
-                                        onToggleRead = { viewModel.toggleRead(item) },
-                                        onPin = {
-                                            val mt = item.mediaType
-                                            val id = item.traktId
-                                            if (mt != null && id != null) {
-                                                viewModel.pin(mt, id, !item.alertsPinned)
-                                            }
-                                        },
-                                    )
+                                AlertItemCard(
+                                    item = item,
+                                    baseUrl = baseUrl,
+                                    nested = true,
+                                    onProgress = onProgress,
+                                    onOpenDetail = onOpenDetail,
+                                    onToggleRead = { viewModel.toggleRead(item) },
+                                    onPin = {
+                                        val mt = item.mediaType
+                                        val id = item.traktId
+                                        if (mt != null && id != null) {
+                                            viewModel.pin(mt, id, !item.alertsPinned)
+                                        }
+                                    },
+                                    onWatch = item.mediaType?.let { mt -> item.traktId?.let { { viewModel.confirmWatch(item) } } },
+                                    onLists = item.mediaType?.let { mt -> item.traktId?.let { { viewModel.openLists(item) } } },
+                                    onFoundOn = item.mediaType?.let { mt -> item.traktId?.let { { viewModel.openFoundOn(item) } } },
+                                    onRate = item.mediaType?.let { mt -> item.traktId?.let { { viewModel.openRate(item) } } },
+                                )
                                 }
                             }
                         } else {
@@ -175,6 +183,10 @@ fun AlertsScreen(
                                             viewModel.pin(mt, id, !single.alertsPinned)
                                         }
                                     },
+                                    onWatch = single.mediaType?.let { mt -> single.traktId?.let { { viewModel.confirmWatch(single) } } },
+                                    onLists = single.mediaType?.let { mt -> single.traktId?.let { { viewModel.openLists(single) } } },
+                                    onFoundOn = single.mediaType?.let { mt -> single.traktId?.let { { viewModel.openFoundOn(single) } } },
+                                    onRate = single.mediaType?.let { mt -> single.traktId?.let { { viewModel.openRate(single) } } },
                                 )
                             }
                         }
@@ -182,6 +194,36 @@ fun AlertsScreen(
                 }
             }
         }
+    }
+    state.watchConfirm?.let { item ->
+        ConfirmDialog(
+            title = "Mark watched?",
+            message = item.mediaTitle ?: item.title,
+            confirmLabel = "Watch",
+            onConfirm = viewModel::applyWatch,
+            onDismiss = viewModel::dismissWatch,
+        )
+    }
+    state.rateTarget?.let { item ->
+        RateDialog(current = null, onSave = viewModel::applyRate, onDismiss = viewModel::dismissRate)
+    }
+    state.listsDialog?.let { dialog ->
+        ListsDialog(
+            title = dialog.item.title,
+            lists = dialog.lists,
+            defaults = dialog.defaults,
+            onApply = viewModel::applyLists,
+            onDismiss = viewModel::dismissLists,
+        )
+    }
+    state.foundOnDialog?.let { dialog ->
+        FoundOnDialog(
+            selected = dialog.item.foundOn,
+            choices = dialog.choices,
+            choiceLinks = dialog.choiceLinks,
+            onApply = viewModel::applyFoundOn,
+            onDismiss = viewModel::dismissFoundOn,
+        )
     }
 }
 
@@ -301,6 +343,10 @@ private fun AlertItemCard(
     onOpenDetail: (String, Int) -> Unit,
     onToggleRead: () -> Unit,
     onPin: () -> Unit,
+    onWatch: (() -> Unit)? = null,
+    onLists: (() -> Unit)? = null,
+    onFoundOn: (() -> Unit)? = null,
+    onRate: (() -> Unit)? = null,
 ) {
     val title = item.displayTitle?.takeIf { it.isNotBlank() }
         ?: listOfNotNull(
@@ -401,6 +447,34 @@ private fun AlertItemCard(
                         modifier = Modifier.height(AlertActionHeight),
                     ) {
                         Text(if (item.isRead) "Mark unread" else "Mark read", maxLines = 1, softWrap = false)
+                    }
+                    onWatch?.let {
+                        OutlinedButton(
+                            onClick = it,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) { Text("Watch", maxLines = 1, softWrap = false) }
+                    }
+                    onLists?.let {
+                        OutlinedButton(
+                            onClick = it,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) { Text("Lists", maxLines = 1, softWrap = false) }
+                    }
+                    onFoundOn?.let {
+                        OutlinedButton(
+                            onClick = it,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) { Text("Found on", maxLines = 1, softWrap = false) }
+                    }
+                    onRate?.let {
+                        OutlinedButton(
+                            onClick = it,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) { Text("Rate", maxLines = 1, softWrap = false) }
                     }
                     if (item.mediaType == "show" && item.traktId != null) {
                         OutlinedButton(

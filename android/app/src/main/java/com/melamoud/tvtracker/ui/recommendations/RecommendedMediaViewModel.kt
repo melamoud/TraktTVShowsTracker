@@ -32,6 +32,10 @@ data class RecommendedMediaUiState(
     val pages: Int = 1,
     val total: Int = 0,
     val foundOnChoices: List<String> = emptyList(),
+    val refresh: Boolean = false,
+    val year: String = "",
+    val genres: List<String> = emptyList(),
+    val genreChoices: List<String> = emptyList(),
     val listsDialog: ListsDialogState? = null,
     val foundOnDialog: FoundOnDialogState? = null,
     val rateTarget: MediaItemDto? = null,
@@ -66,6 +70,9 @@ class RecommendedMediaViewModel(
                 onMyServices = s.onMyServices,
                 matchOnly = s.matchOnly,
                 perPage = s.perPage,
+                refresh = s.refresh,
+                year = s.year,
+                genres = s.genres,
             )
             if (seq != loadSeq) return@launch
             _state.value = result.fold(
@@ -87,6 +94,10 @@ class RecommendedMediaViewModel(
                         hasMatchPrefs = it.hasMatchPrefs,
                         userServiceNames = it.userServiceNames,
                         foundOnChoices = it.foundOnChoices.ifEmpty { _state.value.foundOnChoices },
+                        year = it.year ?: s.year,
+                        genres = it.genres.ifEmpty { s.genres },
+                        genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
+                        refresh = false,
                     )
                 },
                 onFailure = { _state.value.copy(loading = false, error = it.message) },
@@ -130,6 +141,26 @@ class RecommendedMediaViewModel(
 
     fun setPerPage(value: Int) {
         _state.value = _state.value.copy(perPage = value, page = 1)
+        reload()
+    }
+
+    fun setRefresh() {
+        _state.value = _state.value.copy(refresh = true, page = 1)
+        reload()
+    }
+
+    fun setYear(value: String) {
+        _state.value = _state.value.copy(year = value.trim(), page = 1)
+        reload()
+    }
+
+    fun toggleGenre(genre: String) {
+        val g = genre.trim()
+        val current = _state.value.genres.toSet()
+        _state.value = _state.value.copy(
+            genres = if (g in current) _state.value.genres.filter { it != g } else _state.value.genres + g,
+            page = 1,
+        )
         reload()
     }
 

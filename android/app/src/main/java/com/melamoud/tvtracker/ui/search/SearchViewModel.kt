@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
+import com.melamoud.tvtracker.data.api.dto.PersonDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
 import com.melamoud.tvtracker.ui.media.FoundOnDialogState
 import com.melamoud.tvtracker.ui.media.ListsDialogState
@@ -37,6 +38,9 @@ data class SearchUiState(
     val watchConfirm: MediaItemDto? = null,
     val actorId: Int? = null,
     val actorName: String = "",
+    val actorSearchQuery: String = "",
+    val actorSearchResults: List<PersonDto> = emptyList(),
+    val actorSearchLoading: Boolean = false,
 )
 
 class SearchViewModel(
@@ -79,6 +83,34 @@ class SearchViewModel(
 
     fun clearActor() {
         _state.value = _state.value.copy(actorId = null, actorName = "", items = emptyList(), total = 0)
+    }
+
+    fun onActorQueryChange(value: String) {
+        _state.value = _state.value.copy(actorSearchQuery = value)
+    }
+
+    fun searchActors() {
+        val q = _state.value.actorSearchQuery.trim()
+        if (q.length < 2) {
+            _state.value = _state.value.copy(actorSearchResults = emptyList())
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(actorSearchLoading = true)
+            repo.peopleSearch(q).onSuccess {
+                _state.value = _state.value.copy(actorSearchResults = it.people, actorSearchLoading = false)
+            }.onFailure {
+                _state.value = _state.value.copy(actorSearchLoading = false, error = it.message)
+            }
+        }
+    }
+
+    fun selectActor(person: PersonDto) {
+        _state.value = _state.value.copy(
+            actorSearchResults = emptyList(),
+            actorSearchQuery = "",
+        )
+        searchActor(person.traktId, person.name)
     }
 
     fun reloadFromServer() {

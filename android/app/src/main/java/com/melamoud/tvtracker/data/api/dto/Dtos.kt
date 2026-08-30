@@ -122,6 +122,9 @@ data class MyMediaResponse(
     val calendar: CalendarDto? = null,
     val title: String? = null,
     @SerializedName("found_on_choices") val foundOnChoices: List<String> = emptyList(),
+    val year: String? = null,
+    val genres: List<String> = emptyList(),
+    @SerializedName("genre_choices") val genreChoices: List<String> = emptyList(),
 )
 
 data class ReviewMarkerDto(
@@ -150,6 +153,9 @@ data class LatestMediaResponse(
     @SerializedName("has_more_older") val hasMoreOlder: Boolean = false,
     val marker: ReviewMarkerDto? = null,
     @SerializedName("marker_page") val markerPage: Int? = null,
+    val year: String? = null,
+    val genres: List<String> = emptyList(),
+    @SerializedName("genre_choices") val genreChoices: List<String> = emptyList(),
 )
 
 data class SyncCatalogResponse(
@@ -170,20 +176,45 @@ data class CustomServiceDto(
     val url: String? = null,
     @SerializedName("search_template") val searchTemplate: String? = null,
     val note: String? = null,
+    @SerializedName("suggest_default") val suggestDefault: Boolean = false,
+)
+
+data class ListPreferenceDto(
+    val id: String,
+    val name: String,
+    val kind: String = "list",
+    val hidden: Boolean = false,
+    @SerializedName("default_selected") val defaultSelected: Boolean = false,
+    @SerializedName("alert_enabled") val alertEnabled: Boolean = false,
+)
+
+data class MarkerDto(
+    @SerializedName("trakt_id") val traktId: Int,
+    val title: String,
+)
+
+data class MarkersDto(
+    val movie: MarkerDto? = null,
+    val show: MarkerDto? = null,
 )
 
 data class PreferencesResponse(
     val success: Boolean,
     val message: String? = null,
+    @SerializedName("is_admin") val isAdmin: Boolean = false,
     val defaults: List<StreamingServiceDto> = emptyList(),
     val customs: List<CustomServiceDto> = emptyList(),
     @SerializedName("common_genres") val commonGenres: List<String> = emptyList(),
     val genres: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     @SerializedName("excluded_genres") val excludedGenres: List<String> = emptyList(),
+    val lists: List<ListPreferenceDto> = emptyList(),
+    @SerializedName("lists_error") val listsError: String? = null,
     val alerts: AlertPrefsDto? = null,
     @SerializedName("favorite_actors") val favoriteActors: List<FavoriteActorDto> = emptyList(),
     @SerializedName("prefs_reminder_disabled") val prefsReminderDisabled: Boolean = false,
+    @SerializedName("prefs_reminder_snooze_until") val prefsReminderSnoozeUntil: String? = null,
+    val markers: MarkersDto = MarkersDto(),
 )
 
 data class AlertPrefsDto(
@@ -203,6 +234,28 @@ data class FavoriteActorDto(
     @SerializedName("headshot_url") val headshotUrl: String? = null,
 )
 
+data class PersonDto(
+    @SerializedName("trakt_id") val traktId: Int,
+    val name: String,
+    @SerializedName("headshot_url") val headshotUrl: String? = null,
+)
+
+data class PeopleSearchResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val people: List<PersonDto> = emptyList(),
+)
+
+data class ListPrefsSaveRequest(
+    @SerializedName("shown_ids") val shownIds: List<String> = emptyList(),
+    @SerializedName("default_ids") val defaultIds: List<String> = emptyList(),
+    @SerializedName("alert_ids") val alertIds: List<String> = emptyList(),
+)
+
+data class MarkerActionDto(
+    val action: String,
+)
+
 data class PreferencesSaveRequest(
     @SerializedName("service_ids") val serviceIds: List<Int> = emptyList(),
     @SerializedName("remove_custom_ids") val removeCustomIds: List<Int> = emptyList(),
@@ -210,9 +263,12 @@ data class PreferencesSaveRequest(
     val genres: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     @SerializedName("excluded_genres") val excludedGenres: List<String> = emptyList(),
+    val lists: List<ListPreferenceDto> = emptyList(),
+    @SerializedName("lists_prefs") val listsPrefs: ListPrefsSaveRequest? = null,
     val alerts: AlertPrefsDto? = null,
     @SerializedName("remove_favorite_actor_ids") val removeFavoriteActorIds: List<Int> = emptyList(),
     @SerializedName("prefs_reminder_disabled") val prefsReminderDisabled: Boolean? = null,
+    @SerializedName("marker_actions") val markerActions: Map<String, MarkerActionDto> = emptyMap(),
 )
 
 data class CategoryDto(
@@ -243,6 +299,7 @@ data class RecommendedMediaResponse(
     @SerializedName("user_service_names") val userServiceNames: List<String> = emptyList(),
     val genres: List<String> = emptyList(),
     val year: String? = null,
+    @SerializedName("genre_choices") val genreChoices: List<String> = emptyList(),
 )
 
 data class SearchResponse(
@@ -564,6 +621,10 @@ data class CreateListRequest(
     val name: String,
 )
 
+data class PrefsReminderRequest(
+    val action: String,
+)
+
 data class AdminStatsDto(
     val users: Int = 0,
     @SerializedName("active_users") val activeUsers: Int = 0,
@@ -602,4 +663,56 @@ data class AdminActionResponse(
     @SerializedName("is_admin") val isAdmin: Boolean? = null,
     val username: String? = null,
     val notified: Int? = null,
+)
+
+data class AdminStreamingServiceDto(
+    val id: Int,
+    val name: String,
+    val url: String? = null,
+    val note: String? = null,
+    @SerializedName("is_default") val isDefault: Boolean = true,
+)
+
+data class AdminServiceSuggestionDto(
+    val id: Int,
+    val name: String,
+    val url: String? = null,
+    val note: String? = null,
+    @SerializedName("user_id") val userId: Int? = null,
+    @SerializedName("created_at") val createdAt: String? = null,
+)
+
+data class AdminStreamingServicesResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val services: List<AdminStreamingServiceDto> = emptyList(),
+    val pending: List<AdminServiceSuggestionDto> = emptyList(),
+)
+
+data class AdminSchedulerResponse(
+    val success: Boolean,
+    val message: String? = null,
+    val status: Map<String, Any>? = null,
+)
+
+data class AdminSchedulerSaveRequest(
+    val action: String? = null,
+    @SerializedName("catalog_sync_enabled") val catalogSyncEnabled: Boolean = false,
+    @SerializedName("catalog_sync_mode") val catalogSyncMode: String = "interval",
+    @SerializedName("catalog_sync_interval_minutes") val catalogSyncIntervalMinutes: Int = 60,
+    @SerializedName("catalog_sync_cron_time") val catalogSyncCronTime: String = "08:00",
+    @SerializedName("media_alerts_enabled") val mediaAlertsEnabled: Boolean = false,
+    @SerializedName("media_alerts_mode") val mediaAlertsMode: String = "interval",
+    @SerializedName("media_alerts_interval_hours") val mediaAlertsIntervalHours: Double = 4.0,
+    @SerializedName("media_alerts_cron_time") val mediaAlertsCronTime: String = "08:00",
+    @SerializedName("media_alerts_timezone") val mediaAlertsTimezone: String = "America/New_York",
+    @SerializedName("trakt_read_cache_hours") val traktReadCacheHours: Double = 2.0,
+)
+
+data class AdminStreamingServiceActionRequest(
+    val action: String,
+    val name: String? = null,
+    val url: String? = null,
+    val note: String? = null,
+    @SerializedName("suggestion_id") val suggestionId: Int? = null,
 )

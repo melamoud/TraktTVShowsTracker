@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -23,6 +24,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -102,12 +104,17 @@ fun LatestMediaScreen(
             BooleanFilterButton("Match only", state.matchOnly) { viewModel.setMatchOnly(it) }
             BooleanFilterButton("Recent years", state.recentYears) { viewModel.setRecentYears(it) }
             PerPageFilterButton(state.perPage) { viewModel.setPerPage(it) }
+            YearFilterField(state.year) { viewModel.setYear(it) }
+            GenreFilterButton(state.genres, state.genreChoices) { viewModel.toggleGenre(it) }
             LatestActionsMenu(
                 hasMarker = state.marker != null,
                 hasMoreOlder = state.hasMoreOlder,
+                markerPage = state.markerPage,
                 onSync = viewModel::syncCatalog,
                 onCaughtUp = viewModel::reviewMarkerCaughtUp,
                 onClearMarker = viewModel::reviewMarkerClear,
+                onLoadOlder = { viewModel.reload(loadOlder = true) },
+                onJumpToMarker = viewModel::jumpToMarker,
             )
         }
         state.marker?.let { marker ->
@@ -245,9 +252,12 @@ private fun PerPageFilterButton(
 private fun LatestActionsMenu(
     hasMarker: Boolean,
     hasMoreOlder: Boolean,
+    markerPage: Int?,
     onSync: () -> Unit,
     onCaughtUp: () -> Unit,
     onClearMarker: () -> Unit,
+    onLoadOlder: () -> Unit,
+    onJumpToMarker: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -260,6 +270,17 @@ private fun LatestActionsMenu(
                 onClick = { expanded = false; onSync() },
             )
             DropdownMenuItem(
+                text = { Text("Load older catalog") },
+                onClick = { expanded = false; onLoadOlder() },
+                enabled = hasMoreOlder,
+            )
+            markerPage?.let { page ->
+                DropdownMenuItem(
+                    text = { Text("Jump to marker (page $page)") },
+                    onClick = { expanded = false; onJumpToMarker() },
+                )
+            }
+            DropdownMenuItem(
                 text = { Text(stringResource(R.string.review_marker_caught_up)) },
                 onClick = { expanded = false; onCaughtUp() },
             )
@@ -268,6 +289,41 @@ private fun LatestActionsMenu(
                     text = { Text(stringResource(R.string.review_marker_clear)) },
                     onClick = { expanded = false; onClearMarker() },
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun YearFilterField(value: String, onChange: (String) -> Unit) {
+    var text by remember(value) { mutableStateOf(value) }
+    OutlinedTextField(
+        value = text,
+        onValueChange = { text = it },
+        label = { Text("Year", style = MaterialTheme.typography.labelSmall) },
+        singleLine = true,
+        modifier = Modifier.width(90.dp),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+        keyboardActions = KeyboardActions(onDone = { onChange(text) }),
+    )
+}
+
+@Composable
+private fun GenreFilterButton(
+    selected: List<String>,
+    choices: List<String>,
+    onToggle: (String) -> Unit,
+) {
+    val label = if (selected.isEmpty()) "Genres" else "Genres (${selected.size})"
+    FilterMenuButton(label) { dismiss ->
+        if (choices.isEmpty()) {
+            DropdownMenuItem(text = { Text("No genres") }, onClick = dismiss)
+        } else {
+            choices.forEach { genre ->
+                CheckMenuItem(genre, selected.contains(genre)) {
+                    onToggle(genre)
+                    dismiss()
+                }
             }
         }
     }

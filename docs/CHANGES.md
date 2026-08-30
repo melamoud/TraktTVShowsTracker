@@ -1,5 +1,15 @@
 # Changes log
 
+## 2026-08-30 — Android app reaches full web parity
+
+- Latest Movies/Shows, Recommended Movies/Shows, and full Preferences are now in the Android app, with the same filters, review markers, list management, and external links as the website
+- My Shows/Movies adds a calendar grid view, year/genre filters, and **Refresh Trakt**
+- Search adds actor search and year/genre filters
+- Progress adds episode rating/comment and **Refresh from Trakt**
+- Alerts get inline **Watch**, **Lists**, **Found on**, and **Rate** actions
+- Admin screen adds dashboard stats, streaming-service defaults, pending suggestions, and scheduler editing
+- Updated [Android help](help/user/android.md) to reflect the new screens
+
 ## 2026-08-29 — No-confirm review marker; marker page indicator; clearer Hide recommendation feedback
 
 - **Reviewed older than this** sets the marker immediately with no confirmation dialog or success alert

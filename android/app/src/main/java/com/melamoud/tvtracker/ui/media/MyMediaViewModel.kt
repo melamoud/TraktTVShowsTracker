@@ -29,6 +29,9 @@ data class MyMediaUiState(
     val perPage: Int = 50,
     val total: Int = 0,
     val filterLists: List<FilterListDto> = emptyList(),
+    val year: String = "",
+    val genres: List<String> = emptyList(),
+    val genreChoices: List<String> = emptyList(),
     val listsDialog: ListsDialogState? = null,
     val foundOnDialog: FoundOnDialogState? = null,
     val foundOnChoices: List<String> = emptyList(),
@@ -65,7 +68,7 @@ class MyMediaViewModel(
     private var persistAvail = false
     private var persistDisplay = false
 
-    fun reload(lists: List<String>? = null) {
+    fun reload(lists: List<String>? = null, refresh: Boolean = false) {
         val seq = ++loadSeq
         viewModelScope.launch {
             val s = _state.value
@@ -79,8 +82,10 @@ class MyMediaViewModel(
                 calDate = s.calDate,
                 perPage = s.perPage,
                 page = s.page,
-                refresh = false,
+                refresh = refresh,
                 lists = lists,
+                year = s.year,
+                genres = s.genres,
             )
             if (seq != loadSeq) return@launch
             _state.value = result.fold(
@@ -98,6 +103,9 @@ class MyMediaViewModel(
                         perPage = it.perPage,
                         total = it.total,
                         filterLists = it.filterLists,
+                        year = it.year ?: s.year,
+                        genres = it.genres.ifEmpty { s.genres },
+                        genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
                         foundOnChoices = it.foundOnChoices.ifEmpty { _state.value.foundOnChoices },
                     )
                 },
@@ -129,6 +137,25 @@ class MyMediaViewModel(
     fun applyQuery() { _state.value = _state.value.copy(page = 1); reload() }
     fun setPage(page: Int) { _state.value = _state.value.copy(page = page); reload() }
     fun setPerPage(value: Int) { _state.value = _state.value.copy(perPage = value, page = 1); reload() }
+    fun setYear(value: String) {
+        _state.value = _state.value.copy(year = value.trim(), page = 1)
+        reload()
+    }
+
+    fun toggleGenre(genre: String) {
+        val g = genre.trim()
+        val current = _state.value.genres.toSet()
+        _state.value = _state.value.copy(
+            genres = if (g in current) _state.value.genres.filter { it != g } else _state.value.genres + g,
+            page = 1,
+        )
+        reload()
+    }
+
+    fun refreshFromTrakt() {
+        reload(refresh = true)
+    }
+
     fun toggleList(id: String) {
         val selected = _state.value.filterLists.filter { it.selected }.map { it.id }.toMutableSet()
         if (id in selected) selected.remove(id) else selected.add(id)

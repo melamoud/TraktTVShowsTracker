@@ -31,6 +31,9 @@ data class LatestMediaUiState(
     val markerPage: Int? = null,
     val hasMoreOlder: Boolean = false,
     val foundOnChoices: List<String> = emptyList(),
+    val year: String = "",
+    val genres: List<String> = emptyList(),
+    val genreChoices: List<String> = emptyList(),
     val listsDialog: ListsDialogState? = null,
     val foundOnDialog: FoundOnDialogState? = null,
     val rateTarget: MediaItemDto? = null,
@@ -65,6 +68,8 @@ class LatestMediaViewModel(
                 recentYears = s.recentYears,
                 perPage = s.perPage,
                 loadOlder = loadOlder,
+                year = s.year,
+                genres = s.genres,
             )
             if (seq != loadSeq) return@launch
             _state.value = result.fold(
@@ -81,6 +86,9 @@ class LatestMediaViewModel(
                         markerPage = it.markerPage,
                         hasMoreOlder = it.hasMoreOlder,
                         foundOnChoices = it.foundOnChoices.ifEmpty { _state.value.foundOnChoices },
+                        year = it.year ?: s.year,
+                        genres = it.genres.ifEmpty { s.genres },
+                        genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
                     )
                 },
                 onFailure = { _state.value.copy(loading = false, error = it.message) },
@@ -119,6 +127,27 @@ class LatestMediaViewModel(
 
     fun setPerPage(value: Int) {
         _state.value = _state.value.copy(perPage = value, page = 1)
+        reload()
+    }
+
+    fun setYear(value: String) {
+        _state.value = _state.value.copy(year = value.trim(), page = 1)
+        reload()
+    }
+
+    fun jumpToMarker() {
+        val page = _state.value.markerPage ?: return
+        _state.value = _state.value.copy(page = page)
+        reload()
+    }
+
+    fun toggleGenre(genre: String) {
+        val g = genre.trim()
+        val current = _state.value.genres.toSet()
+        _state.value = _state.value.copy(
+            genres = if (g in current) _state.value.genres.filter { it != g } else _state.value.genres + g,
+            page = 1,
+        )
         reload()
     }
 

@@ -6,6 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.melamoud.tvtracker.data.api.dto.AlertPrefsDto
 import com.melamoud.tvtracker.data.api.dto.CustomServiceDto
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorDto
+import com.melamoud.tvtracker.data.api.dto.ListPreferenceDto
+import com.melamoud.tvtracker.data.api.dto.ListPrefsSaveRequest
+import com.melamoud.tvtracker.data.api.dto.MarkerActionDto
+import com.melamoud.tvtracker.data.api.dto.MarkersDto
 import com.melamoud.tvtracker.data.api.dto.PreferencesSaveRequest
 import com.melamoud.tvtracker.data.api.dto.StreamingServiceDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
@@ -20,15 +24,20 @@ data class PreferencesUiState(
     val error: String? = null,
     val saveError: String? = null,
     val saved: Boolean = false,
+    val isAdmin: Boolean = false,
     val defaults: List<StreamingServiceDto> = emptyList(),
     val customs: List<CustomServiceDto> = emptyList(),
     val commonGenres: List<String> = emptyList(),
     val genres: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     val excludedGenres: List<String> = emptyList(),
+    val lists: List<ListPreferenceDto> = emptyList(),
+    val listsError: String? = null,
     val alerts: AlertPrefsDto = AlertPrefsDto(),
     val favoriteActors: List<FavoriteActorDto> = emptyList(),
     val prefsReminderDisabled: Boolean = false,
+    val prefsReminderSnoozeUntil: String? = null,
+    val markers: MarkersDto = MarkersDto(),
     val actorBusy: Boolean = false,
 )
 
@@ -48,15 +57,20 @@ class PreferencesViewModel(
                     _state.value = _state.value.copy(
                         loading = false,
                         error = null,
+                        isAdmin = it.isAdmin,
                         defaults = it.defaults,
                         customs = it.customs,
                         commonGenres = it.commonGenres,
                         genres = it.genres,
                         keywords = it.keywords,
                         excludedGenres = it.excludedGenres,
+                        lists = it.lists,
+                        listsError = it.listsError,
                         alerts = it.alerts ?: AlertPrefsDto(),
                         favoriteActors = it.favoriteActors,
                         prefsReminderDisabled = it.prefsReminderDisabled,
+                        prefsReminderSnoozeUntil = it.prefsReminderSnoozeUntil,
+                        markers = it.markers,
                     )
                 },
                 onFailure = { _state.value = _state.value.copy(loading = false, error = it.message) },
@@ -74,7 +88,7 @@ class PreferencesViewModel(
         )
     }
 
-    fun addCustom(name: String, url: String, searchTemplate: String, note: String) {
+    fun addCustom(name: String, url: String, searchTemplate: String, note: String, suggestDefault: Boolean) {
         val trimmed = name.trim()
         if (trimmed.isEmpty()) return
         _state.value = _state.value.copy(
@@ -83,7 +97,21 @@ class PreferencesViewModel(
                 url = url.trim().ifEmpty { null },
                 searchTemplate = searchTemplate.trim().ifEmpty { null },
                 note = note.trim().ifEmpty { null },
+                suggestDefault = suggestDefault,
             ),
+            saved = false,
+        )
+    }
+
+    fun updateCustom(id: Int, searchTemplate: String, note: String, suggestDefault: Boolean) {
+        _state.value = _state.value.copy(
+            customs = _state.value.customs.map {
+                if (it.id == id) it.copy(
+                    searchTemplate = searchTemplate.trim().ifEmpty { null },
+                    note = note.trim().ifEmpty { null },
+                    suggestDefault = suggestDefault,
+                ) else it
+            },
             saved = false,
         )
     }
@@ -189,6 +217,65 @@ class PreferencesViewModel(
         _state.value = _state.value.copy(prefsReminderDisabled = value, saved = false)
     }
 
+    fun snoozeReminder() {
+        viewModelScope.launch {
+            repo.prefsReminder("snooze").onSuccess { load() }
+        }
+    }
+
+    fun enableReminder() {
+        viewModelScope.launch {
+            repo.prefsReminder("enable").onSuccess { load() }
+        }
+    }
+
+    fun toggleListHidden(id: String) {
+        _state.value = _state.value.copy(
+            lists = _state.value.lists.map {
+                if (it.id == id) it.copy(hidden = !it.hidden) else it
+            },
+            saved = false,
+        )
+    }
+
+    fun toggleListDefault(id: String) {
+        _state.value = _state.value.copy(
+            lists = _state.value.lists.map {
+                if (it.id == id) it.copy(defaultSelected = !it.defaultSelected) else it
+            },
+            saved = false,
+        )
+    }
+
+    fun toggleListAlert(id: String) {
+        _state.value = _state.value.copy(
+            lists = _state.value.lists.map {
+                if (it.id == id) it.copy(alertEnabled = !it.alertEnabled) else it
+            },
+            saved = false,
+        )
+    }
+
+    fun markerClear(mediaType: String) {
+        viewModelScope.launch {
+            repo.reviewMarkerClear(mediaType)
+            _state.value = _state.value.copy(
+                markers = when (mediaType) {
+                    "movie" -> _state.value.markers.copy(movie = null)
+                    "show" -> _state.value.markers.copy(show = null)
+                    else -> _state.value.markers
+                },
+            )
+        }
+    }
+
+    fun markerCaughtUp(mediaType: String) {
+        viewModelScope.launch {
+            repo.reviewMarkerCaughtUp(mediaType)
+            load()
+        }
+    }
+
     fun removeFavoriteActor(traktId: Int) {
         viewModelScope.launch {
             _state.value = _state.value.copy(actorBusy = true)
@@ -208,6 +295,9 @@ class PreferencesViewModel(
         viewModelScope.launch {
             val s = _state.value
             _state.value = s.copy(saving = true, saveError = null, saved = false)
+            val shownIds = s.lists.filter { !it.hidden }.map { it.id }
+            val defaultIds = s.lists.filter { it.defaultSelected }.map { it.id }
+            val alertIds = s.lists.filter { it.alertEnabled }.map { it.id }
             val body = PreferencesSaveRequest(
                 serviceIds = s.defaults.filter { it.selected }.map { it.id },
                 removeCustomIds = emptyList(),
@@ -215,6 +305,12 @@ class PreferencesViewModel(
                 genres = s.genres,
                 keywords = s.keywords,
                 excludedGenres = s.excludedGenres,
+                lists = s.lists,
+                listsPrefs = ListPrefsSaveRequest(
+                    shownIds = shownIds,
+                    defaultIds = defaultIds,
+                    alertIds = alertIds,
+                ),
                 alerts = s.alerts,
                 removeFavoriteActorIds = emptyList(),
                 prefsReminderDisabled = s.prefsReminderDisabled,
