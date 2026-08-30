@@ -1,0 +1,36 @@
+# Server-side features must work for both web and Android app
+
+When adding or changing any server-side feature in this project, always deliver it
+for both clients unless it is explicitly and narrowly web-only or app-only.
+
+## What this means in practice
+
+- New data, actions, or screens added to the Flask backend must be exposed through
+the mobile JSON API under `/api/v1/` in `mobile_api.py`.
+- Reuse the same data-building logic used by the web routes: extract helpers where
+needed (e.g. `_my_media`, `_latest_page_data`, `_recommendations_page_data`) so
+both `render_template` and `jsonify` paths stay consistent.
+- If the feature introduces new data shapes, add the corresponding DTOs in
+`android/app/src/main/java/com/melamoud/tvtracker/data/api/dto/Dtos.kt` and wire
+them into `TvTrackerApi.kt`, `CatalogRepository.kt`, and the relevant
+ViewModel/Screen.
+- If the feature is read-only and already rendered as an HTML page, a WebView is
+acceptable for the app (e.g. Help), but still expose the endpoint and prefer native
+screens for interactive workflows (lists, toggles, forms, calendars).
+- Client-only behavior (UI layout, animations, gestures) is naturally allowed to
+differ between web and app, but the underlying capability must be available in
+both.
+
+## Cross-check before finishing a server-side feature
+
+- [ ] Web route exists and works.
+- [ ] `/api/v1` equivalent exists and returns the same data.
+- [ ] Android DTO + API interface + repository method are added/updated.
+- [ ] Android UI consumes the new endpoint or action.
+- [ ] Debug APK built successfully after the change.
+
+## Exceptions
+
+Features that are inherently tied to one client (e.g. web-only admin templates,
+Android-only widgets) can skip parity, but the decision must be called out in the
+change description.
