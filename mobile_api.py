@@ -52,6 +52,44 @@ def _json_body():
     return data if isinstance(data, dict) else {}
 
 
+def _serialize_calendar(cal):
+    """Convert a web calendar context into a JSON-friendly Android payload."""
+    if not cal:
+        return None
+
+    def _iso(value):
+        return value.isoformat() if value else None
+
+    return {
+        'period': cal.get('period'),
+        'label': cal.get('label'),
+        'anchor': _iso(cal.get('anchor')),
+        'prev_anchor': _iso(cal.get('prev_anchor')),
+        'next_anchor': _iso(cal.get('next_anchor')),
+        'today': _iso(cal.get('today')),
+        'weekdays': cal.get('weekdays') or [],
+        'extra_months': cal.get('extra_months') or [],
+        'days': [
+            {
+                'date': _iso(day.get('date')),
+                'in_month': bool(day.get('in_month')),
+                'is_today': bool(day.get('is_today')),
+                'events': [
+                    {
+                        'trakt_id': ev.get('trakt_id'),
+                        'media_type': ev.get('media_type'),
+                        'title': ev.get('title'),
+                        'poster_url': ev.get('poster_url'),
+                        'label': ev.get('label'),
+                    }
+                    for ev in (day.get('events') or [])
+                ],
+            }
+            for day in (cal.get('days') or [])
+        ],
+    }
+
+
 def _user_payload():
     unread = Notification.query.filter_by(
         user_id=current_user.id, is_read=False,
@@ -168,6 +206,7 @@ def api_my_media(media_type):
         'q': ctx.get('search_q') or '',
         'avail': ctx.get('avail') or '',
         'display': ctx.get('display_mode') or 'list',
+        'calendar': _serialize_calendar(ctx.get('calendar')),
         'title': ctx.get('title'),
         'found_on_choices': found_on_service_choices(current_user),
     })
@@ -670,3 +709,17 @@ def api_sync_catalog(media_type):
 def api_hide_recommendation(media_type, trakt_id):
     from routes.catalog_routes import api_hide_recommendation as impl
     return impl(media_type, trakt_id)
+
+
+@mobile_api_bp.route('/lists/create', methods=['POST'])
+@login_required
+def api_create_list():
+    from routes.user_routes import api_create_trakt_list as impl
+    return impl()
+
+
+@mobile_api_bp.route('/lists/<list_id>/delete', methods=['POST'])
+@login_required
+def api_delete_list(list_id):
+    from routes.user_routes import api_delete_trakt_list as impl
+    return impl(list_id)

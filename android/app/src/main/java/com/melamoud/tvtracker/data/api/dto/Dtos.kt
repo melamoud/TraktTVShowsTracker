@@ -119,6 +119,7 @@ data class MyMediaResponse(
     val q: String? = null,
     val avail: String? = null,
     val display: String? = null,
+    val calendar: CalendarDto? = null,
     val title: String? = null,
     @SerializedName("found_on_choices") val foundOnChoices: List<String> = emptyList(),
 )
@@ -507,4 +508,35 @@ data class FavoriteActorResponse(
     val favorited: Boolean = false,
     @SerializedName("trakt_id") val traktId: Int? = null,
     val name: String? = null,
+)
+
+data class CalendarEventDto(
+    @SerializedName("trakt_id") val traktId: Int = 0,
+    @SerializedName("media_type") val mediaType: String? = null,
+    val title: String = "",
+    @SerializedName("poster_url") val posterUrl: String? = null,
+    val label: String? = null,
+)
+
+data class CalendarDayDto(
+    val date: String? = null,
+    @SerializedName("in_month") val inMonth: Boolean = true,
+    @SerializedName("is_today") val isToday: Boolean = false,
+    val events: List<CalendarEventDto> = emptyList(),
+)
+
+data class CalendarDto(
+    val period: String = "",
+    val label: String = "",
+    val anchor: String? = null,
+    @SerializedName("prev_anchor") val prevAnchor: String? = null,
+    @SerializedName("next_anchor") val nextAnchor: String? = null,
+    val today: String? = null,
+    val weekdays: List<String> = emptyList(),
+    @SerializedName("extra_months") val extraMonths: List<String> = emptyList(),
+    val days: List<CalendarDayDto> = emptyList(),
+)
+
+data class CreateListRequest(
+    val name: String,
 )

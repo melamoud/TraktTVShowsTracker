@@ -5,6 +5,7 @@ import com.melamoud.tvtracker.data.api.dto.AlertsResponse
 import com.melamoud.tvtracker.data.api.dto.AuthCompleteRequest
 import com.melamoud.tvtracker.data.api.dto.AuthStartResponse
 import com.melamoud.tvtracker.data.api.dto.CommentResponse
+import com.melamoud.tvtracker.data.api.dto.CreateListRequest
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteResponse
 import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
@@ -55,6 +56,7 @@ interface TvTrackerApi {
         @Query("avail") avail: String? = null,
         @Query("q") query: String? = null,
         @Query("display") display: String? = null,
+        @Query("cal_date") calDate: String? = null,
         @Query("page") page: Int = 1,
         @Query("per_page") perPage: Int? = null,
         @Query("refresh") refresh: Int? = null,
@@ -145,6 +147,12 @@ interface TvTrackerApi {
         @Path("traktId") traktId: Int,
         @Body body: ActionRequest,
     ): ListsResponse
+
+    @POST("/api/v1/lists/create")
+    suspend fun createList(@Body body: CreateListRequest): SimpleResponse
+
+    @POST("/api/v1/lists/{listId}/delete")
+    suspend fun deleteList(@Path("listId") listId: String): SimpleResponse
 
     @POST("/api/v1/episode/watched")
     suspend fun episodeWatched(@Body body: ActionRequest): WatchedResponse

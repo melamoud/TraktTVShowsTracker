@@ -36,6 +36,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
         avail: String? = null,
         query: String? = null,
         display: String? = null,
+        calDate: String? = null,
+        perPage: Int? = null,
         page: Int = 1,
         refresh: Boolean = false,
         lists: List<String>? = null,
@@ -46,6 +48,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
             avail = avail,
             query = query?.takeIf { it.length >= 2 },
             display = display,
+            calDate = calDate,
+            perPage = perPage,
             page = page,
             refresh = if (refresh) 1 else null,
             listsSet = if (lists != null) 1 else null,
@@ -139,6 +143,12 @@ class CatalogRepository(private val api: TvTrackerApi) {
 
     suspend fun listsSet(mediaType: String, traktId: Int, selected: List<String>): Result<ListsResponse> =
         runCatching { api.listsSet(mediaType, traktId, ActionRequest(selected = selected)) }
+
+    suspend fun createList(name: String): Result<SimpleResponse> =
+        runCatching { api.createList(com.melamoud.tvtracker.data.api.dto.CreateListRequest(name)) }
+
+    suspend fun deleteList(listId: String): Result<SimpleResponse> =
+        runCatching { api.deleteList(listId) }
 
     suspend fun episodeWatched(
         ids: Map<String, Any>,

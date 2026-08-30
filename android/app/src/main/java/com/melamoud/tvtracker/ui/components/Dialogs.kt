@@ -31,6 +31,7 @@ fun ConfirmDialog(
     title: String,
     message: String,
     confirmLabel: String,
+    destructive: Boolean = false,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -38,7 +39,11 @@ fun ConfirmDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = { Text(message) },
-        confirmButton = { TextButton(onClick = onConfirm) { Text(confirmLabel) } },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(confirmLabel, color = if (destructive) com.melamoud.tvtracker.ui.theme.Danger else androidx.compose.material3.LocalContentColor.current)
+            }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
     )
 }

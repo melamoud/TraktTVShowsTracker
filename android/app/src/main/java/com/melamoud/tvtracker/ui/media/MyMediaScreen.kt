@@ -8,15 +8,22 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.NavigateBefore
+import androidx.compose.material.icons.automirrored.filled.NavigateNext
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -25,13 +32,19 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import coil.compose.AsyncImage
 import com.melamoud.tvtracker.R
+import com.melamoud.tvtracker.data.api.absoluteUrl
+import com.melamoud.tvtracker.data.api.dto.FilterListDto
 import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
 import com.melamoud.tvtracker.ui.components.FilterMenuButton
@@ -61,8 +74,15 @@ fun MyMediaScreen(
         "streaming" -> "Streaming"
         else -> "Avail"
     }
-    val viewLabel = if (state.display == "newest_aired") "Newest" else "List"
     val displayMode = state.display.ifBlank { "list" }
+    val viewLabel = when (displayMode) {
+        "newest_aired" -> "Newest"
+        "daily" -> "Daily"
+        "weekly" -> "Weekly"
+        "monthly" -> "Monthly"
+        else -> "List"
+    }
+    val perPageLabel = "${state.perPage}/pg"
     val listsSelected = state.filterLists.count { it.selected }
     val listsLabel = if (listsSelected == 0) "Lists" else "Lists ($listsSelected)"
     ReloadOnResume(viewModel::reload)
@@ -97,10 +117,11 @@ fun MyMediaScreen(
                 }
             }
             if (state.filterLists.isNotEmpty()) {
-                FilterMenuButton(listsLabel) { _ ->
+                FilterMenuButton(listsLabel) { dismiss ->
                     state.filterLists.forEach { lst ->
                         CheckMenuItem(lst.name, lst.selected) { viewModel.toggleList(lst.id) }
                     }
+                    TextButton(onClick = { dismiss(); viewModel.showCreateList() }) { Text("Manage lists…") }
                 }
             }
             FilterMenuButton(availLabel) { dismiss ->
@@ -113,29 +134,50 @@ fun MyMediaScreen(
                     }
             }
             FilterMenuButton(viewLabel) { dismiss ->
-                CheckMenuItem("List", displayMode == "list") {
-                    viewModel.setDisplay("list")
-                    dismiss()
+                listOf(
+                    "list" to "List",
+                    "newest_aired" to "Newest aired",
+                    "daily" to "Daily",
+                    "weekly" to "Weekly",
+                    "monthly" to "Monthly",
+                ).forEach { (id, label) ->
+                    CheckMenuItem(label, displayMode == id) {
+                        viewModel.setDisplay(id)
+                        dismiss()
+                    }
                 }
-                CheckMenuItem("Newest aired", displayMode == "newest_aired") {
-                    viewModel.setDisplay("newest_aired")
-                    dismiss()
+            }
+            FilterMenuButton(perPageLabel) { dismiss ->
+                listOf(10, 50, 100).forEach { n ->
+                    CheckMenuItem("$n / page", state.perPage == n) {
+                        viewModel.setPerPage(n)
+                        dismiss()
+                    }
                 }
             }
         }
-        Text(
-            "${state.total} titles · page ${state.page}/${state.pages}",
-            color = TextMuted,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-        )
+        if (displayMode in setOf("daily", "weekly", "monthly")) {
+            CalendarHeader(state, viewModel)
+        } else {
+            Text(
+                "${state.total} titles · page ${state.page}/${state.pages}",
+                color = TextMuted,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+            )
+        }
         ServerRefreshBox(
             isRefreshing = state.loading && state.items.isNotEmpty(),
             onRefresh = viewModel::reload,
             modifier = Modifier.weight(1f),
         ) {
             when {
-                state.loading && state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
-                state.error != null && state.items.isEmpty() -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
+                state.loading && state.items.isEmpty() && state.calendar == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                state.error != null && state.items.isEmpty() && state.calendar == null -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
+                displayMode in setOf("daily", "weekly", "monthly") -> CalendarListView(
+                    calendar = state.calendar,
+                    baseUrl = baseUrl,
+                    onOpen = onOpenDetail,
+                )
                 state.items.isEmpty() -> Text(stringResource(R.string.empty_list), color = TextMuted, modifier = Modifier.padding(24.dp))
                 else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
@@ -202,6 +244,81 @@ fun MyMediaScreen(
             onDismiss = viewModel::dismissFoundOn,
         )
     }
+    if (state.listCreateDialog) {
+        ListsManagementDialog(
+            lists = state.filterLists,
+            busy = state.listActionBusy,
+            message = state.listActionMessage,
+            onCreate = viewModel::createList,
+            onDelete = viewModel::confirmDeleteList,
+            onDismiss = viewModel::dismissCreateList,
+        )
+    }
+    state.listDeleteConfirm?.let { list ->
+        ConfirmDialog(
+            title = "Delete list?",
+            message = "Delete \"${list.name}\" from Trakt? This cannot be undone.",
+            confirmLabel = "Delete",
+            destructive = true,
+            onConfirm = viewModel::deleteList,
+            onDismiss = viewModel::dismissDeleteList,
+        )
+    }
+}
+
+@Composable
+private fun ListsManagementDialog(
+    lists: List<FilterListDto>,
+    busy: Boolean,
+    message: String?,
+    onCreate: (String) -> Unit,
+    onDelete: (FilterListDto) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var newName by remember { mutableStateOf("") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Manage lists") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    label = { Text("New list name") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    enabled = !busy,
+                )
+                TextButton(
+                    onClick = { onCreate(newName); newName = "" },
+                    enabled = newName.isNotBlank() && !busy,
+                    modifier = Modifier.align(Alignment.End),
+                ) { Text("Create list") }
+                message?.let {
+                    Text(it, color = Danger, modifier = Modifier.padding(vertical = 4.dp))
+                }
+                lists.forEach { lst ->
+                    Row(
+                        Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text(lst.name, modifier = Modifier.weight(1f))
+                        if (lst.kind != "watchlist") {
+                            TextButton(
+                                onClick = { onDelete(lst) },
+                                enabled = !busy,
+                            ) { Text("Delete", color = Danger) }
+                        }
+                    }
+                }
+                if (busy) {
+                    CircularProgressIndicator(modifier = Modifier.padding(top = 8.dp).align(Alignment.CenterHorizontally))
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text("Done") } },
+    )
 }
 
 private fun statusChoices(isShows: Boolean): List<Pair<String, String>> {
@@ -209,5 +326,93 @@ private fun statusChoices(isShows: Boolean): List<Pair<String, String>> {
         listOf("lists" to "Both", "watched" to "Watched", "unwatched_episodes" to "Unwatched eps")
     } else {
         listOf("lists" to "Both", "watched" to "Watched", "unwatched" to "Unwatched")
+    }
+}
+
+@Composable
+private fun CalendarHeader(state: MyMediaUiState, viewModel: MyMediaViewModel) {
+    val calendar = state.calendar ?: return
+    Row(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        IconButton(onClick = { viewModel.setCalDate(calendar.prevAnchor) }) {
+            Icon(Icons.AutoMirrored.Filled.NavigateBefore, contentDescription = "Previous")
+        }
+        TextButton(
+            onClick = { viewModel.setCalDate(calendar.today) },
+            enabled = calendar.today != null && calendar.anchor != calendar.today,
+        ) { Text("Today") }
+        Text(
+            calendar.label,
+            modifier = Modifier.weight(1f),
+            color = TextMuted,
+        )
+        IconButton(onClick = { viewModel.setCalDate(calendar.nextAnchor) }) {
+            Icon(Icons.AutoMirrored.Filled.NavigateNext, contentDescription = "Next")
+        }
+    }
+}
+
+@Composable
+private fun CalendarListView(
+    calendar: com.melamoud.tvtracker.data.api.dto.CalendarDto?,
+    baseUrl: String,
+    onOpen: (String, Int) -> Unit,
+) {
+    if (calendar == null) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+        return
+    }
+    val allEvents = remember(calendar) { calendar.days.flatMap { it.events } }
+    if (allEvents.isEmpty()) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Nothing airing or releasing in this period.", color = TextMuted)
+        }
+        return
+    }
+    LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        calendar.days.forEach { day ->
+            if (day.events.isEmpty()) return@forEach
+            item(key = "header-${day.date}") {
+                Text(
+                    day.date ?: "",
+                    color = TextMuted,
+                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp),
+                )
+            }
+            items(day.events, key = { "${day.date}-${it.traktId}-${it.label}" }) { ev ->
+                CalendarEventCard(ev, baseUrl, onOpen)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CalendarEventCard(
+    event: com.melamoud.tvtracker.data.api.dto.CalendarEventDto,
+    baseUrl: String,
+    onOpen: (String, Int) -> Unit,
+) {
+    Card(
+        onClick = { onOpen(event.mediaType ?: "show", event.traktId) },
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            Modifier.padding(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            AsyncImage(
+                model = absoluteUrl(baseUrl, event.posterUrl),
+                contentDescription = event.title,
+                modifier = Modifier.width(40.dp).height(60.dp),
+            )
+            Column(Modifier.weight(1f)) {
+                Text(event.title, maxLines = 2)
+                event.label?.let { Text(it, color = TextMuted, maxLines = 1) }
+            }
+        }
     }
 }

@@ -3,6 +3,7 @@ package com.melamoud.tvtracker.ui.media
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.melamoud.tvtracker.data.api.dto.CalendarDto
 import com.melamoud.tvtracker.data.api.dto.FilterListDto
 import com.melamoud.tvtracker.data.api.dto.ListMembershipDto
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
@@ -20,9 +21,12 @@ data class MyMediaUiState(
     val filter: String = "lists",
     val avail: String = "",
     val display: String = "",
+    val calDate: String? = null,
+    val calendar: CalendarDto? = null,
     val query: String = "",
     val page: Int = 1,
     val pages: Int = 1,
+    val perPage: Int = 50,
     val total: Int = 0,
     val filterLists: List<FilterListDto> = emptyList(),
     val listsDialog: ListsDialogState? = null,
@@ -30,6 +34,10 @@ data class MyMediaUiState(
     val foundOnChoices: List<String> = emptyList(),
     val rateTarget: MediaItemDto? = null,
     val watchConfirm: MediaItemDto? = null,
+    val listCreateDialog: Boolean = false,
+    val listDeleteConfirm: FilterListDto? = null,
+    val listActionBusy: Boolean = false,
+    val listActionMessage: String? = null,
 )
 
 data class ListsDialogState(
@@ -68,6 +76,8 @@ class MyMediaViewModel(
                 avail = s.avail.takeIf { persistAvail },
                 query = s.query,
                 display = s.display.takeIf { persistDisplay && it.isNotBlank() },
+                calDate = s.calDate,
+                perPage = s.perPage,
                 page = s.page,
                 refresh = false,
                 lists = lists,
@@ -82,8 +92,10 @@ class MyMediaViewModel(
                         filter = it.filter ?: _state.value.filter,
                         avail = it.avail.orEmpty(),
                         display = it.display ?: _state.value.display,
+                        calendar = it.calendar,
                         page = it.page,
                         pages = it.pages,
+                        perPage = it.perPage,
                         total = it.total,
                         filterLists = it.filterLists,
                         foundOnChoices = it.foundOnChoices.ifEmpty { _state.value.foundOnChoices },
@@ -106,12 +118,17 @@ class MyMediaViewModel(
     }
     fun setDisplay(value: String) {
         persistDisplay = true
-        _state.value = _state.value.copy(display = value, page = 1)
+        _state.value = _state.value.copy(display = value, page = 1, calDate = null)
+        reload()
+    }
+    fun setCalDate(value: String?) {
+        _state.value = _state.value.copy(calDate = value, page = 1)
         reload()
     }
     fun setQuery(value: String) { _state.value = _state.value.copy(query = value) }
     fun applyQuery() { _state.value = _state.value.copy(page = 1); reload() }
     fun setPage(page: Int) { _state.value = _state.value.copy(page = page); reload() }
+    fun setPerPage(value: Int) { _state.value = _state.value.copy(perPage = value, page = 1); reload() }
     fun toggleList(id: String) {
         val selected = _state.value.filterLists.filter { it.selected }.map { it.id }.toMutableSet()
         if (id in selected) selected.remove(id) else selected.add(id)
@@ -197,6 +214,46 @@ class MyMediaViewModel(
         }
     }
     fun dismissFoundOn() { _state.value = _state.value.copy(foundOnDialog = null) }
+
+    fun showCreateList() { _state.value = _state.value.copy(listCreateDialog = true) }
+    fun dismissCreateList() { _state.value = _state.value.copy(listCreateDialog = false) }
+    fun createList(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(listActionBusy = true, listActionMessage = null)
+            repo.createList(trimmed).onSuccess {
+                _state.value = _state.value.copy(
+                    listCreateDialog = false,
+                    listActionBusy = false,
+                    listActionMessage = null,
+                )
+                reload()
+            }.onFailure {
+                _state.value = _state.value.copy(
+                    listActionBusy = false,
+                    listActionMessage = it.message,
+                )
+            }
+        }
+    }
+
+    fun confirmDeleteList(list: FilterListDto) { _state.value = _state.value.copy(listDeleteConfirm = list) }
+    fun dismissDeleteList() { _state.value = _state.value.copy(listDeleteConfirm = null) }
+    fun deleteList() {
+        val list = _state.value.listDeleteConfirm ?: return
+        _state.value = _state.value.copy(listDeleteConfirm = null)
+        viewModelScope.launch {
+            _state.value = _state.value.copy(listActionBusy = true, listActionMessage = null)
+            repo.deleteList(list.id).onSuccess {
+                _state.value = _state.value.copy(listActionBusy = false, listActionMessage = null)
+                reload()
+            }.onFailure {
+                _state.value = _state.value.copy(listActionBusy = false, listActionMessage = it.message)
+            }
+        }
+    }
+
     fun applyFoundOn(labels: List<String>) {
         val dialog = _state.value.foundOnDialog ?: return
         _state.value = _state.value.copy(foundOnDialog = null)
