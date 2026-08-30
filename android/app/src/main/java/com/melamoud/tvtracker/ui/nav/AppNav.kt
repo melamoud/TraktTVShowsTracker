@@ -338,7 +338,9 @@ fun AppNav(
                     factory = AlertsViewModel.factory(container.catalogRepository, onUnread),
                 )
                 AlertsScreen(
-                    vm, container.baseUrl,
+                    vm,
+                    container.baseUrl,
+                    isAdmin = isAdmin,
                     onProgress = ::openProgress,
                     onOpenDetail = ::openDetail,
                 )

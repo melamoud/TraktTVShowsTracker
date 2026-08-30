@@ -106,6 +106,13 @@ class AlertsViewModel(
         }
     }
 
+    fun runReleaseCheck() {
+        viewModelScope.launch {
+            repo.adminRunReleaseCheck()
+            reload()
+        }
+    }
+
     companion object {
         fun factory(repo: CatalogRepository, onUnread: (Int) -> Unit) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")

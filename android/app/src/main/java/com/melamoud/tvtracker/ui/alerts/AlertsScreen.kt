@@ -44,6 +44,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -68,10 +69,12 @@ private val AlertActionHeight = 40.dp
 fun AlertsScreen(
     viewModel: AlertsViewModel,
     baseUrl: String,
+    isAdmin: Boolean,
     onProgress: (Int) -> Unit,
     onOpenDetail: (String, Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val uriHandler = LocalUriHandler.current
     ReloadOnResume(viewModel::reload)
     Column(Modifier.fillMaxSize()) {
         Row(
@@ -97,8 +100,13 @@ fun AlertsScreen(
                 onClick = { viewModel.setGroupShows(!state.groupShows) },
                 label = { Text(if (state.groupShows) "Grouped by show" else "One row each") },
             )
-            TextButton(onClick = viewModel::readAll) { Text("Mark all read") }
+            if (state.unreadCount > 0) {
+                TextButton(onClick = viewModel::readAll) { Text("Mark all read (${state.unreadCount})") }
+            }
             Text("${state.unreadCount} unread", color = TextMuted)
+            if (isAdmin) {
+                OutlinedButton(onClick = viewModel::runReleaseCheck) { Text("Run alert check") }
+            }
             IconButton(onClick = viewModel::reload) {
                 Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
             }
@@ -256,6 +264,13 @@ private fun AlertGroupCard(
                     ) {
                         Text("Progress", maxLines = 1, softWrap = false)
                     }
+                    OutlinedButton(
+                        onClick = onOpenDetail,
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        modifier = Modifier.height(AlertActionHeight),
+                    ) {
+                        Text("Details", maxLines = 1, softWrap = false)
+                    }
                     TextButton(
                         onClick = onPin,
                         contentPadding = PaddingValues(horizontal = 8.dp),
@@ -320,6 +335,17 @@ private fun AlertItemCard(
                     if (!item.typeLabel.isNullOrBlank()) {
                         Text(item.typeLabel, color = AccentGold, style = MaterialTheme.typography.labelMedium)
                     }
+                    if (!item.isRead) {
+                        Text(
+                            "Unread",
+                            color = AccentGold,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(AccentGold.copy(alpha = 0.14f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp),
+                        )
+                    }
                 }
                 val headline = item.headline?.takeIf { it.isNotBlank() }
                 if (headline != null) {
@@ -383,6 +409,25 @@ private fun AlertItemCard(
                             modifier = Modifier.height(AlertActionHeight),
                         ) {
                             Text("Progress", maxLines = 1, softWrap = false)
+                        }
+                    }
+                    if (item.mediaType != null && item.traktId != null) {
+                        OutlinedButton(
+                            onClick = { onOpenDetail(item.mediaType, item.traktId) },
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) {
+                            Text("Details", maxLines = 1, softWrap = false)
+                        }
+                    }
+                    if (!item.link.isNullOrBlank() && (item.mediaType == null || item.traktId == null)) {
+                        val handler = LocalUriHandler.current
+                        OutlinedButton(
+                            onClick = { try { handler.openUri(item.link) } catch (_: Exception) {} },
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) {
+                            Text("View", maxLines = 1, softWrap = false)
                         }
                     }
                     if (item.mediaType != null && item.traktId != null) {
