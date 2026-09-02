@@ -162,8 +162,12 @@ class SearchViewModel(
     }
 
     fun setPage(page: Int) {
-        _state.value = _state.value.copy(page = page)
-        search()
+        if (!canSearch()) return
+        viewModelScope.launch {
+            val s = _state.value.copy(page = page)
+            _state.value = s.copy(loading = true, error = null)
+            load(s)
+        }
     }
 
     fun refreshFromTrakt() {
