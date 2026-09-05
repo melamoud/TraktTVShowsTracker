@@ -54,7 +54,7 @@ fun ProgressScreen(
     val open = remember { mutableStateMapOf<Int, Boolean>() }
     val data = state.data
     var menuExpanded by remember { mutableStateOf(false) }
-    ReloadOnResume(viewModel::reload)
+    ReloadOnResume(viewModel::refreshFromTrakt)
 
     Column(Modifier.fillMaxSize()) {
         TopAppBar(
@@ -63,7 +63,7 @@ fun ProgressScreen(
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
             },
             actions = {
-                IconButton(onClick = viewModel::reload) {
+                IconButton(onClick = viewModel::refreshFromTrakt) {
                     Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
                 }
                 Box {
@@ -84,7 +84,7 @@ fun ProgressScreen(
         )
         ServerRefreshBox(
             isRefreshing = state.loading && data != null,
-            onRefresh = viewModel::reload,
+            onRefresh = viewModel::refreshFromTrakt,
             modifier = Modifier.weight(1f),
         ) {
             when {
