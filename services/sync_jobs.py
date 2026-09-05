@@ -1099,12 +1099,16 @@ def apply_show_episode_progress(
     aired: int | None,
     completed: int | None,
     next_episode: dict | None = None,
+    clear_payload: bool = True,
 ) -> UserMediaState:
     """
     Cache show episode summary on UserMediaState for My Shows cards.
 
     ``aired`` / ``completed`` are regular-season counts when available.
     ``next_episode`` is a Trakt episode object or {season, number, title}.
+    When ``clear_payload`` is True (default), the full progress payload JSON is
+    invalidated because the episode summary changed without rewriting that list.
+    Pass False when the caller just saved the payload (e.g. save_progress_payload).
     """
     row = UserMediaState.query.filter_by(
         user_id=user_id, media_type='show', trakt_id=int(trakt_id),
@@ -1153,6 +1157,10 @@ def apply_show_episode_progress(
         row.next_episode_title = None
 
     row.progress_detail_at = datetime.utcnow()
+    # The episode summary changed, but the full progress payload JSON was not
+    # rewritten here; mark it stale so the next Progress/Alerts request re-fetches.
+    if clear_payload:
+        row.progress_payload_json = None
     row.updated_at = datetime.utcnow()
     return row
 
@@ -1168,7 +1176,7 @@ def refresh_show_progress_for_ids(
     """
     Fetch Trakt progress for the given show ids (typically one My Shows page).
 
-    Skips rows with fresh ``progress_detail_at`` unless ``force``. Age uses the
+    Skips rows with fresh progress payload unless ``force``. Age uses the
     admin Trakt read-cache TTL when ``max_age_hours`` is omitted.
     """
     ids = [int(t) for t in trakt_ids if t]
@@ -1190,7 +1198,13 @@ def refresh_show_progress_for_ids(
     need: list[int] = []
     for tid in ids:
         row = rows.get(tid)
-        if force or row is None or not row.progress_detail_at or row.progress_detail_at < cutoff:
+        if (
+            force
+            or row is None
+            or not row.progress_payload_json
+            or not row.progress_detail_at
+            or row.progress_detail_at < cutoff
+        ):
             need.append(tid)
     if not need:
         return 0

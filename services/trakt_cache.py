@@ -270,6 +270,7 @@ def save_progress_payload(
         aired=aired,
         completed=completed,
         next_episode=next_episode,
+        clear_payload=False,
     )
     return row
 

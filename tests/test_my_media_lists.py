@@ -412,7 +412,7 @@ def test_my_shows_card_shows_episode_progress_and_next(app, client, user):
 
 
 def test_refresh_show_progress_skips_fresh_cache(app, user):
-    """Page enrich does not re-hit Trakt when progress_detail_at is fresh."""
+    """Page enrich does not re-hit Trakt when progress payload is fresh."""
     from models import User
     from services.sync_jobs import refresh_show_progress_for_ids
 
@@ -425,6 +425,7 @@ def test_refresh_show_progress_skips_fresh_cache(app, user):
             watched=True,
             episodes_aired=8,
             episodes_completed=3,
+            progress_payload_json='{}',
             progress_detail_at=datetime.utcnow(),
         ))
         db.session.commit()
