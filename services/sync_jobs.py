@@ -1119,6 +1119,19 @@ def apply_show_episode_progress(
         )
         db.session.add(row)
 
+    # Capture the existing summary so we only invalidate the full progress payload
+    # when something actually changed. This avoids redundant Trakt fetches when
+    # the background sync runs with no new data.
+    old_summary = (
+        row.episodes_aired,
+        row.episodes_completed,
+        row.progress_percent,
+        row.next_episode_season,
+        row.next_episode_number,
+        row.next_episode_title,
+        row.watched,
+    )
+
     last = row.last_episode_aired_at
     last_still_upcoming = False
     if last is not None:
@@ -1157,9 +1170,19 @@ def apply_show_episode_progress(
         row.next_episode_title = None
 
     row.progress_detail_at = datetime.utcnow()
-    # The episode summary changed, but the full progress payload JSON was not
-    # rewritten here; mark it stale so the next Progress/Alerts request re-fetches.
-    if clear_payload:
+    new_summary = (
+        row.episodes_aired,
+        row.episodes_completed,
+        row.progress_percent,
+        row.next_episode_season,
+        row.next_episode_number,
+        row.next_episode_title,
+        row.watched,
+    )
+    # The episode summary changed without rewriting the full progress payload,
+    # so mark the payload stale. Callers that just saved a fresh payload pass
+    # clear_payload=False to keep it.
+    if clear_payload and old_summary != new_summary:
         row.progress_payload_json = None
     row.updated_at = datetime.utcnow()
     return row
@@ -1358,6 +1381,16 @@ def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
     if not row:
         row = UserMediaState(user_id=user_id, media_type='show', trakt_id=trakt_id)
         db.session.add(row)
+
+    # Capture existing summary to avoid invalidating the full progress payload
+    # when the latest-aired probe finds nothing new.
+    old_summary = (
+        row.last_episode_aired_at,
+        row.last_episode_label,
+        row.episodes_aired,
+        row.progress_percent,
+    )
+
     if latest is not None:
         row.last_episode_aired_at = latest
         row.last_episode_label = label
@@ -1370,6 +1403,18 @@ def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
                 row.progress_percent = round(100.0 * done / aired_count, 1)
             else:
                 row.progress_percent = 0.0
+
+    new_summary = (
+        row.last_episode_aired_at,
+        row.last_episode_label,
+        row.episodes_aired,
+        row.progress_percent,
+    )
+    if old_summary != new_summary:
+        # Latest-aired metadata changed; the progress payload (full episode list)
+        # is now stale for both web and app clients.
+        row.progress_payload_json = None
+
     row.last_aired_checked_at = datetime.utcnow()
     return True
 
