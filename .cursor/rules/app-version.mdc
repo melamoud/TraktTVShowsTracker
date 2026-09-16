@@ -1,0 +1,16 @@
+---
+description: Bump the Android app x.y.z version on every change and show it on Home.
+alwaysApply: true
+---
+
+# App version
+
+`android/app/build.gradle.kts` `versionName` is **x.y.z**. Home shows `BuildConfig.VERSION_NAME` in the top bar and at the bottom of the screen.
+
+On every change that the user will install as an APK (code, UI, or user-facing help):
+
+1. Bump **patch** (`z` in `x.y.z`) by 1, unless the user asked for a minor/major bump.
+2. Bump `versionCode` by 1 (must always increase).
+3. When you finish coding, tell the user the new version (e.g. **1.0.1**).
+
+Do not leave two APKs with the same `versionName`.

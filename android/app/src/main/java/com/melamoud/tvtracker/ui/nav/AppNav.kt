@@ -1,5 +1,6 @@
 package com.melamoud.tvtracker.ui.nav
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Movie
@@ -17,6 +18,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -28,9 +30,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -40,6 +44,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.melamoud.tvtracker.BuildConfig
 import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.di.AppContainer
 import com.melamoud.tvtracker.ui.alerts.AlertsScreen
@@ -65,6 +70,7 @@ import com.melamoud.tvtracker.ui.search.SearchScreen
 import com.melamoud.tvtracker.ui.search.SearchViewModel
 import com.melamoud.tvtracker.ui.theme.Background
 import com.melamoud.tvtracker.ui.theme.Primary
+import com.melamoud.tvtracker.ui.theme.TextMuted
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -147,6 +153,12 @@ fun AppNav(
                     title = { Text(screenTitle(currentRoute), color = Color.White) },
                     actions = {
                         Text(username.orEmpty(), color = Color.White.copy(alpha = 0.85f))
+                        Text(
+                            "v${BuildConfig.VERSION_NAME}",
+                            color = Color.White.copy(alpha = 0.7f),
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 8.dp),
+                        )
                         var menuOpen by remember { mutableStateOf(false) }
                         IconButton(onClick = { menuOpen = true }) {
                             Icon(Icons.Default.MoreVert, contentDescription = stringResource(R.string.more))
@@ -249,7 +261,14 @@ fun AppNav(
         },
         bottomBar = {
             if (showChrome) {
-                NavigationBar(containerColor = Background) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        "v${BuildConfig.VERSION_NAME}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = TextMuted,
+                        modifier = Modifier.padding(top = 2.dp, bottom = 2.dp),
+                    )
+                    NavigationBar(containerColor = Background) {
                     fun go(route: String) {
                         navController.navigate(route) {
                             popUpTo(navController.graph.findStartDestination().id) { saveState = true }
@@ -293,6 +312,7 @@ fun AppNav(
                     )
                 }
             }
+        }
         },
     ) { padding ->
         NavHost(
