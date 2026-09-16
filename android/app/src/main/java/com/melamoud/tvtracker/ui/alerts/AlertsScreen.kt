@@ -23,12 +23,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -38,6 +41,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -55,6 +61,7 @@ import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.data.api.absoluteUrl
 import com.melamoud.tvtracker.data.api.dto.AlertEntryDto
 import com.melamoud.tvtracker.data.api.dto.AlertItemDto
+import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
 import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
@@ -284,6 +291,13 @@ private fun AlertGroupCard(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     OutlinedButton(
+                        onClick = onProgress,
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        modifier = Modifier.height(AlertActionHeight),
+                    ) {
+                        Text("Progress", maxLines = 1, softWrap = false)
+                    }
+                    OutlinedButton(
                         onClick = onToggle,
                         contentPadding = PaddingValues(horizontal = 10.dp),
                         modifier = Modifier.height(AlertActionHeight),
@@ -300,32 +314,35 @@ private fun AlertGroupCard(
                         )
                     }
                     OutlinedButton(
-                        onClick = onProgress,
-                        contentPadding = PaddingValues(horizontal = 10.dp),
-                        modifier = Modifier.height(AlertActionHeight),
-                    ) {
-                        Text("Progress", maxLines = 1, softWrap = false)
-                    }
-                    OutlinedButton(
                         onClick = onOpenDetail,
                         contentPadding = PaddingValues(horizontal = 10.dp),
                         modifier = Modifier.height(AlertActionHeight),
                     ) {
                         Text("Details", maxLines = 1, softWrap = false)
                     }
-                    TextButton(
-                        onClick = onPin,
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.height(AlertActionHeight),
-                    ) {
-                        Icon(
-                            if (entry.alertsPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                            contentDescription = if (entry.alertsPinned) "Unpin" else "Pin",
-                            modifier = Modifier
-                                .padding(end = 4.dp)
-                                .size(18.dp),
-                        )
-                        Text(if (entry.alertsPinned) "Unpin" else "Pin", maxLines = 1, softWrap = false)
+                    Box {
+                        var expandedMenu by remember { mutableStateOf(false) }
+                        IconButton(onClick = { expandedMenu = true }) {
+                            Icon(Icons.Default.MoreVert, contentDescription = "More")
+                        }
+                        DropdownMenu(
+                            expanded = expandedMenu,
+                            onDismissRequest = { expandedMenu = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            if (entry.alertsPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                            contentDescription = null,
+                                            modifier = Modifier.padding(end = 8.dp).size(18.dp),
+                                        )
+                                        Text(if (entry.alertsPinned) "Unpin" else "Pin")
+                                    }
+                                },
+                                onClick = { expandedMenu = false; onPin() },
+                            )
+                        }
                     }
                 }
             }
@@ -441,41 +458,6 @@ private fun AlertItemCard(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    TextButton(
-                        onClick = onToggleRead,
-                        contentPadding = PaddingValues(horizontal = 8.dp),
-                        modifier = Modifier.height(AlertActionHeight),
-                    ) {
-                        Text(if (item.isRead) "Mark unread" else "Mark read", maxLines = 1, softWrap = false)
-                    }
-                    onWatch?.let {
-                        OutlinedButton(
-                            onClick = it,
-                            contentPadding = PaddingValues(horizontal = 10.dp),
-                            modifier = Modifier.height(AlertActionHeight),
-                        ) { Text("Watch", maxLines = 1, softWrap = false) }
-                    }
-                    onLists?.let {
-                        OutlinedButton(
-                            onClick = it,
-                            contentPadding = PaddingValues(horizontal = 10.dp),
-                            modifier = Modifier.height(AlertActionHeight),
-                        ) { Text("Lists", maxLines = 1, softWrap = false) }
-                    }
-                    onFoundOn?.let {
-                        OutlinedButton(
-                            onClick = it,
-                            contentPadding = PaddingValues(horizontal = 10.dp),
-                            modifier = Modifier.height(AlertActionHeight),
-                        ) { Text("Found on", maxLines = 1, softWrap = false) }
-                    }
-                    onRate?.let {
-                        OutlinedButton(
-                            onClick = it,
-                            contentPadding = PaddingValues(horizontal = 10.dp),
-                            modifier = Modifier.height(AlertActionHeight),
-                        ) { Text("Rate", maxLines = 1, softWrap = false) }
-                    }
                     if (item.mediaType == "show" && item.traktId != null) {
                         OutlinedButton(
                             onClick = { onProgress(item.traktId) },
@@ -485,14 +467,26 @@ private fun AlertItemCard(
                             Text("Progress", maxLines = 1, softWrap = false)
                         }
                     }
-                    if (item.mediaType != null && item.traktId != null) {
+                    onWatch?.let {
                         OutlinedButton(
-                            onClick = { onOpenDetail(item.mediaType, item.traktId) },
+                            onClick = it,
                             contentPadding = PaddingValues(horizontal = 10.dp),
                             modifier = Modifier.height(AlertActionHeight),
-                        ) {
-                            Text("Details", maxLines = 1, softWrap = false)
-                        }
+                        ) { Text("Watch", maxLines = 1, softWrap = false) }
+                    }
+                    onRate?.let {
+                        OutlinedButton(
+                            onClick = it,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) { Text("Rate", maxLines = 1, softWrap = false) }
+                    }
+                    TextButton(
+                        onClick = onToggleRead,
+                        contentPadding = PaddingValues(horizontal = 8.dp),
+                        modifier = Modifier.height(AlertActionHeight),
+                    ) {
+                        Text(if (item.isRead) "Mark unread" else "Mark read", maxLines = 1, softWrap = false)
                     }
                     if (!item.link.isNullOrBlank() && (item.mediaType == null || item.traktId == null)) {
                         val handler = LocalUriHandler.current
@@ -504,20 +498,45 @@ private fun AlertItemCard(
                             Text("View", maxLines = 1, softWrap = false)
                         }
                     }
-                    if (item.mediaType != null && item.traktId != null) {
-                        TextButton(
-                            onClick = onPin,
-                            contentPadding = PaddingValues(horizontal = 8.dp),
-                            modifier = Modifier.height(AlertActionHeight),
-                        ) {
-                            Icon(
-                                if (item.alertsPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
-                                contentDescription = if (item.alertsPinned) "Unpin" else "Pin",
-                                modifier = Modifier
-                                    .padding(end = 4.dp)
-                                    .size(18.dp),
-                            )
-                            Text(if (item.alertsPinned) "Unpin" else "Pin", maxLines = 1, softWrap = false)
+                    val hasOverflow = onLists != null || onFoundOn != null || (item.mediaType != null && item.traktId != null)
+                    if (hasOverflow) {
+                        Box {
+                            var expandedMenu by remember { mutableStateOf(false) }
+                            IconButton(onClick = { expandedMenu = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = "More")
+                            }
+                            DropdownMenu(
+                                expanded = expandedMenu,
+                                onDismissRequest = { expandedMenu = false },
+                            ) {
+                                onLists?.let { action ->
+                                    DropdownMenuItem(
+                                        text = { Text("Lists") },
+                                        onClick = { expandedMenu = false; action() },
+                                    )
+                                }
+                                onFoundOn?.let { action ->
+                                    DropdownMenuItem(
+                                        text = { Text("Found on") },
+                                        onClick = { expandedMenu = false; action() },
+                                    )
+                                }
+                                if (item.mediaType != null && item.traktId != null) {
+                                    DropdownMenuItem(
+                                        text = {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    if (item.alertsPinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.padding(end = 8.dp).size(18.dp),
+                                                )
+                                                Text(if (item.alertsPinned) "Unpin" else "Pin")
+                                            }
+                                        },
+                                        onClick = { expandedMenu = false; onPin() },
+                                    )
+                                }
+                            }
                         }
                     }
                 }

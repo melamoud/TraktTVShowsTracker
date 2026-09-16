@@ -51,6 +51,7 @@ import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
 import com.melamoud.tvtracker.ui.components.MoreFiltersButton
+import com.melamoud.tvtracker.ui.components.PageJumpDialog
 import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
@@ -65,6 +66,7 @@ fun LatestMediaScreen(
     onOpenDetail: (String, Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var showPageJump by remember { mutableStateOf(false) }
     val availLabel = when (state.avail) {
         "upcoming" -> "Upcoming"
         "theater" -> "Theater"
@@ -114,11 +116,13 @@ fun LatestMediaScreen(
                 hasMarker = state.marker != null,
                 hasMoreOlder = state.hasMoreOlder,
                 markerPage = state.markerPage,
+                showReviewed = state.showReviewed,
                 onSync = viewModel::syncCatalog,
                 onCaughtUp = viewModel::reviewMarkerCaughtUp,
                 onClearMarker = viewModel::reviewMarkerClear,
                 onLoadOlder = { viewModel.reload(loadOlder = true) },
                 onJumpToMarker = viewModel::jumpToMarker,
+                onShowReviewed = { viewModel.setShowReviewed(!state.showReviewed) },
             )
             MoreFiltersButton(advancedCount) {
                 PerPageSection(state.perPage) { viewModel.setPerPage(it) }
@@ -181,11 +185,18 @@ fun LatestMediaScreen(
                     }
                     if (state.pages > 1) {
                         item {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 TextButton(
                                     onClick = { viewModel.setPage(state.page - 1) },
                                     enabled = state.page > 1,
                                 ) { Text("Previous") }
+                                TextButton(onClick = { showPageJump = true }) {
+                                    Text("${state.page}/${state.pages}")
+                                }
                                 TextButton(
                                     onClick = { viewModel.setPage(state.page + 1) },
                                     enabled = state.page < state.pages,
@@ -195,6 +206,17 @@ fun LatestMediaScreen(
                     }
                 }
             }
+        }
+        if (showPageJump) {
+            PageJumpDialog(
+                current = state.page,
+                pages = state.pages,
+                onConfirm = { page ->
+                    showPageJump = false
+                    viewModel.setPage(page)
+                },
+                onDismiss = { showPageJump = false },
+            )
         }
     }
     state.watchConfirm?.let { item ->
@@ -250,11 +272,13 @@ private fun LatestActionsMenu(
     hasMarker: Boolean,
     hasMoreOlder: Boolean,
     markerPage: Int?,
+    showReviewed: Boolean,
     onSync: () -> Unit,
     onCaughtUp: () -> Unit,
     onClearMarker: () -> Unit,
     onLoadOlder: () -> Unit,
     onJumpToMarker: () -> Unit,
+    onShowReviewed: () -> Unit,
 ) {
     var expanded by remember { mutableStateOf(false) }
     Box {
@@ -286,6 +310,10 @@ private fun LatestActionsMenu(
                     text = { Text(stringResource(R.string.review_marker_clear)) },
                     onClick = { expanded = false; onClearMarker() },
                 )
+            }
+            CheckMenuItem("Show reviewed", showReviewed) {
+                expanded = false
+                onShowReviewed()
             }
         }
     }

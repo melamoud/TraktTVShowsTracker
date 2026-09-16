@@ -150,6 +150,7 @@ data class LatestMediaResponse(
     @SerializedName("hide_lists") val hideLists: Boolean = true,
     @SerializedName("match_only") val matchOnly: Boolean = false,
     @SerializedName("recent_years") val recentYears: Boolean = true,
+    @SerializedName("show_reviewed") val showReviewed: Boolean = false,
     @SerializedName("has_more_older") val hasMoreOlder: Boolean = false,
     val marker: ReviewMarkerDto? = null,
     @SerializedName("marker_page") val markerPage: Int? = null,

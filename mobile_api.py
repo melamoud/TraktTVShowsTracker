@@ -558,6 +558,7 @@ def api_latest_media(media_type):
         'hide_lists': ctx.get('hide_lists'),
         'match_only': ctx.get('match_only'),
         'recent_years': ctx.get('recent_years'),
+        'show_reviewed': ctx.get('show_reviewed'),
         'has_more_older': ctx.get('has_more_older'),
         'marker': marker_payload,
         'marker_page': ctx.get('marker_page'),

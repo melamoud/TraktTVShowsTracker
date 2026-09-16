@@ -48,6 +48,7 @@ import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
 import com.melamoud.tvtracker.ui.components.MoreFiltersButton
+import com.melamoud.tvtracker.ui.components.PageJumpDialog
 import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
@@ -64,6 +65,7 @@ fun SearchScreen(
     onOpenDetail: (String, Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var showPageJump by remember { mutableStateOf(false) }
     LaunchedEffect(pendingActor) {
         if (pendingActor != null) {
             viewModel.searchActor(pendingActor.traktId, pendingActor.name)
@@ -217,11 +219,18 @@ fun SearchScreen(
                     }
                     if (state.pages > 1) {
                         item {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 TextButton(
                                     onClick = { viewModel.setPage(state.page - 1) },
                                     enabled = state.page > 1,
                                 ) { Text("Previous") }
+                                TextButton(onClick = { showPageJump = true }) {
+                                    Text("${state.page}/${state.pages}")
+                                }
                                 TextButton(
                                     onClick = { viewModel.setPage(state.page + 1) },
                                     enabled = state.page < state.pages,
@@ -231,6 +240,17 @@ fun SearchScreen(
                     }
                 }
             }
+        }
+        if (showPageJump) {
+            PageJumpDialog(
+                current = state.page,
+                pages = state.pages,
+                onConfirm = { page ->
+                    showPageJump = false
+                    viewModel.setPage(page)
+                },
+                onDismiss = { showPageJump = false },
+            )
         }
     }
     state.watchConfirm?.let { item ->

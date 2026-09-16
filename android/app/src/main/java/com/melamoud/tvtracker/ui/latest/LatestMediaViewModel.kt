@@ -23,6 +23,7 @@ data class LatestMediaUiState(
     val hideLists: Boolean = true,
     val matchOnly: Boolean = false,
     val recentYears: Boolean = true,
+    val showReviewed: Boolean = false,
     val perPage: Int = 50,
     val page: Int = 1,
     val pages: Int = 1,
@@ -66,6 +67,7 @@ class LatestMediaViewModel(
                 hideLists = s.hideLists,
                 matchOnly = s.matchOnly,
                 recentYears = s.recentYears,
+                showReviewed = s.showReviewed,
                 perPage = s.perPage,
                 loadOlder = loadOlder,
                 year = s.year,
@@ -89,6 +91,7 @@ class LatestMediaViewModel(
                         year = it.year ?: s.year,
                         genres = it.genres.ifEmpty { s.genres },
                         genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
+                        showReviewed = it.showReviewed,
                     )
                 },
                 onFailure = { _state.value.copy(loading = false, error = it.message) },
@@ -122,6 +125,11 @@ class LatestMediaViewModel(
 
     fun setRecentYears(value: Boolean) {
         _state.value = _state.value.copy(recentYears = value, page = 1)
+        reload()
+    }
+
+    fun setShowReviewed(value: Boolean) {
+        _state.value = _state.value.copy(showReviewed = value, page = 1)
         reload()
     }
 

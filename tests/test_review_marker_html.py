@@ -43,7 +43,7 @@ def test_latest_movies_dims_marker_row_in_html(app, client, user):
     ), patch(
         'services.sync_jobs.enrich_media_list_for_display'
     ):
-        resp = client.get('/latest/movies?hide_watched=0&per_page=50')
+        resp = client.get('/latest/movies?hide_watched=0&per_page=50&show_reviewed=1')
     assert resp.status_code == 200
     html = resp.data.decode('utf-8')
     # Three rows, one page — pager hidden until pages > 1.
@@ -89,7 +89,7 @@ def test_latest_movies_underlines_marker_page(app, client, user):
     ), patch(
         'services.sync_jobs.enrich_media_list_for_display'
     ):
-        resp = client.get('/latest/movies?hide_watched=0&per_page=10')
+        resp = client.get('/latest/movies?hide_watched=0&per_page=10&show_reviewed=1')
     assert resp.status_code == 200
     html = resp.data.decode('utf-8')
     # Movie 15 is at index 10 (0-based) in the descending listed_at order, so page 2.

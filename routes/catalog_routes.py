@@ -972,6 +972,12 @@ def _latest_page_data(media_type: str) -> dict:
     )
     min_year = discovery_year_cutoff() if recent_years else None
 
+    # Default: hide titles already reviewed via the "Reviewed older than this" marker.
+    # The user can toggle Show reviewed when they need to see the dimmed history again.
+    show_reviewed = view_prefs.resolve_bool(
+        current_user, view, 'show_reviewed', 'show_reviewed', default=False,
+    )
+
     # Hide-watched uses local watched cache — keep it aligned with Trakt activity.
     try:
         from services.user_media_sync import ensure_user_media_fresh
@@ -1025,6 +1031,10 @@ def _latest_page_data(media_type: str) -> dict:
     filter_stats['visible'] = len(rows_all)
     marker = _marker(media_type)
     marker_page = _marker_page(rows_all, marker, per_page)
+    if not show_reviewed:
+        rows_all = [r for r in rows_all if not r.get('older_than_marker')]
+        marker_page = None
+        filter_stats['visible'] = len(rows_all)
     # Do NOT auto-fetch older Trakt pages when the filtered list is short — that
     # made every Matches-only load walk the cache slowly. Use "Load older" instead.
 
@@ -1088,6 +1098,7 @@ def _latest_page_data(media_type: str) -> dict:
         'hide_lists': hide_lists,
         'match_only': match_only,
         'recent_years': recent_years,
+        'show_reviewed': show_reviewed,
         'min_discovery_year': min_year,
         'has_match_prefs': has_match_prefs,
         'has_more_older': has_more_older,

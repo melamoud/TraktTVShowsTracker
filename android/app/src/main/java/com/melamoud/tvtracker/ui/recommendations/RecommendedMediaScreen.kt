@@ -49,6 +49,7 @@ import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
 import com.melamoud.tvtracker.ui.components.MoreFiltersButton
+import com.melamoud.tvtracker.ui.components.PageJumpDialog
 import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
@@ -63,6 +64,7 @@ fun RecommendedMediaScreen(
     onOpenDetail: (String, Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var showPageJump by remember { mutableStateOf(false) }
     val categoryLabel = state.categories.find { it.slug == state.category }?.label ?: "Category"
     val availLabel = when (state.avail) {
         "upcoming" -> "Upcoming"
@@ -194,11 +196,18 @@ fun RecommendedMediaScreen(
                     }
                     if (state.pages > 1) {
                         item {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
                                 TextButton(
                                     onClick = { viewModel.setPage(state.page - 1) },
                                     enabled = state.page > 1,
                                 ) { Text("Previous") }
+                                TextButton(onClick = { showPageJump = true }) {
+                                    Text("${state.page}/${state.pages}")
+                                }
                                 TextButton(
                                     onClick = { viewModel.setPage(state.page + 1) },
                                     enabled = state.page < state.pages,
@@ -208,6 +217,17 @@ fun RecommendedMediaScreen(
                     }
                 }
             }
+        }
+        if (showPageJump) {
+            PageJumpDialog(
+                current = state.page,
+                pages = state.pages,
+                onConfirm = { page ->
+                    showPageJump = false
+                    viewModel.setPage(page)
+                },
+                onDismiss = { showPageJump = false },
+            )
         }
     }
     state.watchConfirm?.let { item ->
