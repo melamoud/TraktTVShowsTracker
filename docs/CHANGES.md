@@ -1,5 +1,13 @@
 # Changes log
 
+## 2026-09-15 — Reviewed titles hidden, page jump, cleaner alerts, and version display
+
+- **Latest Movies/Shows** now hide titles at or older than the review marker by default; a **Show reviewed** toggle was added to the web toolbar and the app's Latest actions menu
+- List pagination on Android now shows **Current/Total** as a tappable button that opens a **Go to page** dialog (Latest, Recommended, My Media, Search)
+- Android **Alerts** cards were reorganized: **Progress** is the first inline action on show alerts, and **Lists**, **Found on**, and **Pin/Unpin** moved to the ⋮ menu
+- Android app version is now shown in the top bar and above the bottom navigation bar; adopted the Straw-Barry-Media rule that bumps `versionName`/`versionCode` on every APK-impacting change (now **1.0.1**)
+- Updated [Android help](help/user/android.md)
+
 ## 2026-08-30 — Compact filter toolbars with a "More filters" sheet
 
 - Android list screens (My, Latest, Recommended, Search) now keep the most-used filters on the main row and move year, genres, per-page, and refresh options into a **More** bottom sheet with an active-filter badge
