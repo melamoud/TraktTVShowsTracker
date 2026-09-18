@@ -87,11 +87,11 @@ def test_filter_rows_by_avail():
         {'media': M(today - timedelta(days=100)), 'providers': ['Hulu'], 'my_providers': ['Hulu']},
     ]
     assert normalize_avail('THEATER') == 'theater'
-    upcoming = filter_rows_by_avail(rows, 'upcoming')
+    upcoming = filter_rows_by_avail(rows, 'upcoming', today)
     assert len(upcoming) == 1
-    theater = filter_rows_by_avail(rows, 'theater')
+    theater = filter_rows_by_avail(rows, 'theater', today)
     assert len(theater) == 1
-    streaming = filter_rows_by_avail(rows, 'streaming')
+    streaming = filter_rows_by_avail(rows, 'streaming', today)
     assert len(streaming) == 2
 
 

@@ -16,6 +16,7 @@ import logging
 from datetime import datetime, timedelta
 
 from flask import current_app
+from sqlalchemy.exc import IntegrityError
 
 from models import (
     CachedMedia, CachedPerson, MediaCastMember, User, UserFavoriteActor, db,
@@ -115,34 +116,70 @@ def sync_cast_for_media(media: CachedMedia, *, force: bool = False) -> list[Medi
     if not isinstance(cast_list, list):
         cast_list = []
 
-    MediaCastMember.query.filter_by(cached_media_id=media.id).delete(synchronize_session=False)
-    rows: list[MediaCastMember] = []
-    for idx, entry in enumerate(cast_list):
-        if not isinstance(entry, dict):
-            continue
-        person = upsert_person_from_trakt(entry.get('person'))
-        if not person:
-            continue
-        db.session.flush()
-        characters = _parse_characters(entry.get('characters') or entry.get('character'))
-        ep_count = entry.get('episode_count')
-        try:
-            ep_count = int(ep_count) if ep_count is not None else None
-        except (TypeError, ValueError):
-            ep_count = None
-        credit = MediaCastMember(
-            cached_media_id=media.id,
-            person_id=person.id,
-            characters_json=json.dumps(characters),
-            episode_count=ep_count,
-            sort_order=idx,
+    existing = sorted(media.cast_members, key=lambda c: (c.sort_order, c.id))
+    try:
+        MediaCastMember.query.filter_by(cached_media_id=media.id).delete(
+            synchronize_session=False,
         )
-        db.session.add(credit)
-        rows.append(credit)
+        # Flush the delete before inserts so SQLite never sees old+new rows
+        # for the same (title, person) unique key in one transaction.
+        db.session.flush()
+        rows: list[MediaCastMember] = []
+        seen_person_ids: set[int] = set()
+        for idx, entry in enumerate(cast_list):
+            if not isinstance(entry, dict):
+                continue
+            person = upsert_person_from_trakt(entry.get('person'))
+            if not person:
+                continue
+            db.session.flush()
+            if person.id is None:
+                continue
+            characters = _parse_characters(entry.get('characters') or entry.get('character'))
+            ep_count = entry.get('episode_count')
+            try:
+                ep_count = int(ep_count) if ep_count is not None else None
+            except (TypeError, ValueError):
+                ep_count = None
+            if person.id in seen_person_ids:
+                # Trakt sometimes credits the same person twice (e.g. dual roles).
+                # A second row would violate the (title, person) unique constraint
+                # and fail the whole detail page — merge into the first credit.
+                first = next(r for r in rows if r.person_id == person.id)
+                try:
+                    merged = json.loads(first.characters_json or '[]')
+                except json.JSONDecodeError:
+                    merged = []
+                if not isinstance(merged, list):
+                    merged = []
+                for character in characters:
+                    if character not in merged:
+                        merged.append(character)
+                first.characters_json = json.dumps(merged)
+                if first.episode_count is None:
+                    first.episode_count = ep_count
+                continue
+            seen_person_ids.add(person.id)
+            credit = MediaCastMember(
+                cached_media_id=media.id,
+                person_id=person.id,
+                characters_json=json.dumps(characters),
+                episode_count=ep_count,
+                sort_order=idx,
+            )
+            db.session.add(credit)
+            rows.append(credit)
 
-    media.cast_fetched_at = datetime.utcnow()
-    db.session.commit()
-    return rows
+        media.cast_fetched_at = datetime.utcnow()
+        db.session.commit()
+        return rows
+    except IntegrityError as exc:
+        current_app.logger.warning(
+            'Cast sync IntegrityError %s %s: %s',
+            media.media_type, media.trakt_id, exc,
+        )
+        db.session.rollback()
+        return existing
 
 
 def favorite_actor_person_ids(user: User) -> set[int]:
@@ -305,14 +342,26 @@ def cast_for_detail(media: CachedMedia, user: User) -> list[dict]:
 
     Each item: trakt_id, name, characters, episode_count, favorited, headshot_url.
     Headshots are local-cache URLs when available (filled once per person).
+    Never raises — cast is optional; title pages must still open.
     """
-    credits = sync_cast_for_media(media)
+    try:
+        credits = sync_cast_for_media(media)
+    except Exception as exc:
+        current_app.logger.warning(
+            'Cast sync failed %s %s: %s', media.media_type, media.trakt_id, exc,
+        )
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        credits = sorted(media.cast_members, key=lambda c: (c.sort_order, c.id))
     try:
         ensure_cast_headshots(media, credits)
     except Exception as exc:
         current_app.logger.warning('Cast headshot cache failed: %s', exc)
     fav_ids = favorite_actor_person_ids(user)
     out: list[dict] = []
+    seen: dict[int, dict] = {}
     for credit in credits:
         person = credit.person
         if not person:
@@ -324,14 +373,27 @@ def cast_for_detail(media: CachedMedia, user: User) -> list[dict]:
         if not isinstance(characters, list):
             characters = []
         headshot = resolve_person_headshot(person)
-        out.append({
+        # Trakt sometimes credits the same person twice (e.g. dual roles).
+        # Merge into one row so keyed clients (Android LazyColumn) never see
+        # duplicate trakt_ids, which crash the app on open.
+        existing = seen.get(person.trakt_id)
+        if existing is not None:
+            for character in characters:
+                if character not in existing['characters']:
+                    existing['characters'].append(character)
+            if existing['episode_count'] is None:
+                existing['episode_count'] = credit.episode_count
+            continue
+        row = {
             'trakt_id': person.trakt_id,
             'name': person.name,
-            'characters': characters,
+            'characters': list(characters),
             'episode_count': credit.episode_count,
             'favorited': person.id in fav_ids,
             'headshot_url': headshot,
-        })
+        }
+        seen[person.trakt_id] = row
+        out.append(row)
     if any(p.headshot_url for p in (c.person for c in credits if c.person)):
         db.session.commit()
     return out

@@ -108,40 +108,43 @@ def availability_chips(flags: dict[str, Any]) -> list[dict[str, str]]:
     return chips
 
 
-def attach_availability(row: dict) -> dict:
+def attach_availability(row: dict, today: date | None = None) -> dict:
     """Add ``avail`` flags and ``avail_chips`` onto a decorated/media row."""
     media = row.get('media')
     flags = availability_flags(
         media,
         providers=row.get('providers'),
         my_providers=row.get('my_providers'),
+        today=today,
     )
     row['avail'] = flags
     row['avail_chips'] = availability_chips(flags)
     return row
 
 
-def row_matches_avail(row: dict, avail: str) -> bool:
+def row_matches_avail(row: dict, avail: str, today: date | None = None) -> bool:
     """True when row matches the selected avail filter (or filter is off)."""
     avail = normalize_avail(avail)
     if not avail:
         return True
     flags = row.get('avail')
     if not flags:
-        attach_availability(row)
+        attach_availability(row, today)
         flags = row['avail']
     return bool(flags.get(avail))
 
 
-def filter_rows_by_avail(rows: list[dict], avail: str) -> list[dict]:
+def filter_rows_by_avail(
+    rows: list[dict], avail: str, today: date | None = None,
+) -> list[dict]:
     """Filter decorated rows by avail= upcoming|theater|streaming."""
     avail = normalize_avail(avail)
     if not avail:
         return rows
     out = []
     for row in rows:
-        attach_availability(row)
-        if row_matches_avail(row, avail):
+        attach_availability(row, today)
+        if row_matches_avail(row, avail, today):
             out.append(row)
     return out
 

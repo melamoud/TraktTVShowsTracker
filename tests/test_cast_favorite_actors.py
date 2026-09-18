@@ -76,6 +76,77 @@ def test_media_detail_shows_cast_and_expand(app, client, user):
         assert MediaCastMember.query.filter_by(cached_media_id=media.id).count() == 3
 
 
+def test_cast_for_detail_merges_duplicate_person(app, user):
+    """Same person credited twice (dual role) yields one row with both characters."""
+    from models import User
+    from services.cast_service import cast_for_detail, sync_cast_for_media
+
+    _seed_media(app)
+    dupe_people = {
+        'cast': [
+            {
+                'characters': ['Hero'],
+                'person': {'name': 'Ada Actor', 'ids': {'trakt': 501}},
+            },
+            {
+                'characters': ['Secret Twin'],
+                'person': {'name': 'Ada Actor', 'ids': {'trakt': 501}},
+            },
+            {
+                'characters': ['Villain'],
+                'person': {'name': 'Bea Player', 'ids': {'trakt': 502}},
+            },
+        ],
+    }
+    with app.app_context():
+        media = CachedMedia.query.filter_by(media_type='movie', trakt_id=100).one()
+        user_obj = db.session.get(User, user)
+        with patch(
+            'services.trakt_client.fetch_media_people', return_value=dupe_people,
+        ), patch(
+            'services.cast_service.ensure_cast_headshots', return_value=0,
+        ):
+            rows = cast_for_detail(media, user_obj)
+    assert [r['trakt_id'] for r in rows] == [501, 502]
+    assert rows[0]['characters'] == ['Hero', 'Secret Twin']
+
+
+def test_detail_page_opens_with_duplicate_cast_credit(app, client, user):
+    """A title whose Trakt cast credits someone twice still opens (web + app API)."""
+    _seed_media(app)
+    login_client(client, app, user)
+    dupe_people = {
+        'cast': [
+            {
+                'characters': ['Hero'],
+                'person': {'name': 'Ada Actor', 'ids': {'trakt': 501}},
+            },
+            {
+                'characters': ['Secret Twin'],
+                'person': {'name': 'Ada Actor', 'ids': {'trakt': 501}},
+            },
+        ],
+    }
+    with patch(
+        'services.trakt_client.fetch_media_people', return_value=dupe_people,
+    ), patch(
+        'services.sync_jobs.enrich_media_details_for_display',
+    ), patch(
+        'routes.catalog_routes.sync_providers_for_media',
+    ), patch(
+        'services.cast_service.ensure_cast_headshots', return_value=0,
+    ):
+        resp = client.get('/catalog/movie/100')
+        assert resp.status_code == 200
+        assert 'Ada Actor' in resp.get_data(as_text=True)
+        api_resp = client.get('/api/v1/catalog/movie/100')
+    assert api_resp.status_code == 200
+    payload = api_resp.get_json()
+    assert payload['success'] is True
+    cast = payload['cast']
+    assert [a['trakt_id'] for a in cast] == [501]
+
+
 def test_ensure_cast_headshots_uses_credits_once_and_skips_cached(app, user):
     """One TMDB credits call; download only missing people; second pass is a no-op."""
     from pathlib import Path

@@ -595,13 +595,15 @@ def api_recommendations(media_type):
         'found_on_choices': found_on_service_choices(current_user),
         'categories': ctx.get('categories') or [],
         'category': ctx.get('category') or 'all',
-        'hide_watched': ctx.get('hide_watched'),
-        'hide_wishlist': ctx.get('hide_wishlist'),
-        'on_my_services': ctx.get('on_my_services'),
-        'match_only': ctx.get('match_only'),
-        'has_match_prefs': ctx.get('has_match_prefs'),
+        # Always send real booleans — Gson null into Kotlin Boolean crashes Compose.
+        'hide_watched': bool(ctx.get('hide_watched')),
+        'hide_wishlist': bool(ctx.get('hide_wishlist')),
+        'on_my_services': bool(ctx.get('on_my_services')),
+        'match_only': bool(ctx.get('match_only')),
+        'has_match_prefs': bool(ctx.get('has_match_prefs')),
         'user_service_names': ctx.get('user_service_names') or [],
-        'filter_genres': ctx.get('filter_genres') or [],
+        # Android DTO field is `genres` (same as search/latest payloads).
+        'genres': ctx.get('filter_genres') or [],
         'year': ctx.get('year') or '',
         'genre_choices': ctx.get('genre_choices') or [],
     })

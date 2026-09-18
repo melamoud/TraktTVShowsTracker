@@ -1159,7 +1159,17 @@ def load_media_detail(media_type: str, trakt_id: int) -> dict:
     except json.JSONDecodeError:
         genres = []
     from services.cast_service import cast_for_detail
-    cast = cast_for_detail(media, current_user)
+    try:
+        cast = cast_for_detail(media, current_user)
+    except Exception as exc:
+        current_app.logger.warning(
+            'Cast for detail failed %s %s: %s', media_type, trakt_id, exc,
+        )
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        cast = []
     return {
         'ok': True,
         'row': rows[0],
