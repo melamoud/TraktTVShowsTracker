@@ -211,6 +211,102 @@ def episode_ids_from_progress(
     return {}
 
 
+def _next_episode_ids_from_state(
+    user_id: int, show_trakt_id: int, season: int, episode: int,
+) -> dict:
+    """Ids stored on UserMediaState for the current next episode, or {}."""
+    from services.trakt_client import sanitize_episode_ids
+
+    row = UserMediaState.query.filter_by(
+        user_id=user_id, media_type='show', trakt_id=int(show_trakt_id),
+    ).first()
+    if row is None or not row.next_episode_ids_json:
+        return {}
+    try:
+        if int(row.next_episode_season) != int(season):
+            return {}
+        if int(row.next_episode_number) != int(episode):
+            return {}
+    except (TypeError, ValueError):
+        return {}
+    try:
+        data = json.loads(row.next_episode_ids_json)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return sanitize_episode_ids(data if isinstance(data, dict) else {})
+
+
+def resolve_episode_ids(
+    user_id: int, show_trakt_id: int, season: int, episode: int,
+) -> dict:
+    """
+    Resolve Trakt episode ids for mark-watched.
+
+    Prefer the progress cache, then next_episode_ids_json kept across summary
+    sync clears (c437a8b). Last resort: live Trakt seasons fetch.
+    """
+    from services.trakt_client import get_show_seasons, sanitize_episode_ids
+
+    ids = episode_ids_from_progress(user_id, show_trakt_id, season, episode)
+    if ids:
+        return ids
+    ids = _next_episode_ids_from_state(user_id, show_trakt_id, season, episode)
+    if ids:
+        return ids
+    try:
+        want_s, want_e = int(season), int(episode)
+        for season_row in get_show_seasons(int(show_trakt_id)) or []:
+            try:
+                if int(season_row.get('number')) != want_s:
+                    continue
+            except (TypeError, ValueError):
+                continue
+            for ep in season_row.get('episodes') or []:
+                try:
+                    if int(ep.get('number')) != want_e:
+                        continue
+                except (TypeError, ValueError):
+                    continue
+                ids = sanitize_episode_ids(ep.get('ids') or {})
+                if ids:
+                    _stash_next_episode_ids(
+                        user_id, show_trakt_id, want_s, want_e, ids,
+                    )
+                return ids
+    except Exception as exc:
+        logger.warning(
+            'resolve_episode_ids Trakt fallback failed show=%s S%sE%s: %s',
+            show_trakt_id, season, episode, exc,
+        )
+        return {}
+    return {}
+
+
+def _stash_next_episode_ids(
+    user_id: int,
+    show_trakt_id: int,
+    season: int,
+    episode: int,
+    ids: dict,
+) -> None:
+    """Persist resolved ids on the state row when they match the next episode."""
+    if not ids:
+        return
+    row = UserMediaState.query.filter_by(
+        user_id=user_id, media_type='show', trakt_id=int(show_trakt_id),
+    ).first()
+    if row is None:
+        return
+    try:
+        if int(row.next_episode_season) != int(season):
+            return
+        if int(row.next_episode_number) != int(episode):
+            return
+    except (TypeError, ValueError):
+        return
+    row.next_episode_ids_json = json.dumps(ids)
+
+
 def load_progress_payload(user_id: int, trakt_id: int) -> dict | None:
     """Return stored progress JSON for a show, or None."""
     row = UserMediaState.query.filter_by(
@@ -327,12 +423,14 @@ def summarize_progress(
                         'season': number,
                         'number': ep_no,
                         'title': ep.get('title'),
+                        'ids': ep.get('ids') or {},
                     }
             elif key not in watched_keys and next_special is None:
                 next_special = {
                     'season': number,
                     'number': ep_no,
                     'title': ep.get('title'),
+                    'ids': ep.get('ids') or {},
                 }
     return total_aired, total_completed, next_regular or next_special
 

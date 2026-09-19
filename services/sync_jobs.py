@@ -1160,14 +1160,27 @@ def apply_show_episode_progress(
         # Keep the locally-upcoming episode as Next; Trakt already skipped it.
         pass
     elif next_episode:
-        row.next_episode_season = next_episode.get('season')
-        row.next_episode_number = next_episode.get('number')
+        new_s = next_episode.get('season')
+        new_e = next_episode.get('number')
+        from services.trakt_client import sanitize_episode_ids
+        ids = sanitize_episode_ids(next_episode.get('ids') or {})
+        if ids:
+            row.next_episode_ids_json = json.dumps(ids)
+        elif (
+            row.next_episode_season != new_s
+            or row.next_episode_number != new_e
+        ):
+            # Next episode changed but caller had no ids — clear stale ones.
+            row.next_episode_ids_json = None
+        row.next_episode_season = new_s
+        row.next_episode_number = new_e
         title = next_episode.get('title')
         row.next_episode_title = (str(title)[:400] if title else None)
     else:
         row.next_episode_season = None
         row.next_episode_number = None
         row.next_episode_title = None
+        row.next_episode_ids_json = None
 
     row.progress_detail_at = datetime.utcnow()
     new_summary = (
@@ -1181,7 +1194,8 @@ def apply_show_episode_progress(
     )
     # The episode summary changed without rewriting the full progress payload,
     # so mark the payload stale. Callers that just saved a fresh payload pass
-    # clear_payload=False to keep it.
+    # clear_payload=False to keep it. next_episode_ids_json is kept separately
+    # so the home-screen widget can still mark the next episode.
     if clear_payload and old_summary != new_summary:
         row.progress_payload_json = None
     row.updated_at = datetime.utcnow()
@@ -1414,6 +1428,29 @@ def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
         # Latest-aired metadata changed; the progress payload (full episode list)
         # is now stale for both web and app clients.
         row.progress_payload_json = None
+        # While we have seasons in hand, refresh next-episode ids so the widget
+        # mark button keeps working after the payload clear.
+        want_s, want_e = row.next_episode_season, row.next_episode_number
+        if want_s is not None and want_e is not None and seasons:
+            from services.trakt_client import sanitize_episode_ids
+            found = None
+            for season_row in seasons:
+                try:
+                    if int(season_row.get('number')) != int(want_s):
+                        continue
+                except (TypeError, ValueError):
+                    continue
+                for ep in season_row.get('episodes') or []:
+                    try:
+                        if int(ep.get('number')) != int(want_e):
+                            continue
+                    except (TypeError, ValueError):
+                        continue
+                    found = sanitize_episode_ids(ep.get('ids') or {})
+                    break
+                if found is not None:
+                    break
+            row.next_episode_ids_json = json.dumps(found) if found else None
 
     row.last_aired_checked_at = datetime.utcnow()
     return True

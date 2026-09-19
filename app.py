@@ -313,6 +313,8 @@ def _ensure_schema(app):
                  'ALTER TABLE user_media_state ADD COLUMN last_aired_checked_at DATETIME'),
                 ('progress_payload_json',
                  'ALTER TABLE user_media_state ADD COLUMN progress_payload_json TEXT'),
+                ('next_episode_ids_json',
+                 'ALTER TABLE user_media_state ADD COLUMN next_episode_ids_json TEXT'),
             ):
                 if col not in ucols:
                     u_alters.append(ddl)

@@ -88,8 +88,13 @@ fun SearchScreen(
             placeholder = { Text(stringResource(R.string.search_hint)) },
             leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
             trailingIcon = {
-                IconButton(onClick = viewModel::reloadFromServer) {
-                    Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                Row {
+                    IconButton(onClick = viewModel::search) {
+                        Icon(Icons.Default.Search, contentDescription = stringResource(R.string.search_hint))
+                    }
+                    IconButton(onClick = viewModel::reloadFromServer) {
+                        Icon(Icons.Default.Refresh, contentDescription = stringResource(R.string.refresh))
+                    }
                 }
             },
             singleLine = true,
@@ -194,8 +199,11 @@ fun SearchScreen(
                 state.loading && state.items.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 state.error != null && state.items.isEmpty() -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
                 state.items.isEmpty() -> Text(
-                    if (state.actorId != null) "No titles found for this actor."
-                    else stringResource(R.string.empty_search),
+                    when {
+                        state.actorId != null -> "No titles found for this actor."
+                        state.query.trim().length >= 2 -> stringResource(R.string.empty_search_no_results)
+                        else -> stringResource(R.string.empty_search)
+                    },
                     color = TextMuted,
                     modifier = Modifier.padding(24.dp),
                 )

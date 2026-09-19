@@ -1405,8 +1405,8 @@ def api_episode_watched():
             season = payload.get('season')
             episode = payload.get('episode')
             if show_id and season is not None and episode is not None:
-                from services.trakt_cache import episode_ids_from_progress
-                ids = episode_ids_from_progress(
+                from services.trakt_cache import resolve_episode_ids
+                ids = resolve_episode_ids(
                     current_user.id, show_id, int(season), int(episode),
                 )
         except (TypeError, ValueError):

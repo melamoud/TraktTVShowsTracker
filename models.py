@@ -336,6 +336,9 @@ class UserMediaState(db.Model):
     next_episode_season = db.Column(db.Integer)
     next_episode_number = db.Column(db.Integer)
     next_episode_title = db.Column(db.String(400))
+    # JSON ids for next episode (trakt/tvdb/tmdb/imdb) so widget mark-watched
+    # still works after summary sync clears progress_payload_json.
+    next_episode_ids_json = db.Column(db.Text)
     progress_detail_at = db.Column(db.DateTime)
     # JSON: watched_keys, aired_keys, seasons_meta — shared by Progress + Alerts.
     progress_payload_json = db.Column(db.Text)

@@ -96,7 +96,7 @@ def _media_items(user, media_type: str) -> list[dict]:
 
 
 def _show_item(user_id: int, st, title: str) -> dict:
-    from services.trakt_cache import episode_ids_from_progress
+    from services.trakt_cache import resolve_episode_ids
 
     aired = int(st.episodes_aired or 0)
     done = int(st.episodes_completed or 0)
@@ -116,7 +116,8 @@ def _show_item(user_id: int, st, title: str) -> dict:
         remaining_label = f'{done}/{aired} watched'
     ids = {}
     if season is not None and episode is not None:
-        ids = episode_ids_from_progress(user_id, st.trakt_id, season, episode)
+        # Same resolver as /api/episode/watched — survives progress_payload clears.
+        ids = resolve_episode_ids(user_id, st.trakt_id, season, episode)
     can_watch = remaining > 0 and season is not None and episode is not None
     return {
         'id': f'show-{st.trakt_id}',

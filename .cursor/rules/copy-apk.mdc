@@ -1,0 +1,11 @@
+---
+description: Copy every built APK to the Echo share.
+alwaysApply: true
+---
+
+# Copy APK after every build
+
+After `assembleDebug` / `assembleRelease` succeeds, copy the APK to
+`\\echo\AudioBooks\_TMP\`.
+
+Overwrite the same filename. Do not rename. Tell the user the share path.

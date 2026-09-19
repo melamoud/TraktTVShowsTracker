@@ -23,7 +23,8 @@
     <string name="review_marker_caught_up">Mark all caught up</string>
     <string name="search_hint">Search Trakt titles…</string>
     <string name="list_search_hint">Search titles in this list…</string>
-    <string name="empty_search">Type at least 2 characters to search Trakt.</string>
+    <string name="empty_search">Type at least 2 characters, then press Search.</string>
+    <string name="empty_search_no_results">No titles matched. Try another query, or turn off Not watched / Not in lists.</string>
     <string name="empty_list">Nothing matches these filters.</string>
     <string name="empty_alerts">No alerts right now.</string>
     <string name="refresh">Refresh</string>
@@ -47,4 +48,5 @@
     <string name="widget_collapse">Hide alerts</string>
     <string name="widget_mark_episode">Mark %1$s watched?</string>
     <string name="widget_mark_movie">Mark %1$s watched on Trakt?</string>
+    <string name="widget_mark_failed">Could not mark watched. Try again from the app.</string>
 </resources>

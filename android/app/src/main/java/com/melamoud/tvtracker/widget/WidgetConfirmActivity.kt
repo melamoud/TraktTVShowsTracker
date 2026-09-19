@@ -35,12 +35,26 @@ class WidgetConfirmActivity : ComponentActivity() {
             .setPositiveButton(R.string.mark_watched) { _, _ ->
                 CoroutineScope(Dispatchers.IO).launch {
                     val repo = TvTrackerApp.from(this@WidgetConfirmActivity).container.catalogRepository
-                    if (mediaType == "show" && traktId > 0 && season != null && episode != null) {
-                        val ids = linkedMapOf<String, Any>()
-                        episodeTrakt?.let { ids["trakt"] = it }
-                        repo.episodeWatched(ids, traktId, season, episode, true)
-                    } else if (mediaType == "movie" && traktId > 0) {
-                        repo.watched("movie", traktId, true)
+                    val result = when {
+                        mediaType == "show" && traktId > 0 && season != null && episode != null -> {
+                            val ids = linkedMapOf<String, Any>()
+                            episodeTrakt?.let { ids["trakt"] = it }
+                            repo.episodeWatched(ids, traktId, season, episode, true)
+                        }
+                        mediaType == "movie" && traktId > 0 -> {
+                            repo.watched("movie", traktId, true)
+                        }
+                        else -> Result.failure(IllegalStateException("Missing title info"))
+                    }
+                    result.onFailure {
+                        android.util.Log.w("WidgetConfirm", "Mark watched failed: ${it.message}", it)
+                        withContext(Dispatchers.Main) {
+                            android.widget.Toast.makeText(
+                                this@WidgetConfirmActivity,
+                                it.message ?: getString(R.string.widget_mark_failed),
+                                android.widget.Toast.LENGTH_LONG,
+                            ).show()
+                        }
                     }
                     if (widgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                         WidgetRepository.refresh(this@WidgetConfirmActivity, widgetId)

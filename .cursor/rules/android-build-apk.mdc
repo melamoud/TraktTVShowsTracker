@@ -15,4 +15,6 @@ gradlew.bat :app:assembleDebug
 
 Report the APK path when it succeeds: `android/app/build/outputs/apk/debug/TVTracker-v1.0.0-debug.apk`.
 
+Then copy that APK to `\\echo\AudioBooks\_TMP\` (overwrite same filename). See `copy-apk.mdc`.
+
 Skip the APK only when the change is purely website/Python with no Android files touched.
