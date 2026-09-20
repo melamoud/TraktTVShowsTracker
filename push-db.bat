@@ -13,6 +13,13 @@ if not exist "trakttv.db" (
   exit /b 1
 )
 
+REM trakttv.db is over GitHub's 100 MB blob limit — must use Git LFS.
+git lfs install >nul 2>&1
+if not exist ".gitattributes" (
+  git lfs track "trakttv.db"
+  git add .gitattributes
+)
+
 git add trakttv.db
 git diff --cached --quiet
 if errorlevel 1 (
