@@ -1,0 +1,13 @@
+---
+description: Never start, stop, or restart the app server unless the user explicitly asks.
+alwaysApply: true
+---
+
+# Never restart the server
+
+Do **not** run `run.bat`, `stop.bat`, `run.py`, or otherwise start/stop/restart the
+TraktTV Shows Tracker process on port 8300 (or any other port) unless the user
+explicitly asks you to in that message.
+
+If a fix needs a restart, say so and wait. Do not "helpfully" bounce the server
+after deploys, schema changes, debugging, or clearing duplicate listeners.

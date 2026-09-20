@@ -435,11 +435,90 @@ def summarize_progress(
     return total_aired, total_completed, next_regular or next_special
 
 
+def _refresh_progress_summary_from_trakt(user_id: int, trakt_id: int) -> bool:
+    """
+    Re-pull show progress summary from Trakt (same outcome as opening Progress
+    on the web when the full payload was cleared by summary sync).
+    """
+    from models import User
+    from services.sync_jobs import refresh_show_progress_for_ids
+
+    user = db.session.get(User, user_id)
+    if user is None:
+        invalidate_show_progress(user_id, trakt_id)
+        return False
+    try:
+        updated = refresh_show_progress_for_ids(user, [int(trakt_id)], force=True)
+    except Exception as exc:
+        logger.warning(
+            'Trakt progress refresh after mark failed show=%s: %s',
+            trakt_id, exc,
+        )
+        invalidate_show_progress(user_id, trakt_id)
+        return False
+    return bool(updated)
+
+
+def _advance_next_episode_locally(
+    user_id: int,
+    trakt_id: int,
+    season: int,
+    episode: int,
+    *,
+    watched: bool,
+) -> bool:
+    """
+    Last-resort summary bump when Trakt refresh is unavailable.
+
+    If the marked episode is the cached next episode, bump completed and clear
+    next so My Shows / the widget stop showing that episode (matches removing
+    it from the unwatched queue until the next full progress pull).
+    """
+    row = UserMediaState.query.filter_by(
+        user_id=user_id, media_type='show', trakt_id=int(trakt_id),
+    ).first()
+    if row is None:
+        return False
+    try:
+        same_next = (
+            int(row.next_episode_season) == int(season)
+            and int(row.next_episode_number) == int(episode)
+        )
+    except (TypeError, ValueError):
+        same_next = False
+    if not same_next:
+        invalidate_show_progress(user_id, trakt_id)
+        return False
+    if watched:
+        done = int(row.episodes_completed or 0) + 1
+        aired = row.episodes_aired
+        if aired is not None:
+            done = min(done, int(aired))
+        row.episodes_completed = done
+        if aired and int(aired) > 0:
+            row.progress_percent = round(100.0 * done / int(aired), 1)
+        row.next_episode_season = None
+        row.next_episode_number = None
+        row.next_episode_title = None
+        row.next_episode_ids_json = None
+        row.progress_payload_json = None
+        row.progress_detail_at = None
+        log_cache_event(
+            'progress', 'patch', item=str(int(trakt_id)),
+            reason='local-next-advance', calls=0,
+        )
+        return True
+    invalidate_show_progress(user_id, trakt_id)
+    return False
+
+
 def _patch_or_invalidate(user_id: int, trakt_id: int, mutator) -> bool:
     payload = load_progress_payload(user_id, trakt_id)
     if not payload or not payload.get('seasons_meta'):
-        invalidate_show_progress(user_id, trakt_id)
-        return False
+        # c437a8b / summary sync often clears the full payload while leaving
+        # next_episode_* set. Web Progress then re-fetches from Trakt; do the
+        # same here so the widget / My Shows summary advances after mark.
+        return _refresh_progress_summary_from_trakt(user_id, int(trakt_id))
     watched = _keys_to_tuples(payload.get('watched_keys'))
     aired = _keys_to_tuples(payload.get('aired_keys'))
     mutator(watched, aired, payload.get('seasons_meta') or [])
@@ -471,7 +550,13 @@ def patch_episode_watched(
         else:
             watched_keys.discard(key)
 
-    return _patch_or_invalidate(user_id, int(trakt_id), _mut)
+    if _patch_or_invalidate(user_id, int(trakt_id), _mut):
+        return True
+    # Trakt summary refresh failed — still drop the marked next episode from
+    # the widget / My card so UI matches "I just watched this".
+    return _advance_next_episode_locally(
+        user_id, int(trakt_id), int(season), int(episode), watched=watched,
+    )
 
 
 def patch_season_watched(

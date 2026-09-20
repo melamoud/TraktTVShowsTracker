@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-09-20 — Widget mark-watched advances summary like web Progress
+
+- After `c437a8b` cleared `progress_payload_json` on summary sync, mark-watched from the home-screen widget still wrote to Trakt but left `next_episode_*` stale, so the widget kept showing the same episode while web Progress looked correct (it re-fetches from Trakt)
+- Mark-watched now refreshes the show progress summary from Trakt when the full payload is missing (same outcome as opening Progress on the web); if that fails, it still clears the marked next episode locally so the widget drops it
+- Updated [Android help](help/user/android.md)
+
 ## 2026-09-19 — Widget mark watched + Android Search empty state (1.0.4)
 
 - **Home-screen widget** mark-watched works again when the progress payload was cleared by summary sync: the server resolves episode ids from cached next-episode ids or a live Trakt seasons fetch; the widget shows a toast if mark fails

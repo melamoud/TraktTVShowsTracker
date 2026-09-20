@@ -209,6 +209,83 @@ def test_episode_watch_patches_progress_and_is_finished(app, user):
         assert is_finished(user, 'show', 502) is True
 
 
+def test_episode_watch_refreshes_summary_when_payload_cleared(app, user):
+    """
+    After summary sync clears progress_payload_json (c437a8b), mark-watched
+    must still advance next_episode so the widget drops/moves the show —
+    same as web Progress reloading from Trakt.
+    """
+    with app.app_context():
+        row = UserMediaState(
+            user_id=user, media_type='show', trakt_id=8801,
+            episodes_aired=5,
+            episodes_completed=2,
+            next_episode_season=1,
+            next_episode_number=3,
+            next_episode_title='Stale next',
+            progress_payload_json=None,
+            progress_detail_at=None,
+        )
+        db.session.add(row)
+        db.session.commit()
+
+        trakt_progress = {
+            'aired': 5,
+            'completed': 3,
+            'next_episode': {
+                'season': 1,
+                'number': 4,
+                'title': 'Real next',
+                'ids': {'trakt': 999001},
+            },
+        }
+        with patch(
+            'services.trakt_client.get_show_progress',
+            return_value=trakt_progress,
+        ) as prog:
+            ok = patch_episode_watched(user, 8801, 1, 3, watched=True)
+            db.session.commit()
+        prog.assert_called()
+        assert ok is True
+        row = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=8801,
+        ).one()
+        assert row.episodes_completed == 3
+        assert row.next_episode_season == 1
+        assert row.next_episode_number == 4
+        assert row.next_episode_title == 'Real next'
+
+
+def test_episode_watch_local_advance_when_trakt_refresh_fails(app, user):
+    """If Trakt refresh fails with empty payload, still clear the marked next."""
+    with app.app_context():
+        row = UserMediaState(
+            user_id=user, media_type='show', trakt_id=8802,
+            episodes_aired=4,
+            episodes_completed=1,
+            next_episode_season=2,
+            next_episode_number=1,
+            next_episode_title='Only one left shown',
+            progress_payload_json=None,
+        )
+        db.session.add(row)
+        db.session.commit()
+
+        with patch(
+            'services.trakt_client.get_show_progress',
+            side_effect=RuntimeError('trakt down'),
+        ):
+            ok = patch_episode_watched(user, 8802, 2, 1, watched=True)
+            db.session.commit()
+        assert ok is True
+        row = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=8802,
+        ).one()
+        assert row.episodes_completed == 2
+        assert row.next_episode_season is None
+        assert row.next_episode_number is None
+
+
 def test_alert_cleanup_uses_fresh_progress_payload(app, user):
     """Alert job must not GET show progress when that show's cache is fresh."""
     with app.app_context():
