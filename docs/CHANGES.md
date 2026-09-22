@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-09-21 — Widget confirm dialog shows its buttons (1.0.5)
+
+- The home-screen widget confirm screen was a floating window with the Mark watched dialog inside it, so on Android 15 the **Cancel** and **Mark watched** buttons were clipped
+- That screen is now a normal translucent page, so the dialog sizes to its content and both buttons are visible
+- Updated [Android help](help/user/android.md)
+
 ## 2026-09-20 — Widget mark-watched advances summary like web Progress
 
 - After `c437a8b` cleared `progress_payload_json` on summary sync, mark-watched from the home-screen widget still wrote to Trakt but left `next_episode_*` stale, so the widget kept showing the same episode while web Progress looked correct (it re-fetches from Trakt)

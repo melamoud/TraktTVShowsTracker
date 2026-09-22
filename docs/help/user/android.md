@@ -13,7 +13,7 @@ The TV Tracker Android app connects to the same server as the website (`tvtracke
 - **Progress** — mark episodes or a whole season watched / unwatched. Writes to Trakt. A **Refresh from Trakt** option reloads the latest watched state. Each episode has a **Rate** button for rating and commenting.
 - **Preferences** — all the web preferences that affect the app: streaming services (default + custom, with optional **Suggest as default** to admin), genres/keywords/excluded genres, Trakt list visibility (**Show in menu** / **Auto-select** / **Alerts**), favorite-actor management, alert type toggles, review marker actions (**Clear** / **Caught up**), and the daily preferences reminder (**Snooze** / **Enable**). The first-login wizard is the same as the web.
 - **Admin** (admin users only) — dashboard stats, release-check trigger, user management, streaming-service defaults, pending service suggestions, and scheduler editing (intervals, enabled toggles, timezone). Matches the web admin screen.
-- **Home-screen widget** — long-press the home screen → Widgets → **TV Tracker**. Resize it for more rows and width. The header shows the app icon and **TV Tracker ·** mode; the swap button cycles **Shows Progress** / **Movies** / **Alerts**. The list scrolls. Tap a title or poster to open that show, movie, or alert in the app. The checkmark asks before marking the next episode (Shows) or the movie (Movies) watched — the server updates Trakt and advances the same progress summary the website uses, so the row leaves or moves to the next episode after refresh (even when the full progress cache was cleared by a background sync). If mark fails, a short toast explains it. Refresh on the widget reloads from the server (same cache as the app).
+- **Home-screen widget** — long-press the home screen → Widgets → **TV Tracker**. Resize it for more rows and width. The header shows the app icon and **TV Tracker ·** mode; the swap button cycles **Shows Progress** / **Movies** / **Alerts**. The list scrolls. Tap a title or poster to open that show, movie, or alert in the app. The checkmark asks before marking the next episode (Shows) or the movie (Movies) watched. That confirm dialog shows **Cancel** and **Mark watched** — the server updates Trakt and advances the same progress summary the website uses, so the row leaves or moves to the next episode after refresh (even when the full progress cache was cleared by a background sync). If mark fails, a short toast explains it. Refresh on the widget reloads from the server (same cache as the app).
 
 ## Filter bars
 
@@ -25,7 +25,7 @@ When a list has multiple pages, the bottom bar shows **Previous**, the current p
 
 ## Version
 
-The current app version is shown in the top bar and just above the bottom navigation bar (**1.0.4** and later). It bumps with each release so you can confirm you have the latest APK.
+The current app version is shown in the top bar and just above the bottom navigation bar (**1.0.5** and later). It bumps with each release so you can confirm you have the latest APK.
 
 ## Refresh
 
