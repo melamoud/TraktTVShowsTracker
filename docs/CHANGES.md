@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-09-26 — Found on… from Alerts (1.0.6)
+
+- Website Alerts cards (and grouped show headers) get a **Found on…** button when the alert is tied to a title
+- Android Alerts: **Found on** in the ⋮ menu loads the full service picker (same as My); also available on grouped show rows
+- Updated [Alerts](help/user/release_alerts.md) and [Streaming vs Found on](help/user/streaming.md)
+
 ## 2026-09-21 — Widget confirm dialog shows its buttons (1.0.5)
 
 - The home-screen widget confirm screen was a floating window with the Mark watched dialog inside it, so on Android 15 the **Cancel** and **Mark watched** buttons were clipped

@@ -87,6 +87,9 @@
         <a class="btn btn-small" href="{{ n.link }}">View</a>
       {% endif %}
       {% if card.media_pair %}
+        {% set media_type = card.media_pair[0] %}
+        {% set trakt_id = card.media_pair[1] %}
+        {% include '_found_on_button.html' %}
         {% if card.alerts_pinned %}
           <button class="btn btn-small" type="button"
                   data-action="alerts-pin-remove"

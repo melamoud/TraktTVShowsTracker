@@ -102,6 +102,12 @@
                 <a class="btn btn-small"
                    href="{{ media_detail_url('show', entry.trakt_id) }}">Details</a>
               {% endif %}
+              {% set media_type = 'show' %}
+              {% set trakt_id = entry.trakt_id %}
+              {% set title = entry.title %}
+              {% set year = entry.media.year if entry.media else none %}
+              {% set found_on = entry.cards[0].found_on if entry.cards else [] %}
+              {% include '_found_on_button.html' %}
               {% if entry.alerts_pinned %}
                 <button class="btn btn-small" type="button"
                         data-action="alerts-pin-remove"

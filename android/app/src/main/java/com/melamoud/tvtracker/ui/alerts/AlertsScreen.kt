@@ -148,6 +148,7 @@ fun AlertsScreen(
                                     },
                                     onProgress = { entry.traktId?.let(onProgress) },
                                     onOpenDetail = { entry.traktId?.let { onOpenDetail("show", it) } },
+                                    onFoundOn = entry.traktId?.let { { viewModel.openFoundOn(entry) } },
                                 )
                             }
                             if (expanded) {
@@ -244,6 +245,7 @@ private fun AlertGroupCard(
     onPin: () -> Unit,
     onProgress: () -> Unit,
     onOpenDetail: () -> Unit,
+    onFoundOn: (() -> Unit)? = null,
 ) {
     val dimmed = entry.unreadCount == 0
     Card(
@@ -329,6 +331,12 @@ private fun AlertGroupCard(
                             expanded = expandedMenu,
                             onDismissRequest = { expandedMenu = false },
                         ) {
+                            onFoundOn?.let { action ->
+                                DropdownMenuItem(
+                                    text = { Text("Found on") },
+                                    onClick = { expandedMenu = false; action() },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = {
                                     Row(verticalAlignment = Alignment.CenterVertically) {

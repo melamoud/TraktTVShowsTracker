@@ -178,28 +178,51 @@ class AlertsViewModel(
         }
     }
 
-    fun openFoundOn(item: AlertItemDto) {
-        val choices = item.foundOn
-        val links = item.foundOnLinks
-        _state.value = _state.value.copy(
-            foundOnDialog = FoundOnDialogState(
-                MediaItemDto(
-                    mediaType = item.mediaType ?: "movie",
-                    traktId = item.traktId ?: 0,
-                    title = item.mediaTitle ?: item.title,
-                    year = item.year,
-                    foundOn = item.foundOn,
-                    foundOnChoiceLinks = item.foundOnLinks,
-                ),
-                choices = choices.ifEmpty { _state.value.foundOnChoices },
-                choiceLinks = links,
+    fun openFoundOn(entry: AlertEntryDto) {
+        val tid = entry.traktId ?: return
+        val sample = entry.items.firstOrNull()
+        openFoundOn(
+            AlertItemDto(
+                mediaType = entry.mediaType ?: "show",
+                traktId = tid,
+                title = entry.title ?: sample?.title.orEmpty(),
+                mediaTitle = entry.title ?: sample?.mediaTitle,
+                year = sample?.year,
+                foundOn = sample?.foundOn.orEmpty(),
+                foundOnLinks = sample?.foundOnLinks.orEmpty(),
             ),
         )
-        if (_state.value.foundOnChoices.isEmpty()) {
-            viewModelScope.launch {
-                repo.foundOnChoices(item.mediaTitle ?: item.title, item.year).onSuccess {
-                    _state.value = _state.value.copy(foundOnChoices = it.choices)
-                }
+    }
+
+    fun openFoundOn(item: AlertItemDto) {
+        val mt = item.mediaType ?: return
+        val tid = item.traktId ?: return
+        val media = MediaItemDto(
+            mediaType = mt,
+            traktId = tid,
+            title = item.mediaTitle ?: item.title,
+            year = item.year,
+            foundOn = item.foundOn,
+            foundOnChoiceLinks = item.foundOnLinks,
+        )
+        val cached = _state.value.foundOnChoices
+        val links = item.foundOnLinks
+        if (cached.isNotEmpty()) {
+            _state.value = _state.value.copy(
+                foundOnDialog = FoundOnDialogState(media, cached, links),
+            )
+            return
+        }
+        viewModelScope.launch {
+            repo.foundOnChoices(media.title, media.year).onSuccess {
+                _state.value = _state.value.copy(
+                    foundOnChoices = it.choices.ifEmpty { cached },
+                    foundOnDialog = FoundOnDialogState(
+                        media,
+                        it.choices.ifEmpty { cached },
+                        it.choiceLinks.ifEmpty { links },
+                    ),
+                )
             }
         }
     }
