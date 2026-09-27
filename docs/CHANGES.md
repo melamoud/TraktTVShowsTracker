@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-09-27 — Recommendations: show last cache when Trakt 500s
+
+- Trakt’s `/recommendations/movies` and `/recommendations/shows` were returning HTTP 500 while other APIs worked; the page now falls back to the last cached list with a clear warning instead of an empty feed
+
 ## 2026-09-27 — Alerts: Dismiss instead of Mark read (1.0.7)
 
 - **Dismiss** / **Restore** replace **Mark read** / **Mark unread** on Alerts (web and Android) so it is not confused with marking a title watched — dismissing only clears the alert badge (and hides the row when Hide dismissed is on); it does not delete the alert

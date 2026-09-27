@@ -726,7 +726,29 @@ def _recommendations_page_data(media_type: str) -> dict:
     except Exception as exc:
         fetch_error = str(exc)
         current_app.logger.warning('Recommendations fetch failed: %s', exc)
-        flash('Could not load recommendations from Trakt right now.', 'warning')
+        stale = None
+        try:
+            from services.trakt_cache import load_recommendations_cache
+            stale = load_recommendations_cache(
+                current_user.id, media_type, genre_filter, allow_stale=True,
+            )
+        except Exception:
+            stale = None
+        if stale:
+            for entry in stale:
+                row = upsert_cached_media(media_type, entry)
+                if row:
+                    items.append(row)
+            try:
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+            flash(
+                'Trakt recommendations are unavailable right now — showing your last cached list.',
+                'warning',
+            )
+        else:
+            flash('Could not load recommendations from Trakt right now.', 'warning')
 
     # Deduplicate while preserving Trakt order.
     seen_ids: set[int] = set()

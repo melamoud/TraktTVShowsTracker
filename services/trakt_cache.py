@@ -611,13 +611,17 @@ def load_recommendations_cache(
     user_id: int,
     media_type: str,
     genre_filter: str | None,
+    *,
+    allow_stale: bool = False,
 ) -> list | None:
-    """Return cached recs payload when within TTL; else None."""
+    """Return cached recs payload when within TTL (or any age if ``allow_stale``)."""
     slug = recs_genre_key(genre_filter)
     row = UserRecommendationCache.query.filter_by(
         user_id=user_id, media_type=media_type, genre_slug=slug,
     ).first()
-    if row is None or not cache_is_fresh(row.fetched_at):
+    if row is None:
+        return None
+    if not allow_stale and not cache_is_fresh(row.fetched_at):
         return None
     try:
         data = json.loads(row.payload_json or '[]')

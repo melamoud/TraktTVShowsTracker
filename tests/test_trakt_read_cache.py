@@ -4,7 +4,7 @@ import json
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from models import Notification, User, UserMediaState, db
+from models import Notification, User, UserMediaState, UserRecommendationCache, db
 from services.alerts import ALERT_EPISODE_AIRED, _mark_watched_alerts_read
 from services.trakt_cache import (
     cache_is_fresh,
@@ -375,6 +375,39 @@ def test_recommendations_use_cached_payload_within_ttl(app, client, user):
     assert resp.status_code == 200
     recs.assert_not_called()
     assert b'Cached Rec' in resp.data
+
+
+def test_recommendations_fall_back_to_stale_cache_on_trakt_error(app, client, user):
+    """When Trakt 500s and the TTL cache is expired, still show the last list."""
+    from services.trakt_cache import save_recommendations_cache
+    from services.trakt_client import TraktError
+
+    fake = [{
+        'movie': {
+            'title': 'Stale Rec',
+            'year': 2025,
+            'ids': {'trakt': 8802},
+        },
+    }]
+    with app.app_context():
+        save_recommendations_cache(user, 'movie', None, fake)
+        row = UserRecommendationCache.query.filter_by(
+            user_id=user, media_type='movie', genre_slug='all',
+        ).first()
+        row.fetched_at = datetime.utcnow() - timedelta(hours=48)
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('services.user_media_sync.ensure_user_media_fresh', return_value=False), \
+         patch(
+             'services.trakt_client.get_recommendations',
+             side_effect=TraktError('Trakt API error on /recommendations/movies (500)', 500),
+         ), \
+         patch('routes.catalog_routes.trakt_client.get_personal_lists', return_value=[]):
+        resp = client.get('/recommendations/movies')
+    assert resp.status_code == 200
+    assert b'Stale Rec' in resp.data
+    assert b'last cached list' in resp.data
 
 
 def test_cache_is_fresh_respects_age():
