@@ -257,24 +257,27 @@ private fun AlertGroupCard(
         Row(Modifier.padding(12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             AlertPoster(baseUrl, entry.posterUrl, entry.title ?: "", entry.kindLabel ?: "Show")
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(
+                FlowRow(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         entry.title ?: "Show",
                         fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier
-                            .weight(1f, fill = false)
-                            .clickable(onClick = onOpenDetail),
+                        maxLines = 1,
+                        softWrap = false,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable(onClick = onOpenDetail),
                     )
-                    if (entry.episodeCodes.isNotEmpty()) {
+                    entry.episodeCodes.forEachIndexed { index, code ->
                         Text(
-                            entry.episodeCodes.joinToString(" · "),
+                            text = if (index == 0) code else "· $code",
                             color = AccentGold,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleSmall,
+                            maxLines = 1,
+                            softWrap = false,
                         )
                     }
                 }

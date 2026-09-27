@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-09-27 — Grouped alerts keep the show name on one line (1.0.9)
+
+- A grouped show with several episode codes no longer squeezes the title into a narrow column; the name stays one line and the **S#E#** list wraps beside it or onto the next line (app and web)
+- Updated [Alerts](help/user/release_alerts.md)
+
 ## 2026-09-27 — Found on on its own highlighted row (1.0.8)
 
 - **Found on** is no longer squeezed onto the same line as **Plays on your services** (Alerts was the worst case); it gets its own gold-highlighted row above streaming lines on web and Android

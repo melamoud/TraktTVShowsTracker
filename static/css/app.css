@@ -1008,6 +1008,16 @@ body.modal-open { overflow: hidden; }
   color: #fde68a;
   white-space: nowrap;
 }
+.alert-group-head .alert-show-name {
+  flex: 0 0 auto;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.alert-group-head .alert-ep-code + .alert-ep-code::before {
+  content: "· ";
+}
 .media-poster {
   position: relative;
 }

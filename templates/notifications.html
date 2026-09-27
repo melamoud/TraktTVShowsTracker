@@ -72,13 +72,13 @@
             <h2 class="media-title alert-title">
               <span class="alert-title-main">
                 {% if entry.media %}
-                  <a href="{{ media_detail_url('show', entry.trakt_id) }}">{{ entry.title }}</a>
+                  <a class="alert-show-name" href="{{ media_detail_url('show', entry.trakt_id) }}">{{ entry.title }}</a>
                 {% else %}
-                  {{ entry.title }}
+                  <span class="alert-show-name">{{ entry.title }}</span>
                 {% endif %}
-                {% if entry.episode_codes %}
-                  <span class="alert-ep-code">{{ entry.episode_codes|join(' · ') }}</span>
-                {% endif %}
+                {% for code in entry.episode_codes %}
+                  <span class="alert-ep-code">{{ code }}</span>
+                {% endfor %}
                 {% if entry.unread_count %}
                   <span class="tag found">{{ entry.unread_count }} unread</span>
                 {% endif %}
