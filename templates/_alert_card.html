@@ -32,7 +32,7 @@
           <span class="alert-ep-code">{{ card.episode_code }}</span>
         {% endif %}
         <span class="tag alert-{{ n.alert_type or 'info' }}">{{ card.type_label }}</span>
-        {% if not n.is_read %}<span class="tag found">Unread</span>{% endif %}
+        {% if not n.is_read %}<span class="tag found">Active</span>{% endif %}
       </span>
       {% if card.headline %}
         <span class="alert-ep">{{ card.headline }}</span>
@@ -109,12 +109,12 @@
       {% if n.is_read %}
         <form method="post" action="{{ url_for('user.notification_unread', notif_id=n.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="btn btn-small" type="submit">Mark unread</button>
+          <button class="btn btn-small" type="submit" title="Bring this alert back into the active list">Restore</button>
         </form>
       {% else %}
         <form method="post" action="{{ url_for('user.notification_read', notif_id=n.id) }}">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-          <button class="btn btn-small" type="submit">Mark read</button>
+          <button class="btn btn-small" type="submit" title="Clear this alert from the badge (does not delete it or mark the title watched)">Dismiss</button>
         </form>
       {% endif %}
     </div>

@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-09-27 — Alerts: Dismiss instead of Mark read (1.0.7)
+
+- **Dismiss** / **Restore** replace **Mark read** / **Mark unread** on Alerts (web and Android) so it is not confused with marking a title watched — dismissing only clears the alert badge (and hides the row when Hide dismissed is on); it does not delete the alert
+- Filters and bulk action use the same wording: **Hide dismissed** / **Show dismissed**, **Dismiss all**
+- Updated [Alerts](help/user/release_alerts.md) and [Android help](help/user/android.md)
+
 ## 2026-09-26 — Found on… from Alerts (1.0.6)
 
 - Website Alerts cards (and grouped show headers) get a **Found on…** button when the alert is tied to a title

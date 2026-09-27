@@ -9,11 +9,11 @@
   {% include '_page_heading.html' %}
   <div class="pill-row">
     {% if hide_read %}
-      <span class="pill on" title="Unread alerts stay brighter; read rows are hidden">Hiding read</span>
-      <a class="pill" href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group) }}" title="Show already-read alerts (dimmed)">Show read</a>
+      <span class="pill on" title="Active alerts stay brighter; dismissed rows are hidden">Hiding dismissed</span>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group) }}" title="Show dismissed alerts (dimmed)">Show dismissed</a>
     {% else %}
-      <a class="pill" href="{{ url_for('user.notifications', hide_read=1, sort=sort, group_shows=q_group) }}" title="Hide already-read alerts">Hide read</a>
-      <span class="pill on" title="Unread alerts are brighter; dimmed rows are already read">Showing all</span>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=1, sort=sort, group_shows=q_group) }}" title="Hide dismissed alerts">Hide dismissed</a>
+      <span class="pill on" title="Active alerts are brighter; dimmed rows were dismissed">Showing all</span>
     {% endif %}
     {% if sort == 'asc' %}
       <span class="pill on" title="Oldest alerts first (pinned titles still stay on top)">Oldest first</span>
@@ -41,7 +41,7 @@
     {% if unread_count %}
       <form method="post" action="{{ url_for('user.notifications_read_all') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="btn btn-small" type="submit">Mark all read ({{ unread_count }})</button>
+        <button class="btn btn-small" type="submit" title="Clear every active alert from the badge (does not delete them or mark titles watched)">Dismiss all ({{ unread_count }})</button>
       </form>
     {% endif %}
   </div>
@@ -140,7 +140,7 @@
     {% endif %}
   {% else %}
     {% if hide_read %}
-      <p class="muted">No unread alerts.{% if unread_count == 0 %} <a href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group) }}">Show read</a> to browse older ones.{% endif %}</p>
+      <p class="muted">No active alerts.{% if unread_count == 0 %} <a href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group) }}">Show dismissed</a> to browse older ones.{% endif %}</p>
     {% else %}
       <p class="muted">No alerts yet.</p>
     {% endif %}

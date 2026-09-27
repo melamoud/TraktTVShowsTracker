@@ -1,6 +1,6 @@
 # Alerts
 
-In-app messages under **Alerts** in the nav (badge = unread). By default they cover titles on your **Wishlist** only. Turn on **Alerts** for other lists under **Preferences → Trakt lists** if you want those too (park/archive lists can stay off).
+In-app messages under **Alerts** in the nav (badge = active count). By default they cover titles on your **Wishlist** only. Turn on **Alerts** for other lists under **Preferences → Trakt lists** if you want those too (park/archive lists can stay off).
 
 This is separate from **Streaming vs Found on** (where a title plays / where you found it).
 
@@ -9,8 +9,8 @@ This is separate from **Streaming vs Found on** (where a title plays / where you
 | Alert | Meaning |
 |-------|---------|
 | **Movie release date** | A listed movie’s release day arrives |
-| **Added to a streaming service** | A **new** service brand starts carrying that listed title. Multiple brands share **one** alert card listing every vendor. Marking it read, then a later new vendor, makes that same card unread again. Channel/tier renames like “Paramount Plus Apple TV channel” after Premium, or “Netflix Standard with Ads” after Netflix, do **not** re-alert |
-| **New season on a streaming service** | A season of a listed show shows up on TMDB streaming (or gains a new vendor) — e.g. Fauda S5 appearing on Netflix. Separate Preferences toggle. One card per season, vendors listed together. The card shows the date we first saw it on a service (or when a new vendor appeared), so old ones are easy to mark read. Does **not** fire if you already watched that season (or a later one) |
+| **Added to a streaming service** | A **new** service brand starts carrying that listed title. Multiple brands share **one** alert card listing every vendor. Dismissing it, then a later new vendor, makes that same card active again. Channel/tier renames like “Paramount Plus Apple TV channel” after Premium, or “Netflix Standard with Ads” after Netflix, do **not** re-alert |
+| **New season on a streaming service** | A season of a listed show shows up on TMDB streaming (or gains a new vendor) — e.g. Fauda S5 appearing on Netflix. Separate Preferences toggle. One card per season, vendors listed together. The card shows the date we first saw it on a service (or when a new vendor appeared), so old ones are easy to dismiss. Does **not** fire if you already watched that season (or a later one) |
 | **New episode or season** | An episode aired; if a full season drops the same day, one season alert instead. A show premiere is announced by its S01E01 episode alert — there is no separate show “release” alert |
 | **Added to a list** | You add a movie or show to Wishlist or a personal list in this app (Set lists or Wishlist). Immediate — not the 4-hour schedule. Uncheck this type in Preferences to opt out |
 | **New title with a favorite actor** | A movie or show **just listed** on Latest/catalog includes an actor you favorited. Credits are checked on those new titles only — the app does not search each actor’s filmography. Skips titles already on your lists or watched, and titles listed before you favorited the actor. By default only titles matching your **genres or keywords**. Uncheck that extra box (or the whole type) in Preferences to change this |
@@ -44,13 +44,13 @@ Episode titles put the number in the name itself — **The Agency S3E5**. Type t
 - Episode subtitle is the episode name and aired date (in the scheduler timezone). **Now streaming** lists every new vendor on **one** card. Movie **Released** alerts show the movie’s release date. **Also streaming** (other services) is its own row above **Found on** / **Plays on your services**, which share a line — **teal** = on one of your services, gray = elsewhere (kept current at view time).
 - **Pin** a show or movie to keep *all* of its alerts at the top (including future episodes of that show). This is separate from pinning on My Shows / My Movies. Pinned titles stay time-ordered among themselves, then unpinned alerts follow.
 - **Newest first** / **Oldest first** sorts by time. Choice is remembered. Pins still win over the clock.
-- **Grouped by show** (default on) collapses several episode alerts for the same show into one row: poster, show title, and the unread **S#E#** list (oldest first). **Show N alerts** (▸) marks the row as expandable — tap it to indent each episode and **Progress** / **Mark read** / **Pin** them. Pin always applies to the **show**, not one episode. **Ungroup** shows every alert as its own row. Movies, admin, **Added to a list**, and **favorite actor** alerts stay individual.
+- **Grouped by show** (default on) collapses several episode alerts for the same show into one row: poster, show title, and the active **S#E#** list (oldest first). **Show N alerts** (▸) marks the row as expandable — tap it to indent each episode and **Progress** / **Dismiss** / **Pin** them. Pin always applies to the **show**, not one episode. **Ungroup** shows every alert as its own row. Movies, admin, **Added to a list**, and **favorite actor** alerts stay individual.
 - Episode/season alerts have a **Progress** button that opens the progress **side panel** in place — mark episodes watched without leaving Alerts. **Details** goes to the full title page; **← Back** there returns to Alerts.
 - **Found on…** — set where you found the title (same picker as My / Search). On the website it is an action button on title-linked alerts (and show group headers); on Android it is in the ⋮ menu when the alert is tied to a movie or show.
-- **Mark read/unread** dims or brightens the card; the nav badge counts unread.
-- On the next **alert refresh**, movie release/streaming alerts auto-mark read when the movie is watched on Trakt, and episode/season alerts auto-mark read when that episode (or every episode in the season drop) is watched on Trakt.
-- **Immediately** when you click **Watch** / **Mark season watched** / **Mark watched** in this app (Progress or title cards), matching alerts for that episode/season/movie are marked read without waiting for the next refresh. On Android, the Alerts list also reloads when you return from Progress.
-- **Hide read** (default on) — only unread alerts; toggle **Show read** to browse older ones. Choice is remembered.
+- **Dismiss** / **Restore** — clears the alert from the badge and (with **Hide dismissed**, the default) removes it from the list. This does **not** delete the alert and does **not** mark the movie/show watched. **Restore** brings a dismissed alert back. **Dismiss all** does the same for every active alert.
+- On the next **alert refresh**, movie release/streaming alerts auto-dismiss when the movie is watched on Trakt, and episode/season alerts auto-dismiss when that episode (or every episode in the season drop) is watched on Trakt.
+- **Immediately** when you click **Watch** / **Mark season watched** / **Mark watched** in this app (Progress or title cards), matching alerts for that episode/season/movie are dismissed without waiting for the next refresh. On Android, the Alerts list also reloads when you return from Progress.
+- **Hide dismissed** (default on) — only active alerts; toggle **Show dismissed** to browse older ones. Choice is remembered.
 
 ## Turning types / lists off
 

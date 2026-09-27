@@ -136,7 +136,7 @@ def test_legacy_episode_alert_hides_available_on_suffix(app, client, user):
 
 
 def test_notifications_hide_read_filter(app, client, user):
-    """Hide read (default) drops read alerts; Show read brings them back."""
+    """Hide dismissed (default) drops dismissed alerts; Show dismissed brings them back."""
     with app.app_context():
         db.session.add(Notification(
             user_id=user, alert_type='episode_aired',
@@ -259,7 +259,7 @@ def test_alerts_group_show_episodes(app, client, user):
     assert 'Movie' in html
     # Children stay in the expanded body for per-episode actions.
     assert 'data-action="progress-open"' in html
-    assert 'Mark read' in html
+    assert 'Dismiss' in html
 
 
 def test_alerts_ungroup_shows_each_row(app, client, user):
@@ -465,7 +465,7 @@ def test_streaming_alerts_for_same_title_merge(app, client, user):
     assert html.count('Now streaming') == 1
     assert 'HBO Max' in html
     assert 'HBO Max Amazon Channel' in html
-    assert html.count('Unread') >= 1
+    assert html.count('Active') >= 1
     assert 'Show 2 alerts' not in html
 
 

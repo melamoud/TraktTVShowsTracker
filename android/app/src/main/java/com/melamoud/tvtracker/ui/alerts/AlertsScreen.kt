@@ -99,7 +99,7 @@ fun AlertsScreen(
             FilterChip(
                 selected = state.hideRead,
                 onClick = { viewModel.setHideRead(!state.hideRead) },
-                label = { Text(if (state.hideRead) "Hide read" else "Show read") },
+                label = { Text(if (state.hideRead) "Hide dismissed" else "Show dismissed") },
             )
             FilterChip(
                 selected = state.sort == "desc",
@@ -112,9 +112,9 @@ fun AlertsScreen(
                 label = { Text(if (state.groupShows) "Grouped by show" else "One row each") },
             )
             if (state.unreadCount > 0) {
-                TextButton(onClick = viewModel::readAll) { Text("Mark all read (${state.unreadCount})") }
+                TextButton(onClick = viewModel::readAll) { Text("Dismiss all (${state.unreadCount})") }
             }
-            Text("${state.unreadCount} unread", color = TextMuted)
+            Text("${state.unreadCount} active", color = TextMuted)
             if (isAdmin) {
                 OutlinedButton(onClick = viewModel::runReleaseCheck) { Text("Run alert check") }
             }
@@ -280,7 +280,7 @@ private fun AlertGroupCard(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (entry.unreadCount > 0) {
-                        Text("${entry.unreadCount} unread", color = AccentGold, style = MaterialTheme.typography.labelMedium)
+                        Text("${entry.unreadCount} active", color = AccentGold, style = MaterialTheme.typography.labelMedium)
                     }
                     Text(
                         if (expanded) "Tap to hide ${entry.items.size} alerts" else "Tap to show ${entry.items.size} alerts",
@@ -408,7 +408,7 @@ private fun AlertItemCard(
                     }
                     if (!item.isRead) {
                         Text(
-                            "Unread",
+                            "Active",
                             color = AccentGold,
                             style = MaterialTheme.typography.labelMedium,
                             modifier = Modifier
@@ -494,7 +494,7 @@ private fun AlertItemCard(
                         contentPadding = PaddingValues(horizontal = 8.dp),
                         modifier = Modifier.height(AlertActionHeight),
                     ) {
-                        Text(if (item.isRead) "Mark unread" else "Mark read", maxLines = 1, softWrap = false)
+                        Text(if (item.isRead) "Restore" else "Dismiss", maxLines = 1, softWrap = false)
                     }
                     if (!item.link.isNullOrBlank() && (item.mediaType == null || item.traktId == null)) {
                         val handler = LocalUriHandler.current

@@ -6,7 +6,7 @@ Trakt’s **Wishlist** (watchlist) is **not** a “shows I’m following” list
 
 As soon as you mark **any** play on Trakt — one movie watch, or **one episode** of a show — Trakt **removes that title from the Watchlist**. You cannot turn this off. Finishing the show is irrelevant; the first episode is enough.
 
-This app does not delete Wishlist when you **Mark read** on an alert. Marking an episode **Watch** in Progress writes watch history; Trakt then drops the Watchlist row, and the next sync copies that.
+This app does not delete Wishlist when you **Dismiss** an alert. Marking an episode **Watch** in Progress writes watch history; Trakt then drops the Watchlist row, and the next sync copies that.
 
 ## What to use instead
 
