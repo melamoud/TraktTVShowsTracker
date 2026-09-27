@@ -138,6 +138,7 @@ fun MediaCard(
                         prefix = "Found on:",
                         links = item.foundOnLinks,
                         fallbackLabels = item.foundOn,
+                        emphasized = true,
                     )
                 }
                 if (!item.overview.isNullOrBlank()) {

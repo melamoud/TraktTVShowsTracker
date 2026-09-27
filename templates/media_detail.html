@@ -45,6 +45,8 @@
       {% set rating = row.rating %}{% set favorited = row.favorited %}
       {% include '_rate_favorite_tags.html' %}
     </div>
+    {% set found_on = row.found_on %}{% set title = m.title %}{% set year = m.year %}
+    {% include '_found_on_tags.html' %}
     {% if row.my_providers %}
       <div class="streaming-line mine">
         <span class="streaming-label mine">Plays on your services:</span>
@@ -70,8 +72,6 @@
         <span class="muted">Only listed on your services above</span>
       {% endif %}
     </div>
-    {% set found_on = row.found_on %}{% set title = m.title %}{% set year = m.year %}
-    {% include '_found_on_tags.html' %}
 
     <div class="actions">
       <button class="btn{% if not row.on_watchlist %} btn-primary{% endif %}" type="button"

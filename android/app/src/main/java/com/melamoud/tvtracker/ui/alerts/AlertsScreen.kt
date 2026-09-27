@@ -433,6 +433,14 @@ private fun AlertItemCard(
                         match.keywords.forEach { AlertMatchChip(it) }
                     }
                 }
+                if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
+                    ServiceLinksLine(
+                        prefix = "Found on:",
+                        links = item.foundOnLinks,
+                        fallbackLabels = item.foundOn,
+                        emphasized = true,
+                    )
+                }
                 if (item.otherProviders.isNotEmpty() || item.otherProviderLinks.isNotEmpty()) {
                     ServiceLinksLine(
                         prefix = if (item.myProviders.isNotEmpty()) "Also streaming:" else "Streaming:",
@@ -441,26 +449,12 @@ private fun AlertItemCard(
                         color = TextMuted,
                     )
                 }
-                if (
-                    item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty() ||
-                    item.myProviders.isNotEmpty() || item.myProviderLinks.isNotEmpty()
-                ) {
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        if (item.myProviders.isNotEmpty() || item.myProviderLinks.isNotEmpty()) {
-                            ServiceLinksLine(
-                                prefix = "Plays on your services:",
-                                links = item.myProviderLinks,
-                                fallbackLabels = item.myProviders,
-                            )
-                        }
-                        if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
-                            ServiceLinksLine(
-                                prefix = "Found on:",
-                                links = item.foundOnLinks,
-                                fallbackLabels = item.foundOn,
-                            )
-                        }
-                    }
+                if (item.myProviders.isNotEmpty() || item.myProviderLinks.isNotEmpty()) {
+                    ServiceLinksLine(
+                        prefix = "Plays on your services:",
+                        links = item.myProviderLinks,
+                        fallbackLabels = item.myProviders,
+                    )
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,

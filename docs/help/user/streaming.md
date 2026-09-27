@@ -19,5 +19,5 @@ Used on **My movies / My shows**, **Search**, **Latest**, **Recommended**, **Ale
 - Click **Found on…** (website cards including Alerts, Android ⋮ menu, or the title page) and select **one or more** services (including your custom ones)
 - Each service row has a **Search** link that opens that site for the current title (new tab) — no need to save first, and no need to wait for TMDB/streaming mapping
 - Services that TMDB lists for the title are **highlighted** as a hint; you still choose what you actually use
-- The tile shows only the services **you** saved
+- The tile shows only the services **you** saved — **Found on** is on its own highlighted row (gold), above **Plays on your services** / streaming
 - **Found on** and **Plays on your services** chips are links (new tab on the website; the Android app opens the same URL): known apps open a title search; customs can set a **Search template** in Preferences (e.g. `https://toflx.com/search?q=<title>`) so the title is filled in for you. Disney+ has no web search URL, so that chip opens a Google search limited to disneyplus.com. Cable / Other stay plain text (no Search in the dialog either).

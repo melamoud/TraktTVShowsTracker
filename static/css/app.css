@@ -329,16 +329,21 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
 .tag.watchlist { color: #dbeafe; border-color: #3b82f6; }
 .tag.watched { color: #dcfce7; border-color: #22c55e; }
 .tag.partial { color: #fef3c7; border-color: #f59e0b; }
-.tag.found { color: #ccfbf1; border-color: #14b8a6; }
+.tag.found {
+  color: #1a1200;
+  border-color: var(--accent-2);
+  background: var(--accent-2);
+  font-weight: 800;
+}
 a.tag.found,
 a.tag.stream {
   text-decoration: none;
   cursor: pointer;
 }
 a.tag.found:hover {
-  color: #f0fdfa;
-  border-color: #2dd4bf;
-  background: rgba(20, 184, 166, .18);
+  color: #1a1200;
+  border-color: #f6c85a;
+  background: #f6c85a;
   text-decoration: underline;
 }
 a.tag.stream:hover {
@@ -860,12 +865,20 @@ body.modal-open { overflow: hidden; }
 }
 .streaming-label { font-weight: 700; color: var(--muted); margin-right: .15rem; }
 .streaming-label.mine { color: var(--accent); }
+.streaming-label.found { color: var(--accent-2); }
 .streaming-line.mine {
   margin-top: .55rem;
   padding: .45rem .55rem;
   border-radius: 8px;
   border: 1px solid rgba(61, 214, 198, 0.45);
   background: rgba(61, 214, 198, 0.1);
+}
+.streaming-line.found-on {
+  margin-top: .55rem;
+  padding: .45rem .55rem;
+  border-radius: 8px;
+  border: 1px solid rgba(240, 180, 41, 0.55);
+  background: rgba(240, 180, 41, 0.14);
 }
 .tag.stream {
   color: #ccfbf1;
@@ -1056,6 +1069,10 @@ body.modal-open { overflow: hidden; }
   background: rgba(8, 12, 20, .35);
 }
 .alert-row .alert-also { margin-top: .28rem; }
+.alert-row .alert-found-on {
+  margin-top: .28rem;
+  padding: .28rem .45rem;
+}
 .alert-row .alert-services {
   margin-top: .28rem;
 }

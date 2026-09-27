@@ -48,6 +48,14 @@
     {% endif %}
     {% set title = m.title if m else n.title %}
     {% set year = m.year if m else none %}
+    {% if card.found_on %}
+      <div class="streaming-line found-on alert-found-on" title="Where you marked that you found this title">
+        <span class="streaming-label found">Found on:</span>
+        {% set labels = card.found_on %}
+        {% set tag_class = 'found' %}
+        {% include '_service_link_tags.html' %}
+      </div>
+    {% endif %}
     {% if card.other_providers %}
       <div class="streaming-line alert-also">
         <span class="streaming-label">{% if card.my_providers %}Also streaming:{% else %}Streaming:{% endif %}</span>
@@ -56,20 +64,12 @@
         {% include '_service_link_tags.html' %}
       </div>
     {% endif %}
-    {% if card.my_providers or card.found_on %}
-      <div class="streaming-line alert-services{% if card.my_providers %} mine{% endif %}">
-        {% if card.my_providers %}
-          <span class="streaming-label mine">Plays on your services:</span>
-          {% set labels = card.my_providers %}
-          {% set tag_class = 'stream mine' %}
-          {% include '_service_link_tags.html' %}
-        {% endif %}
-        {% if card.found_on %}
-          <span class="streaming-label">Found on:</span>
-          {% set labels = card.found_on %}
-          {% set tag_class = 'found' %}
-          {% include '_service_link_tags.html' %}
-        {% endif %}
+    {% if card.my_providers %}
+      <div class="streaming-line alert-services mine">
+        <span class="streaming-label mine">Plays on your services:</span>
+        {% set labels = card.my_providers %}
+        {% set tag_class = 'stream mine' %}
+        {% include '_service_link_tags.html' %}
       </div>
     {% endif %}
     <div class="actions">

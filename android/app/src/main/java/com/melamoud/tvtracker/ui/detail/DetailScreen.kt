@@ -274,6 +274,14 @@ private fun DetailHero(item: MediaItemDto, detail: MediaDetailResponse, baseUrl:
         item.rating?.let { TagChip("$it/10") }
         if (item.favorited) TagChip("Favorite", gold = true)
     }
+    if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
+        ServiceLinksLine(
+            prefix = "Found on:",
+            links = item.foundOnLinks,
+            fallbackLabels = item.foundOn,
+            emphasized = true,
+        )
+    }
     if (item.myProviders.isNotEmpty() || item.myProviderLinks.isNotEmpty()) {
         ServiceLinksLine(
             prefix = "Plays on your services:",
@@ -291,13 +299,6 @@ private fun DetailHero(item: MediaItemDto, detail: MediaDetailResponse, baseUrl:
         )
     } else if (item.myProviders.isEmpty()) {
         Text("No subscription streaming listed", color = TextMuted, style = MaterialTheme.typography.bodySmall)
-    }
-    if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
-        ServiceLinksLine(
-            prefix = "Found on:",
-            links = item.foundOnLinks,
-            fallbackLabels = item.foundOn,
-        )
     }
 }
 

@@ -278,6 +278,10 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% if st.progress_percent and st.progress_percent < 100 %}<span class="tag partial">{{ '%.0f'|format(st.progress_percent) }}%</span>{% endif %}
           {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
         </div>
+        {% set found_on = row.found_on %}
+        {% set title = m.title if m else '' %}
+        {% set year = m.year if m else none %}
+        {% include '_found_on_tags.html' %}
         {% if row.my_providers %}
           <div class="streaming-line mine">
             <span class="streaming-label mine">Plays on your services:</span>
@@ -308,10 +312,6 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
             <span class="muted">Only listed on your services above</span>
           {% endif %}
         </div>
-        {% set found_on = row.found_on %}
-        {% set title = m.title if m else '' %}
-        {% set year = m.year if m else none %}
-        {% include '_found_on_tags.html' %}
         <div class="actions">
           {% if media_type == 'show' %}
             <button class="btn btn-small btn-primary" type="button"

@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-09-27 — Found on on its own highlighted row (1.0.8)
+
+- **Found on** is no longer squeezed onto the same line as **Plays on your services** (Alerts was the worst case); it gets its own gold-highlighted row above streaming lines on web and Android
+- Same layout on My, Search, Latest, Recs, and title pages
+- Updated [Streaming vs Found on](help/user/streaming.md) and [Alerts](help/user/release_alerts.md)
+
 ## 2026-09-27 — Recommendations: show last cache when Trakt 500s
 
 - Trakt’s `/recommendations/movies` and `/recommendations/shows` were returning HTTP 500 while other APIs worked; the page now falls back to the last cached list with a clear warning instead of an empty feed
