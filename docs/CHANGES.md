@@ -1,5 +1,22 @@
 # Changes log
 
+## 2026-09-29 — Alert type labels are regular text again (1.0.12)
+
+- **Now streaming on …** / **Released** / **New episode** are normal sentence text, not gold framed chips. **Active** is still a chip
+- Updated [Alerts](help/user/release_alerts.md)
+
+## 2026-09-29 — Alert type chips match; Now streaming on … (1.0.11)
+
+- Copy is **Now streaming on Netflix** (and **Season streaming on …**) so the service name reads as a sentence
+- Type labels use regular body text (not colored framed chips); **Active** stays the chip
+- Updated [Alerts](help/user/release_alerts.md)
+
+## 2026-09-29 — Alert title line is one scan, not two sentences (1.0.10)
+
+- Episode name sits next to **S3E9**; streaming and list alerts put the service / list names in the type tag instead of a second gray sentence
+- Air and added dates are a hover tooltip on the website (not a separate line). Android omits them
+- Updated [Alerts](help/user/release_alerts.md) and [Android help](help/user/android.md)
+
 ## 2026-09-27 — Grouped alerts keep the show name on one line (1.0.9)
 
 - A grouped show with several episode codes no longer squeezes the title into a narrow column; the name stays one line and the **S#E#** list wraps beside it or onto the next line (app and web)

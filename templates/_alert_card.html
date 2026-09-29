@@ -21,7 +21,7 @@
     </div>
   {% endif %}
   <div class="media-body">
-    <h2 class="media-title alert-title">
+    <h2 class="media-title alert-title"{% if card.hint %} title="{{ card.hint|e }}"{% endif %}>
       <span class="alert-title-main">
         {% if m %}
           <a href="{{ media_detail_url(m.media_type, m.trakt_id) }}">{{ m.title }}</a>
@@ -31,12 +31,12 @@
         {% if card.episode_code %}
           <span class="alert-ep-code">{{ card.episode_code }}</span>
         {% endif %}
-        <span class="tag alert-{{ n.alert_type or 'info' }}">{{ card.type_label }}</span>
+        {% if card.episode_name %}
+          <span class="alert-ep-name">{{ card.episode_name }}</span>
+        {% endif %}
+        <span class="alert-type">{{ card.type_label }}</span>
         {% if not n.is_read %}<span class="tag found">Active</span>{% endif %}
       </span>
-      {% if card.headline %}
-        <span class="alert-ep">{{ card.headline }}</span>
-      {% endif %}
     </h2>
     {% set match = card.match %}
     {% if match and match.matched %}

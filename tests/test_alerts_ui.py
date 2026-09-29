@@ -71,17 +71,16 @@ def test_notifications_page_renders_episode_card(app, client, user):
     assert 'data-trakt-id="7701"' in html
     assert '/catalog/show/7701' in html              # details link
     assert 'New episode' in html                     # type tag label
-    assert 'Hiding read' in html
-    assert 'alert-title' in html and 'alert-ep' in html
+    assert 'Hiding dismissed' in html
+    assert 'alert-title' in html and 'alert-ep-name' in html
     assert 'alert-ep-code' in html
     assert html.find('S3E1') < html.find('Into the Fire')
     assert 'alert-kind-badge' in html and 'Episode' in html
     assert 'alert-also' in html or 'Streaming:' in html
-    assert 'alert-services' in html
-    # Also streaming / Streaming is its own row above Found on / Plays on.
-    also_at = html.find('Streaming:')
+    # Found on is its own highlighted row above Also streaming / Streaming.
     found_at = html.find('Found on:')
-    assert also_at != -1 and found_at != -1 and also_at < found_at
+    also_at = html.find('Streaming:')
+    assert found_at != -1 and also_at != -1 and found_at < also_at
 
 
 def test_streaming_movie_alert_shows_vendor_not_blurb(app, client, user):
@@ -105,12 +104,13 @@ def test_streaming_movie_alert_shows_vendor_not_blurb(app, client, user):
     assert 'Now streaming' in html
     assert 'Streaming' in html
     assert 'YouTube Free' in html
+    assert 'Now streaming on YouTube Free' in html
     assert 'is available on' not in html
     assert 'data-action="progress-open"' not in html
 
 
 def test_legacy_episode_alert_hides_available_on_suffix(app, client, user):
-    """Older episode messages appended providers; title line keeps S#E# + date only."""
+    """Older episode messages appended providers; title line keeps S#E# + episode name."""
     with app.app_context():
         db.session.add(CachedMedia(
             media_type='show', trakt_id=88, title='Lucky', year=2025,
@@ -130,7 +130,8 @@ def test_legacy_episode_alert_hides_available_on_suffix(app, client, user):
     html = client.get('/notifications').get_data(as_text=True)
     assert 'Lucky' in html
     assert 'S1E5' in html and 'Are We Bad People?' in html
-    assert '2026-08-05' in html
+    assert html.find('S1E5') < html.find('Are We Bad People?')
+    assert 'title="aired 2026-08-05"' in html
     assert 'Available on:' not in html
     assert 'Apple TV Amazon Channel' not in html
 
@@ -154,7 +155,7 @@ def test_notifications_hide_read_filter(app, client, user):
     hidden = client.get('/notifications').get_data(as_text=True)
     assert 'Unread show' in hidden
     assert 'Read show' not in hidden
-    assert 'Hiding read' in hidden
+    assert 'Hiding dismissed' in hidden
 
     shown = client.get('/notifications?hide_read=0').get_data(as_text=True)
     assert 'Unread show' in shown
@@ -434,8 +435,8 @@ def test_notifications_page_renders_list_add_card(app, client, user):
     html = client.get('/notifications').get_data(as_text=True)
     assert 'The Agency' in html
     assert 'alert-kind-list' in html
-    assert 'Added to list' in html
     assert 'Added to Wishlist' in html
+    assert 'Added to list' not in html
     assert 'data-trakt-id="202341"' in html
 
 
@@ -486,14 +487,14 @@ def test_season_streaming_alert_renders_sxe_and_vendors(app, client, user):
     html = client.get('/notifications').get_data(as_text=True)
     assert 'Fauda' in html
     assert 'S5' in html
-    assert 'Season on stream' in html
-    assert 'Netflix' in html
+    assert 'Season streaming on Netflix' in html
+    assert 'On stream:' not in html
     assert 'alert-kind-streaming' in html
     from services.local_time import format_local_date
     with app.app_context():
         note = Notification.query.filter_by(user_id=user, alert_type='season_streaming').one()
         added = format_local_date(note.created_at)
-    assert added in html
+    assert f'title="{added}"' in html
 
 
 def test_notifications_page_renders_favorite_actor_card(app, client, user):
@@ -518,8 +519,7 @@ def test_notifications_page_renders_favorite_actor_card(app, client, user):
     login_client(client, app, user)
     html = client.get('/notifications').get_data(as_text=True)
     assert 'Fauda Film' in html
-    assert 'Lior Raz' in html
-    assert 'Favorite actor' in html
+    assert 'Favorite actor: Lior Raz' in html
     assert 'alert-kind-actor' in html
     assert 'Preference match' in html
     assert 'drama' in html

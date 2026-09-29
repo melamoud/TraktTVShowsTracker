@@ -39,9 +39,9 @@ Each alert is a compact card: poster with a badge for **what happened**, then th
 | **Actor** | A newly listed title includes a favorite actor |
 | **Admin** | New user login |
 
-Episode titles put the number in the name itself — **The Agency S3E5**. Type tags (New episode, Season out, Released, Now streaming, Added to list) still sit on that line.
+Episode titles put the number **and episode name** together — **The Ark S3E9 Critical Failure**. The kind of alert is plain text on that line: **Now streaming on Kanopy**, **Season streaming on Netflix**, **Released**, **Added to Wishlist**, **Favorite actor: Lior Raz**. **Active** stays a chip. Air / added dates sit in a tooltip (hover on the website), not a second sentence.
 
-- Episode subtitle is the episode name and aired date (in the scheduler timezone). **Now streaming** lists every new vendor on **one** card. Movie **Released** alerts show the movie’s release date. **Found on** is its own highlighted row when set; **Also streaming** and **Plays on your services** stay on separate lines below.
+- **Now streaming** lists every new vendor in that type tag on **one** card. Movie **Released** keeps the date as a tooltip. **Found on** is its own highlighted row when set; **Also streaming** and **Plays on your services** stay on separate lines below.
 - **Pin** a show or movie to keep *all* of its alerts at the top (including future episodes of that show). This is separate from pinning on My Shows / My Movies. Pinned titles stay time-ordered among themselves, then unpinned alerts follow.
 - **Newest first** / **Oldest first** sorts by time. Choice is remembered. Pins still win over the clock.
 - **Grouped by show** (default on) collapses several episode alerts for the same show into one row: poster, show title, and the active **S#E#** list (oldest first). The show name stays on one line; episode codes sit beside it when they fit and wrap onto the next line when they do not. **Show N alerts** (▸) marks the row as expandable — tap it to indent each episode and **Progress** / **Dismiss** / **Pin** them. Pin always applies to the **show**, not one episode. **Ungroup** shows every alert as its own row. Movies, admin, **Added to a list**, and **favorite actor** alerts stay individual.

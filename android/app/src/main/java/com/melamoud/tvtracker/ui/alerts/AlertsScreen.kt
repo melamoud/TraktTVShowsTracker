@@ -397,17 +397,28 @@ private fun AlertItemCard(
                 AlertPoster(baseUrl, item.posterUrl, title, item.kindLabel)
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Row(
+                FlowRow(
                     Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+                    verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
-                    Text(title, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f, fill = false))
-                    if (!item.episodeCode.isNullOrBlank() && title.contains(item.episodeCode).not()) {
+                    Text(
+                        item.mediaTitle?.takeIf { it.isNotBlank() } ?: item.title,
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    if (!item.episodeCode.isNullOrBlank()) {
                         Text(item.episodeCode, color = AccentGold, fontWeight = FontWeight.Bold)
                     }
+                    if (!item.episodeName.isNullOrBlank()) {
+                        Text(item.episodeName, fontWeight = FontWeight.SemiBold)
+                    }
                     if (!item.typeLabel.isNullOrBlank()) {
-                        Text(item.typeLabel, color = AccentGold, style = MaterialTheme.typography.labelMedium)
+                        Text(
+                            item.typeLabel,
+                            color = TextMuted,
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Normal,
+                        )
                     }
                     if (!item.isRead) {
                         Text(
@@ -420,10 +431,6 @@ private fun AlertItemCard(
                                 .padding(horizontal = 6.dp, vertical = 2.dp),
                         )
                     }
-                }
-                val headline = item.headline?.takeIf { it.isNotBlank() }
-                if (headline != null) {
-                    Text(headline, color = TextMuted, style = MaterialTheme.typography.bodySmall)
                 }
                 val match = item.match
                 if (match?.matched == true) {

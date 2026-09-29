@@ -304,6 +304,8 @@ def serialize_alert_card(card: dict) -> dict:
         'title': n.title if n else '',
         'message': n.message if n else '',
         'headline': card.get('headline') or '',
+        'hint': card.get('hint') or '',
+        'episode_name': card.get('episode_name') or '',
         'link': n.link if n else None,
         'media_type': media_type,
         'trakt_id': trakt_id,

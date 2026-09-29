@@ -258,7 +258,7 @@ def _alert_single(card: dict, remaining_by_show: dict, parse_se) -> dict:
         'trakt_id': trakt_id,
         'title': title,
         'poster_url': poster,
-        'subtitle': card.get('headline') or card.get('type_label') or None,
+        'subtitle': card.get('type_label') or card.get('headline') or None,
         'remaining_label': f'{remaining} more to watch' if remaining else None,
         'can_watch': can_watch,
         'season': season,

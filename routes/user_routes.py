@@ -1530,6 +1530,14 @@ ALERT_TYPE_LABELS = {
 _EP_CODE_RE = re.compile(r'\bS(\d{1,2})E(\d{1,3})\b', re.IGNORECASE)
 _SEASON_CODE_RE = re.compile(r'(?:Full season|Season)\s+(\d+)', re.IGNORECASE)
 _TITLE_SEASON_RE = re.compile(r'^Season\s+(\d+)\s+out\b', re.IGNORECASE)
+_AIRED_DATE_RE = re.compile(
+    r'(?:\s*[·•—\-]\s*)?aired\s+(\d{4}-\d{2}-\d{2})\s*\.?$',
+    re.IGNORECASE,
+)
+_PUBLISHED_DATE_RE = re.compile(
+    r'published on\s+(\d{4}-\d{2}-\d{2})',
+    re.IGNORECASE,
+)
 
 
 def _strip_available_on_blurb(text: str) -> str:
@@ -1673,63 +1681,116 @@ def _merge_streaming_alert_cards(cards: list[dict]) -> list[dict]:
                 seen.add(fold)
                 vendors.append(vendor)
         if vendors:
-            lead['headline'] = ' · '.join(vendors)
+            lead['type_label'] = f"Now streaming on {' · '.join(vendors)}"
+        lead['headline'] = ''
         lead['merged_ids'] = [c['n'].id for c in items]
         out.append(lead)
     return out
 
 
-def _alert_headline(n, media, episode_code: str = '') -> str:
-    """Subtitle: episode name + date, or a movie date — not S#E# (that's in the title)."""
-    kind = n.alert_type or ''
-    if kind in ('episode_aired', 'season_aired', 'list_add', 'favorite_actor', 'new_user_login'):
-        text = _strip_available_on_blurb(n.message or '')
-        if episode_code:
-            text = re.sub(
-                rf'^{re.escape(episode_code)}\s*[—\-·.]*\s*',
-                '', text, count=1, flags=re.IGNORECASE,
-            )
-            text = re.sub(
-                r'^S\d{1,2}E\d{1,3}\s*[—\-·.]*\s*',
-                '', text, count=1, flags=re.IGNORECASE,
-            )
-            text = re.sub(
-                r'^Full season\s+\d+\s*[—\-·.]*\s*',
-                '', text, count=1, flags=re.IGNORECASE,
-            )
-        return text.strip()
-    if kind in ('new_streaming', 'season_streaming'):
-        msg = (n.message or '').strip()
-        added = ''
-        if kind == 'season_streaming':
-            from services.local_time import format_local_date
-            m = _STREAM_ADDED_DATE_RE.search(msg)
-            if m:
-                added = m.group(1)
-                msg = _STREAM_ADDED_DATE_RE.sub('', msg).strip()
-            elif n.created_at:
-                added = format_local_date(n.created_at) or ''
-        if msg and 'available on' not in msg.lower() and 'published on' not in msg.lower():
-            return f'{msg} · {added}' if added else msg
-        vendor = _streaming_vendor_label(n, media)
-        if vendor:
-            return f'{vendor} · {added}' if added else vendor
-        if added:
-            return added
-    if media is not None and media.released_at:
-        from services.local_time import format_local_date
+def _date_hint(n, media=None) -> str:
+    from services.local_time import format_local_date
+    if media is not None and getattr(media, 'released_at', None):
         return format_local_date(media.released_at) or media.released_at.isoformat()
     if n.created_at:
-        from services.local_time import format_local_date
         return format_local_date(n.created_at) or n.created_at.strftime('%Y-%m-%d')
     return ''
 
 
-def _alert_display_title(media, n, episode_code: str) -> str:
+def _episode_name_and_air(message: str, episode_code: str) -> tuple[str, str]:
+    """Episode title and 'aired YYYY-MM-DD' hint; S#E# stays a separate chip."""
+    text = _strip_available_on_blurb(message or '')
+    hint = ''
+    m = _AIRED_DATE_RE.search(text)
+    if m:
+        hint = f'aired {m.group(1)}'
+        text = text[:m.start()].strip(' ·•—-.')
+    if episode_code:
+        text = re.sub(
+            rf'^{re.escape(episode_code)}\s*[—\-·.]*\s*',
+            '', text, count=1, flags=re.IGNORECASE,
+        )
+        text = re.sub(
+            r'^S\d{1,2}E\d{1,3}\s*[—\-·.]*\s*',
+            '', text, count=1, flags=re.IGNORECASE,
+        )
+        text = re.sub(
+            r'^S\d{1,2}\s+[—\-·.]*\s*',
+            '', text, count=1, flags=re.IGNORECASE,
+        )
+        text = re.sub(
+            r'^Full season\s+\d+\s*[—\-·.]*\s*',
+            '', text, count=1, flags=re.IGNORECASE,
+        )
+    return text.strip(' —·-'), hint
+
+
+def _streaming_vendor_and_date(n, media) -> tuple[str, str]:
+    msg = (n.message or '').strip()
+    added = ''
+    m = _STREAM_ADDED_DATE_RE.search(msg)
+    if m:
+        added = m.group(1)
+        msg = _STREAM_ADDED_DATE_RE.sub('', msg).strip()
+    elif (n.alert_type or '') == 'season_streaming' and n.created_at:
+        from services.local_time import format_local_date
+        added = format_local_date(n.created_at) or ''
+    lower = msg.lower()
+    if msg and 'available on' not in lower and 'published on' not in lower:
+        vendor = _strip_available_on_blurb(msg)
+    else:
+        vendor = _streaming_vendor_label(n, media)
+    return vendor.strip(), added
+
+
+def _alert_presentation(n, media, episode_code: str = '') -> dict:
+    """Per-type title bits: episode name next to S#E#, payload in the type tag, dates as hint."""
+    kind = n.alert_type or ''
+    base = ALERT_TYPE_LABELS.get(kind, (kind or '').replace('_', ' '))
+    episode_name = ''
+    hint = ''
+    if kind == 'episode_aired':
+        episode_name, hint = _episode_name_and_air(n.message or '', episode_code)
+        type_label = base
+    elif kind == 'season_aired':
+        text = _strip_available_on_blurb(n.message or '')
+        m = _PUBLISHED_DATE_RE.search(text)
+        hint = f'published {m.group(1)}' if m else ''
+        type_label = base
+    elif kind == 'list_add':
+        msg = _strip_available_on_blurb(n.message or '').strip()
+        type_label = msg if msg else base
+    elif kind == 'favorite_actor':
+        actors = _strip_available_on_blurb(n.message or '').strip()
+        type_label = f'{base}: {actors}' if actors else base
+    elif kind == 'new_user_login':
+        type_label = base
+        hint = _strip_available_on_blurb(n.message or '').strip()
+    elif kind in ('new_streaming', 'season_streaming'):
+        vendor, added = _streaming_vendor_and_date(n, media)
+        hint = added
+        if kind == 'season_streaming':
+            type_label = f'Season streaming on {vendor}' if vendor else 'Season streaming'
+        else:
+            type_label = f'{base} on {vendor}' if vendor else base
+    elif kind == 'release_day':
+        type_label = base
+        hint = _date_hint(n, media)
+    else:
+        leftover = _strip_available_on_blurb(n.message or '').strip()
+        type_label = leftover or base
+    return {
+        'episode_name': episode_name,
+        'type_label': type_label,
+        'hint': hint,
+        'headline': '',
+    }
+
+
+def _alert_display_title(media, n, episode_code: str, episode_name: str = '') -> str:
     name = media.title if media else (n.title or '')
-    if episode_code and name:
-        return f'{name} {episode_code}'
-    return name or (n.title or '')
+    parts = [p for p in (name, episode_code, episode_name) if p]
+    return ' '.join(parts) or (n.title or '')
 
 
 def _media_name_from_alert_title(title: str) -> str | None:
@@ -2047,6 +2108,7 @@ def _collect_alert_cards() -> dict:
         episode_code = _episode_code(n)
         media_type = pair[0] if pair else n.media_type
         match = match_preferences(media, current_user) if media is not None else None
+        copy = _alert_presentation(n, media, episode_code)
         cards.append({
             'n': n,
             'media': media,
@@ -2056,13 +2118,15 @@ def _collect_alert_cards() -> dict:
             'other_providers': other_providers,
             'found_on': found_on,
             'match': match,
-            'type_label': ALERT_TYPE_LABELS.get(
-                n.alert_type, (n.alert_type or '').replace('_', ' '),
-            ),
+            'type_label': copy['type_label'],
             'kind_label': _alert_kind_label(media_type, n.alert_type),
             'episode_code': episode_code,
-            'display_title': _alert_display_title(media, n, episode_code),
-            'headline': _alert_headline(n, media, episode_code),
+            'episode_name': copy['episode_name'],
+            'hint': copy['hint'],
+            'display_title': _alert_display_title(
+                media, n, episode_code, copy['episode_name'],
+            ),
+            'headline': copy['headline'],
             'alerts_pinned': bool(st and getattr(st, 'alerts_pinned', False)),
         })
     cards.sort(key=lambda c: _alert_sort_key(c, sort))

@@ -1008,6 +1008,17 @@ body.modal-open { overflow: hidden; }
   color: #fde68a;
   white-space: nowrap;
 }
+.alert-ep-name {
+  font-weight: 650;
+  color: var(--text, #e8edf7);
+}
+.alert-type {
+  font-weight: 500;
+  font-size: .95rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+}
 .alert-group-head .alert-show-name {
   flex: 0 0 auto;
   max-width: 100%;
@@ -1091,11 +1102,6 @@ body.modal-open { overflow: hidden; }
   padding: .22rem .4rem;
 }
 .alert-row .actions { margin-top: .4rem; }
-.tag.alert-episode_aired { color: #bfdbfe; border-color: #3b82f6; }
-.tag.alert-season_aired { color: #ddd6fe; border-color: #8b5cf6; }
-.tag.alert-release_day { color: #fde68a; border-color: #f59e0b; }
-.tag.alert-new_streaming { color: #bbf7d0; border-color: #22c55e; }
-.tag.alert-new_user_login { color: #fecaca; border-color: #ef4444; }
 
 /* Global page-loading overlay: shown during any action that leaves or reloads the page. */
 .page-loading {
