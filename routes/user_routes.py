@@ -579,9 +579,10 @@ def _my_media(media_type: str):
     if media_type == 'show' and filt == 'unwatched':
         filt = 'unwatched_episodes'
 
-    # Local DB is a cache: auto-sync when Trakt last_activities advanced
-    # (wishlist / watched / lists). Manual Refresh forces a full pull and
-    # queues a background cycle for progress/episode data (page never blocks).
+    # Local DB is a cache. Page loads skip Trakt while last_sync_at is fresh;
+    # the hourly catalog job probes last_activities for every user. Manual
+    # Refresh forces a full pull and queues a background cycle for
+    # progress/episode data (page never blocks).
     try:
         synced = ensure_user_media_fresh(
             current_user,

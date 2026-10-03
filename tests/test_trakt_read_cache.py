@@ -15,37 +15,22 @@ from services.user_media_sync import ensure_user_media_fresh
 from tests.conftest import login_client
 
 
-def test_ensure_user_media_fresh_probes_even_when_ttl_fresh(app, user):
-    """TTL-fresh still checks last_activities so trakt.tv list moves are not ignored."""
+def test_ensure_user_media_fresh_skips_trakt_when_ttl_fresh(app, user):
+    """Page loads use SQLite while last_sync_at is within the admin TTL."""
     with app.app_context():
         user_obj = db.session.get(User, user)
-        fp = {
-            'watchlist': '2026-08-05T13:02:01.000Z',
-            'lists': '2026-08-05T13:01:57.000Z',
-            'movies_watched': '2026-08-05T03:02:56.000Z',
-            'movies_watchlisted': '2026-08-03T19:09:59.000Z',
-        }
         user_obj.last_sync_at = datetime.utcnow()
-        user_obj.trakt_activities_json = json.dumps(fp)
         db.session.commit()
-        activities = {
-            'watchlist': {'updated_at': fp['watchlist']},
-            'lists': {'updated_at': fp['lists']},
-            'movies': {
-                'watched_at': fp['movies_watched'],
-                'watchlisted_at': fp['movies_watchlisted'],
-            },
-        }
-        with patch('services.user_media_sync.get_last_activities', return_value=activities) as probe, \
+        with patch('services.user_media_sync.get_last_activities') as probe, \
              patch('services.user_media_sync.sync_user_media_state') as sync:
             ran = ensure_user_media_fresh(user_obj, media_types=('movie',), force=False)
         assert ran is False
-        probe.assert_called_once()
+        probe.assert_not_called()
         sync.assert_not_called()
 
 
-def test_ensure_user_media_fresh_syncs_ttl_fresh_when_watchlist_moved(app, user):
-    """A trakt.tv watchlist change during the TTL must still pull membership."""
+def test_ensure_user_media_fresh_probe_syncs_when_watchlist_moved(app, user):
+    """Hourly job / Set lists still pull when last_activities moved, even if TTL is fresh."""
     with app.app_context():
         user_obj = db.session.get(User, user)
         user_obj.last_sync_at = datetime.utcnow()
@@ -66,7 +51,9 @@ def test_ensure_user_media_fresh_syncs_ttl_fresh_when_watchlist_moved(app, user)
         }
         with patch('services.user_media_sync.get_last_activities', return_value=activities), \
              patch('services.user_media_sync.sync_user_media_state', return_value=True) as sync:
-            ran = ensure_user_media_fresh(user_obj, media_types=('movie',), force=False)
+            ran = ensure_user_media_fresh(
+                user_obj, media_types=('movie',), force=False, probe=True,
+            )
         assert ran is True
         sync.assert_called_once()
 
@@ -95,24 +82,58 @@ def test_ensure_user_media_fresh_skips_full_sync_after_local_write(app, user):
         sync.assert_not_called()
 
 
-def test_ensure_user_media_fresh_logs_unchanged_probe(app, user, caplog):
-    """Unchanged last_activities logs a probe, not a TTL cache hit."""
+def test_ensure_user_media_fresh_logs_cache_hit(app, user, caplog):
+    """TTL-fresh page loads log a cache hit with zero Trakt calls."""
     import logging
 
     with app.app_context():
         user_obj = db.session.get(User, user)
-        fp = {'watchlist': '2026-08-05T13:02:01.000Z'}
         user_obj.last_sync_at = datetime.utcnow()
-        user_obj.trakt_activities_json = json.dumps(fp)
         db.session.commit()
         caplog.set_level(logging.INFO, logger='app')
-        activities = {'watchlist': {'updated_at': fp['watchlist']}}
-        with patch('services.user_media_sync.get_last_activities', return_value=activities), \
+        with patch('services.user_media_sync.get_last_activities'), \
              patch('services.user_media_sync.sync_user_media_state'):
             ensure_user_media_fresh(user_obj, media_types=('movie',), force=False)
-    assert 'Cache user_media probe' in caplog.text
-    assert 'reason=unchanged' in caplog.text
+    assert 'Cache user_media hit' in caplog.text
+    assert 'calls=0' in caplog.text
     assert 'user=friend' in caplog.text
+
+
+def test_sync_all_users_media_membership_probes_every_active_user(app, user, admin_user):
+    """Catalog job checks last_activities for each active account."""
+    from services.user_media_sync import sync_all_users_media_membership
+
+    with app.app_context():
+        for uid in (user, admin_user):
+            row = db.session.get(User, uid)
+            row.last_sync_at = datetime.utcnow()
+            row.trakt_activities_json = json.dumps({'watchlist': '2026-08-01T00:00:00.000Z'})
+        db.session.commit()
+        activities = {'watchlist': {'updated_at': '2026-08-01T00:00:00.000Z'}}
+        with patch('services.user_media_sync.get_last_activities', return_value=activities) as probe, \
+             patch('services.user_media_sync.sync_user_media_state') as sync:
+            stats = sync_all_users_media_membership()
+        assert stats['users'] == 2
+        assert stats['unchanged'] == 2
+        assert stats['synced'] == 0
+        assert probe.call_count == 2
+        sync.assert_not_called()
+
+
+def test_sync_all_users_media_membership_skips_inactive(app, user):
+    """Disabled accounts are not probed on the hourly catalog run."""
+    from services.user_media_sync import sync_all_users_media_membership
+
+    with app.app_context():
+        row = db.session.get(User, user)
+        row.is_active_account = False
+        db.session.commit()
+        with patch('services.user_media_sync.get_last_activities') as probe, \
+             patch('services.user_media_sync.sync_user_media_state') as sync:
+            stats = sync_all_users_media_membership()
+        assert stats['users'] == 0
+        probe.assert_not_called()
+        sync.assert_not_called()
 
 
 def test_ensure_user_media_fresh_force_ignores_ttl(app, user):

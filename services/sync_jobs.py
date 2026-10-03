@@ -1517,6 +1517,8 @@ def run_catalog_sync_job(app: Flask) -> None:
                     )
                 enrich_media_details('movie')
                 enrich_media_details('show')
+                from services.user_media_sync import sync_all_users_media_membership
+                sync_all_users_media_membership()
             except Exception as exc:
                 logger.exception('Catalog sync job failed: %s', exc)
 

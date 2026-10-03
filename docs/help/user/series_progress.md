@@ -35,7 +35,7 @@ If an episode is not in any of those, Trakt has **not** recorded a watch for thi
 - **Mark series watched** — next to the header counts; marks **all** aired episodes of the show on Trakt (every remaining season). Confirm carefully — this is not the same as marking one season. Local card % is refreshed from Progress counts afterward (the app does not invent a sticky 100%).  
 - Counts at the top are `watched / aired` from history (+ progress plays when history lags). **Aired** follows the scheduler timezone, not Trakt’s UTC flag.  
 
-My shows auto-syncs watchlist/watched when Trakt activity advances; **Refresh from Trakt** forces a full pull. Neither writes episode history.
+My shows uses the local watchlist/watched cache (hourly catalog job, **Set lists**, or **Refresh from Trakt**). Neither writes episode history.
 
 If the panel says Trakt is **rate-limiting**, wait a few seconds and click **Retry**. A sync that just ran can use up Trakt’s shared quota; the next try usually works once that settles.
 

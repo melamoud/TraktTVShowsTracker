@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from models import db
 from services import trakt_client
 from services.sync_jobs import sync_user_media_state
-from services.trakt_cache import bump_user_sync_stamp, cache_http_span, log_cache_event
+from services.trakt_cache import bump_user_sync_stamp, cache_http_span, cache_is_fresh, log_cache_event
 
 logger = logging.getLogger('app')
 
@@ -112,24 +112,22 @@ def ensure_user_media_fresh(
     media_types: tuple[str, ...] | None = None,
     *,
     force: bool = False,
+    probe: bool = False,
 ) -> bool:
     """
-    Sync watchlist/watched/lists from Trakt when stale.
+    Sync watchlist/watched/lists from Trakt when that object is stale.
 
-    Uses a cheap ``/sync/last_activities`` check. Returns True when a sync ran.
-    ``force=True`` always syncs (manual Refresh button).
-
-    Fingerprint is only advanced after a successful sync so a failed pull cannot
-    mark the cache “fresh” and hide remote wishlist/list adds.
-
-    The admin read-cache TTL must not skip ``last_activities``. Skipping that
-    cheap probe for hours left My Shows / Set lists on a stale watchlist after
-    the user moved titles on trakt.tv (or after a local write bumped the TTL).
-    Saving Set lists from those stale checkboxes wrote Wishlist / default lists
-    back to Trakt.
+    Page loads (``probe=False``) use SQLite while ``last_sync_at`` is within the
+    admin TTL. The hourly catalog job and Set lists pass ``probe=True`` so a
+    cheap ``last_activities`` check still picks up trakt.tv / other-device
+    changes. ``force=True`` is Refresh from Trakt (always full pull).
     """
     types = media_types or ('movie', 'show')
     span = cache_http_span()
+
+    if not force and not probe and cache_is_fresh(getattr(user, 'last_sync_at', None)):
+        log_cache_event('user_media', 'hit', user=user, calls=0)
+        return False
 
     def _persist(fp: dict) -> None:
         if not fp:
@@ -205,6 +203,40 @@ def ensure_user_media_fresh(
         )
     log_cache_event('user_media', 'fetch', user=user, reason=reason, calls=span())
     return True
+
+
+def sync_all_users_media_membership() -> dict:
+    """
+    Hourly: last_activities for every active user; full pull only if clocks moved.
+
+    Page loads stay on SQLite. Cross-device / trakt.tv edits land on the next
+    catalog run (or Refresh from Trakt / Set lists).
+    """
+    from models import User
+
+    users = User.query.filter_by(is_active_account=True).all()
+    synced = 0
+    unchanged = 0
+    failed = 0
+    for user in users:
+        try:
+            if ensure_user_media_fresh(user, probe=True):
+                synced += 1
+            else:
+                unchanged += 1
+        except Exception as exc:
+            failed += 1
+            logger.warning('Membership sync failed for user %s: %s', user.id, exc)
+    logger.info(
+        'Catalog membership check: users=%s synced=%s unchanged=%s failed=%s',
+        len(users), synced, unchanged, failed,
+    )
+    return {
+        'users': len(users),
+        'synced': synced,
+        'unchanged': unchanged,
+        'failed': failed,
+    }
 
 
 def note_user_media_write(

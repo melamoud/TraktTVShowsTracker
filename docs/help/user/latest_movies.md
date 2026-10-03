@@ -36,7 +36,7 @@ This is **not** the public release / “coming soon” calendar.
 1. **First time** / **Refresh**: light pagination probe (`limit=100`, no extended), then **one newest** Trakt `/updates` page with `extended=full` (genres/overview for Matches-only).  
 2. **Later visits**: uses your local catalog cache; at most a throttled 1-page newest refresh (admin **Trakt read cache** TTL, default 2 hours).  
 3. **Older pages**: loaded **only** when you click **Load older Trakt page** — never invent empty UI pages.  
-4. **Hide watched**: uses the same local watched/wishlist cache as My pages (refreshed on that TTL, not on every click).  
+4. **Hide watched**: uses the same local watched/wishlist cache as My pages (hourly catalog job, **Set lists**, or **Refresh from Trakt** — not on every click).  
 
 The review marker only **dims** titles already in cache; it is not a sync depth target anymore.
 

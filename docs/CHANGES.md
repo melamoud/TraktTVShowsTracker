@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-10-03 — Hourly membership check for every user
+
+- Latest / My / Recs / Search stay on SQLite for watchlist / watched / list tags (no `last_activities` on each open)
+- The catalog job (~60m) now probes `last_activities` for **every active account** and full-pulls only when that user’s clocks moved
+- **Set lists** still probes before checkboxes so Save cannot write stale ticks back to Trakt; **Refresh from Trakt** is still the immediate pull
+- Cross-device / trakt.tv edits land on the next hourly run (or Refresh / Set lists)
+
 ## 2026-09-29 — Alert type labels are regular text again (1.0.12)
 
 - **Now streaming on …** / **Released** / **New episode** are normal sentence text, not gold framed chips. **Active** is still a chip

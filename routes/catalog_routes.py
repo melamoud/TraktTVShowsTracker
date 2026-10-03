@@ -1475,10 +1475,12 @@ def api_lists_membership(media_type, trakt_id):
         if lid == WATCHLIST_LIST_ID or lid in visible_ids
     ]
 
-    # Pick up trakt.tv watchlist/list moves even if the 2h membership TTL is
-    # still “fresh” from an earlier page load or in-app write.
+    # Opening Set lists still probes last_activities so checkboxes are not stale
+    # vs trakt.tv (Save must not write old ticks back).
     try:
-        ensure_user_media_fresh(current_user, media_types=(media_type,), force=False)
+        ensure_user_media_fresh(
+            current_user, media_types=(media_type,), force=False, probe=True,
+        )
         st = UserMediaState.query.filter_by(
             user_id=current_user.id, media_type=media_type, trakt_id=trakt_id
         ).first()
