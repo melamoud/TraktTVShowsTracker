@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-10-03 — Episode watch no longer re-downloads the watchlist
+
+- Watching an episode (or rating one, or creating/deleting a list) now stores Trakt `last_activities` the same way Watch / Set lists already did. Opening Latest after Progress no longer full-pulls membership
+- Fingerprint fetches log which clocks moved (`reason=fingerprint:watchlist`)
+- Updated [Troubleshooting](help/admin/troubleshooting.md)
+
 ## 2026-10-03 — Hourly membership check for every user
 
 - Latest / My / Recs / Search stay on SQLite for watchlist / watched / list tags (no `last_activities` on each open)

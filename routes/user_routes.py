@@ -1359,6 +1359,13 @@ def api_create_trakt_list():
     except Exception as exc:
         current_app.logger.warning('Could not refresh lists after create: %s', exc)
     db.session.commit()
+    try:
+        from services.user_media_sync import note_user_media_write
+        note_user_media_write(
+            current_user, media_types=('movie', 'show'), aspects=('lists',),
+        )
+    except Exception:
+        pass
     return jsonify({'success': True, 'list': created})
 
 
@@ -1390,6 +1397,13 @@ def api_delete_trakt_list(list_id):
             user_id=current_user.id, list_id=lid,
         ).delete(synchronize_session=False)
     db.session.commit()
+    try:
+        from services.user_media_sync import note_user_media_write
+        note_user_media_write(
+            current_user, media_types=('movie', 'show'), aspects=('lists',),
+        )
+    except Exception:
+        pass
     return jsonify({'success': True})
 
 
@@ -1449,6 +1463,13 @@ def api_episode_watched():
             current_app.logger.warning(
                 'Could not patch progress cache after episode watch: %s', exc,
             )
+        try:
+            from services.user_media_sync import note_user_media_write
+            note_user_media_write(
+                current_user, media_types=('show',), aspects=('watched',),
+            )
+        except Exception:
+            pass
         return jsonify({'success': True, 'watched': watched})
     except Exception as exc:
         current_app.logger.exception('Episode watched action failed: %s', exc)
@@ -1482,6 +1503,13 @@ def api_season_watched(trakt_id, season_number):
             current_app.logger.warning(
                 'Could not patch progress cache after season watch: %s', exc,
             )
+        try:
+            from services.user_media_sync import note_user_media_write
+            note_user_media_write(
+                current_user, media_types=('show',), aspects=('watched',),
+            )
+        except Exception:
+            pass
         return jsonify({'success': True, 'added': added, 'season': season_number})
     except Exception as exc:
         current_app.logger.exception('Season watched failed: %s', exc)
@@ -1508,6 +1536,13 @@ def api_season_unwatched(trakt_id, season_number):
             current_app.logger.warning(
                 'Could not patch progress cache after season unwatch: %s', exc,
             )
+        try:
+            from services.user_media_sync import note_user_media_write
+            note_user_media_write(
+                current_user, media_types=('show',), aspects=('watched',),
+            )
+        except Exception:
+            pass
         return jsonify({'success': True, 'deleted': deleted, 'season': season_number})
     except Exception as exc:
         current_app.logger.exception('Season unwatched failed: %s', exc)

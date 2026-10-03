@@ -1305,6 +1305,14 @@ def api_rating(media_type, trakt_id):
                 )
             except Exception:
                 pass
+        elif media_type == 'episode':
+            try:
+                from services.user_media_sync import note_user_media_write
+                note_user_media_write(
+                    current_user, media_types=('show',), aspects=('ratings',),
+                )
+            except Exception:
+                pass
         return jsonify({'success': True, 'rating': score})
     except Exception as exc:
         db.session.rollback()

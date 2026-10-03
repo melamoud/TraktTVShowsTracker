@@ -4,7 +4,7 @@
 |---------|--------|
 | Login button errors | `TRAKT_CLIENT_ID/SECRET`, redirect URI exact match |
 | Empty latest lists | API credentials; click Refresh; check `logs/app.log` |
-| Too many Trakt calls / 429s | Open **Admin → Trakt cache log**. `hit` = local, `probe` = 1 last_activities, `fetch` + `calls=` = Trakt HTTP. Scheduler jobs use `reason=scheduler` / `alerts` / `job`. 429s show as errors. |
+| Too many Trakt calls / 429s | Open **Admin → Trakt cache log**. `hit` = local, `probe` = 1 last_activities, `fetch` + `calls=` = Trakt HTTP. `reason=fingerprint:watchlist` (etc.) is which Trakt clock moved. Scheduler jobs use `reason=scheduler` / `alerts` / `job`. 429s show as errors. |
 | My Movies/Shows missing titles that are on Trakt | Wait for the hourly catalog job, or **Refresh from Trakt**. **Set lists** also re-checks membership. Progress/calendar can lag the admin TTL (default 2 hours). |
 | No streaming providers | `TMDB_API_KEY` set? title has `tmdb_id`? |
 | Not admin after login | `ADMIN_TRAKT_USERNAMES` matches Trakt username; bootstrap not already locked to someone else |

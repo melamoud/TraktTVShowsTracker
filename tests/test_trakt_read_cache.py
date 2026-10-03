@@ -82,6 +82,157 @@ def test_ensure_user_media_fresh_skips_full_sync_after_local_write(app, user):
         sync.assert_not_called()
 
 
+T0 = '2026-10-03T09:18:00.000Z'
+T_EP = '2026-10-03T10:44:00.000Z'
+
+
+def _last_activities(*, watchlist=T0, lists=T0, episodes_watched=T0, movies_watched=T0):
+    return {
+        'watchlist': {'updated_at': watchlist},
+        'lists': {'updated_at': lists},
+        'ratings': {'updated_at': T0},
+        'favorites': {'updated_at': T0},
+        'movies': {
+            'watched_at': movies_watched,
+            'watchlisted_at': T0,
+            'rated_at': T0,
+        },
+        'shows': {'watchlisted_at': T0, 'rated_at': T0},
+        'episodes': {'watched_at': episodes_watched},
+    }
+
+
+def test_episode_watch_without_snapshot_makes_latest_movies_full_pull(app, user, caplog):
+    """17:26 Latest movies: episode watch moved Trakt watchlist clock; we never stored it."""
+    import logging
+
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        user_obj.last_sync_at = datetime.utcnow()
+        user_obj.trakt_activities_json = json.dumps({
+            'watchlist': T0,
+            'lists': T0,
+            'ratings': T0,
+            'favorites': T0,
+            'movies_watched': T0,
+            'movies_watchlisted': T0,
+            'movies_rated': T0,
+            'episodes_watched': T0,
+            'shows_watchlisted': T0,
+            'shows_rated': T0,
+        })
+        db.session.commit()
+        caplog.set_level(logging.INFO, logger='app')
+        # Trakt auto-drops a show from Wishlist on first episode play.
+        after_episode = _last_activities(watchlist=T_EP, episodes_watched=T_EP)
+        with patch('services.user_media_sync.get_last_activities', return_value=after_episode), \
+             patch('services.user_media_sync.sync_user_media_state', return_value=True) as sync:
+            ran = ensure_user_media_fresh(
+                user_obj, media_types=('movie',), force=False, probe=True,
+            )
+        assert ran is True
+        sync.assert_called_once()
+        assert 'reason=fingerprint:watchlist' in caplog.text
+
+
+def test_movie_probe_persists_episode_clock_so_show_page_does_not_pull(app, user, caplog):
+    """A movie last_activities GET must store episodes_watched too (18:08 Set lists)."""
+    import logging
+    from services.user_media_sync import activity_fingerprint
+
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        stored = activity_fingerprint(_last_activities(), ('movie', 'show'))
+        user_obj.last_sync_at = datetime.utcnow()
+        user_obj.trakt_activities_json = json.dumps(stored)
+        db.session.commit()
+        live = _last_activities(episodes_watched=T_EP)
+        caplog.set_level(logging.INFO, logger='app')
+        with patch('services.user_media_sync.get_last_activities', return_value=live), \
+             patch('services.user_media_sync.sync_user_media_state') as sync:
+            movie_ran = ensure_user_media_fresh(
+                user_obj, media_types=('movie',), force=False, probe=True,
+            )
+            show_ran = ensure_user_media_fresh(
+                user_obj, media_types=('show',), force=False, probe=True,
+            )
+        assert movie_ran is False
+        assert show_ran is False
+        sync.assert_not_called()
+        db.session.refresh(user_obj)
+        saved = json.loads(user_obj.trakt_activities_json)
+        assert saved.get('episodes_watched') == T_EP
+
+
+def test_last_activities_one_second_later_is_treated_as_changed(app, user):
+    """Lag: snapshot too early, next GET is 1s newer → we currently full-pull."""
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        user_obj.last_sync_at = datetime.utcnow()
+        user_obj.trakt_activities_json = json.dumps({
+            'watchlist': T0,
+            'lists': T0,
+            'movies_watched': T0,
+            'movies_watchlisted': T0,
+            'movies_rated': T0,
+            'ratings': T0,
+            'favorites': T0,
+        })
+        db.session.commit()
+        later = _last_activities(watchlist='2026-10-03T09:18:01.000Z')
+        with patch('services.user_media_sync.get_last_activities', return_value=later), \
+             patch('services.user_media_sync.sync_user_media_state', return_value=True) as sync:
+            ran = ensure_user_media_fresh(
+                user_obj, media_types=('movie',), force=False, probe=True,
+            )
+        assert ran is True
+        sync.assert_called_once()
+
+
+def test_last_activities_z_vs_offset_is_treated_as_changed(app, user):
+    """Same instant, different string → string compare currently full-pulls."""
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        user_obj.last_sync_at = datetime.utcnow()
+        user_obj.trakt_activities_json = json.dumps({
+            'watchlist': '2026-10-03T09:18:00.000Z',
+            'lists': T0,
+            'movies_watched': T0,
+            'movies_watchlisted': T0,
+            'movies_rated': T0,
+            'ratings': T0,
+            'favorites': T0,
+        })
+        db.session.commit()
+        same_instant = _last_activities(watchlist='2026-10-03T09:18:00.000+00:00')
+        with patch('services.user_media_sync.get_last_activities', return_value=same_instant), \
+             patch('services.user_media_sync.sync_user_media_state', return_value=True) as sync:
+            ran = ensure_user_media_fresh(
+                user_obj, media_types=('movie',), force=False, probe=True,
+            )
+        assert ran is True
+        sync.assert_called_once()
+
+
+def test_episode_watched_api_snapshots_last_activities(app, client, user):
+    """Progress episode watch must store last_activities or the next page full-pulls."""
+    login_client(client, app, user)
+    with patch('routes.user_routes.trakt_client.mark_episode_watched', return_value={'added': {'episodes': 1}}), \
+         patch('services.user_media_sync.note_user_media_write') as note:
+        resp = client.post(
+            '/api/episode/watched',
+            json={
+                'ids': {'trakt': 99},
+                'action': 'add',
+                'show_trakt_id': 1,
+                'season': 1,
+                'episode': 1,
+            },
+        )
+    assert resp.status_code == 200
+    note.assert_called()
+
+
 def test_ensure_user_media_fresh_logs_cache_hit(app, user, caplog):
     """TTL-fresh page loads log a cache hit with zero Trakt calls."""
     import logging

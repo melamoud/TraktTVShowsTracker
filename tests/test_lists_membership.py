@@ -401,13 +401,16 @@ def test_create_trakt_list_writes_to_trakt(app, client, user):
         'routes.user_routes.trakt_client.create_personal_list', return_value=created,
     ) as create, patch(
         'routes.user_routes.trakt_client.get_personal_lists', return_value=[created],
-    ):
+    ), patch(
+        'services.user_media_sync.note_user_media_write',
+    ) as note:
         resp = client.post('/api/lists/create', json={'name': '  Park  '})
     assert resp.status_code == 200
     assert resp.get_json()['success'] is True
     assert resp.get_json()['list']['id'] == '99'
     create.assert_called_once()
     assert create.call_args.args[1] == 'Park'
+    note.assert_called()
 
 
 def test_create_trakt_list_requires_name(app, client, user):
@@ -431,10 +434,13 @@ def test_delete_trakt_list_writes_to_trakt_and_clears_local(app, client, user):
         'routes.user_routes.trakt_client.delete_personal_list', return_value=None,
     ) as delete, patch(
         'routes.user_routes.trakt_client.get_personal_lists', return_value=[],
-    ):
+    ), patch(
+        'services.user_media_sync.note_user_media_write',
+    ) as note:
         resp = client.post('/api/lists/20/delete')
     assert resp.status_code == 200
     delete.assert_called_once()
+    note.assert_called()
     with app.app_context():
         assert UserListMembership.query.filter_by(user_id=user, list_id='20').count() == 0
         prefs = UserPreference.query.filter_by(user_id=user).one()

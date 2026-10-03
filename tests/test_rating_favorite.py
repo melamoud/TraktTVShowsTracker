@@ -63,11 +63,13 @@ def test_api_favorite_toggles(app, client, user):
 def test_api_episode_rating_does_not_touch_user_media_state(app, client, user):
     """Episode ratings sync to Trakt only (no UserMediaState row)."""
     login_client(client, app, user)
-    with patch('routes.catalog_routes.trakt_client.add_rating', return_value={}) as add:
+    with patch('routes.catalog_routes.trakt_client.add_rating', return_value={}) as add, \
+         patch('services.user_media_sync.note_user_media_write') as note:
         resp = client.post('/api/rating/episode/501', json={'rating': 7})
     assert resp.status_code == 200
     assert resp.get_json()['rating'] == 7
     assert add.call_args.args[1:] == ('episode', 501, 7)
+    note.assert_called()
 
     with app.app_context():
         assert UserMediaState.query.filter_by(

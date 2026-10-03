@@ -93,6 +93,9 @@ def fingerprint_keys_for_aspects(
     return keys
 
 
+_ALL_MEDIA_TYPES = ('movie', 'show')
+
+
 def _stored_fingerprint(user) -> dict:
     raw = getattr(user, 'trakt_activities_json', None) or '{}'
     try:
@@ -105,6 +108,15 @@ def _stored_fingerprint(user) -> dict:
 def _save_fingerprint(user, fingerprint: dict) -> None:
     user.trakt_activities_json = json.dumps(fingerprint)
     user.last_sync_at = datetime.utcnow()
+
+
+def _full_fingerprint(activities: dict) -> dict:
+    """Persist movie+show clocks from one last_activities GET."""
+    return activity_fingerprint(activities, _ALL_MEDIA_TYPES)
+
+
+def _changed_fingerprint_keys(new_fp: dict, stored: dict) -> list[str]:
+    return [k for k in new_fp if new_fp.get(k) != stored.get(k)]
 
 
 def ensure_user_media_fresh(
@@ -133,7 +145,9 @@ def ensure_user_media_fresh(
         if not fp:
             return
         merged = dict(_stored_fingerprint(user))
-        merged.update(fp)
+        for key, value in fp.items():
+            if value is not None:
+                merged[key] = value
         _save_fingerprint(user, merged)
         try:
             db.session.commit()
@@ -146,7 +160,7 @@ def ensure_user_media_fresh(
         if ok:
             try:
                 activities = get_last_activities(user)
-                _persist(activity_fingerprint(activities, types))
+                _persist(_full_fingerprint(activities))
             except Exception as exc:
                 logger.warning('Could not store activities after forced sync: %s', exc)
         else:
@@ -160,16 +174,21 @@ def ensure_user_media_fresh(
     need_sync = False
     reason = 'fingerprint'
     fingerprint: dict = {}
+    full_fp: dict = {}
+    changed_keys: list[str] = []
     try:
         activities = get_last_activities(user)
+        full_fp = _full_fingerprint(activities)
         fingerprint = activity_fingerprint(activities, types)
         stored = _stored_fingerprint(user)
         if not user.last_sync_at:
             need_sync = True
             reason = 'empty'
-        elif any(fingerprint.get(k) != stored.get(k) for k in fingerprint):
-            need_sync = True
-            reason = 'fingerprint'
+        else:
+            changed_keys = _changed_fingerprint_keys(fingerprint, stored)
+            if changed_keys:
+                need_sync = True
+                reason = 'fingerprint:' + '+'.join(changed_keys)
     except Exception as exc:
         logger.warning('last_activities check failed for user %s: %s', user.id, exc)
         # Fallback: periodic sync if activities probe fails.
@@ -178,12 +197,7 @@ def ensure_user_media_fresh(
             reason = 'fallback'
 
     if not need_sync:
-        bump_user_sync_stamp(user)
-        try:
-            db.session.commit()
-        except Exception as exc:
-            logger.warning('Could not extend TTL after unchanged probe: %s', exc)
-            db.session.rollback()
+        _persist(full_fp)
         log_cache_event('user_media', 'probe', user=user, reason='unchanged', calls=span())
         if 'show' in types:
             try:
@@ -194,8 +208,8 @@ def ensure_user_media_fresh(
         return False
 
     ok = sync_user_media_state(user, media_types=types)
-    if ok and fingerprint:
-        _persist(fingerprint)
+    if ok and full_fp:
+        _persist(full_fp)
     elif not ok:
         logger.warning(
             'Media sync incomplete for user %s; not advancing activities fingerprint',
@@ -258,13 +272,14 @@ def note_user_media_write(
     """
     try:
         bump_user_sync_stamp(user)
-        types = media_types or ('movie', 'show')
         try:
             activities = get_last_activities(user)
-            fp = activity_fingerprint(activities, types)
+            fp = _full_fingerprint(activities)
             if fp:
                 merged = dict(_stored_fingerprint(user))
-                merged.update(fp)
+                for key, value in fp.items():
+                    if value is not None:
+                        merged[key] = value
                 user.trakt_activities_json = json.dumps(merged)
         except Exception as exc:
             logger.warning(
