@@ -1,5 +1,9 @@
 # Changes log
 
+## 2026-10-04 — Write review loads again (Trakt comments URL)
+
+- Opening **Write review…** called `/users/me/comments/shows`, which Trakt now rejects with 400. The path is `/users/me/comments/all/shows` (same for movies and episodes)
+
 ## 2026-10-03 — Episode watch no longer re-downloads the watchlist
 
 - Watching an episode (or rating one, or creating/deleting a list) now stores Trakt `last_activities` the same way Watch / Set lists already did. Opening Latest after Progress no longer full-pulls membership

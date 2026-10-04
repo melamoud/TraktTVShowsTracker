@@ -968,9 +968,9 @@ def find_user_comment(user: User, media_type: str, trakt_id: int) -> dict | None
             'user_rating': score,
         }
 
-    # /users/me/comments/episodes|movies|shows — newest first on Trakt.
+    # /users/me/comments/{all|reviews|shouts}/{movies|shows|episodes}
     return _paginate_until(
-        user, f'/users/me/comments/{media_type}s', match_fn=_normalize,
+        user, f'/users/me/comments/all/{media_type}s', match_fn=_normalize,
     )
 
 

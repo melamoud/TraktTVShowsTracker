@@ -177,6 +177,19 @@ def test_get_media_feedback_prefers_comment_user_rating():
     rating.assert_not_called()
 
 
+def test_find_user_comment_uses_comment_type_and_media_path():
+    """Trakt requires /users/me/comments/{all|reviews|shouts}/{movies|shows|episodes}."""
+    from services import trakt_client
+
+    class _User:
+        id = 1
+
+    with patch.object(trakt_client, 'api_request', return_value=[]) as api:
+        assert trakt_client.find_user_comment(_User(), 'show', 170597) is None
+    api.assert_called_once()
+    assert api.call_args.args[1] == '/users/me/comments/all/shows'
+
+
 def test_add_comment_requires_five_words():
     """Client helper enforces Trakt's minimum before calling the API."""
     from services import trakt_client
