@@ -35,6 +35,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.R
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.ui.theme.Background
 import com.melamoud.tvtracker.ui.theme.Danger
 import com.melamoud.tvtracker.ui.theme.Primary
@@ -44,11 +45,17 @@ import com.melamoud.tvtracker.ui.theme.TextMuted
 fun LoginScreen(
     viewModel: LoginViewModel,
     onOpenUrl: (String) -> Unit,
-    onLoggedIn: (String, Boolean, Int) -> Unit,
+    onLoggedIn: (String, Boolean, AlertCounts) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(state.loggedIn, state.username, state.isAdmin, state.unreadAlerts) {
-        if (state.loggedIn) onLoggedIn(state.username.orEmpty(), state.isAdmin, state.unreadAlerts)
+    LaunchedEffect(state.loggedIn, state.username, state.isAdmin, state.unreadAlerts, state.newAlerts) {
+        if (state.loggedIn) {
+            onLoggedIn(
+                state.username.orEmpty(),
+                state.isAdmin,
+                AlertCounts(newCount = state.newAlerts, unreadCount = state.unreadAlerts),
+            )
+        }
     }
     LaunchedEffect(state.authorizeUrl) {
         val url = state.authorizeUrl ?: return@LaunchedEffect

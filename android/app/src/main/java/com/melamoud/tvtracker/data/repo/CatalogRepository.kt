@@ -5,6 +5,7 @@ import com.melamoud.tvtracker.data.api.TvTrackerApi
 import com.melamoud.tvtracker.data.api.dto.ActionRequest
 import com.melamoud.tvtracker.data.api.dto.AdminSchedulerSaveRequest
 import com.melamoud.tvtracker.data.api.dto.AdminStreamingServiceActionRequest
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.data.api.dto.AlertsResponse
 import com.melamoud.tvtracker.data.api.dto.CommentResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
@@ -113,19 +114,27 @@ class CatalogRepository(private val api: TvTrackerApi) {
         runCatching { api.widget(mode) }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
-    suspend fun unreadAlerts(): Int =
-        runCatching { api.me().user?.unreadAlerts ?: 0 }.getOrDefault(0)
+    suspend fun alertCounts(): AlertCounts =
+        runCatching {
+            val user = api.me().user
+            AlertCounts(
+                newCount = user?.newAlerts ?: 0,
+                unreadCount = user?.unreadAlerts ?: 0,
+            )
+        }.getOrDefault(AlertCounts())
 
     suspend fun alerts(
         hideRead: Boolean? = null,
         sort: String? = null,
         groupShows: Boolean? = null,
+        inbox: Boolean? = null,
     ): Result<AlertsResponse> =
         runCatching {
             api.alerts(
                 hideRead?.let { if (it) 1 else 0 },
                 sort,
                 groupShows?.let { if (it) 1 else 0 },
+                inbox?.let { if (it) 1 else 0 },
             )
         }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
@@ -134,7 +143,13 @@ class CatalogRepository(private val api: TvTrackerApi) {
         if (read) api.alertRead(id) else api.alertUnread(id)
     }
 
+    suspend fun alertAck(id: Int) = runCatching { api.alertAck(id) }
+
+    suspend fun alertUnack(id: Int) = runCatching { api.alertUnack(id) }
+
     suspend fun alertsReadAll() = runCatching { api.alertsReadAll() }
+
+    suspend fun alertsAckAll() = runCatching { api.alertsAckAll() }
 
     suspend fun pin(mediaType: String, traktId: Int, pin: Boolean) = runCatching {
         api.pin(mediaType, traktId, ActionRequest(action = if (pin) "pin" else "unpin"))

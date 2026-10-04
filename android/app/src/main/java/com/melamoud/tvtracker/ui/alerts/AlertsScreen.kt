@@ -1,5 +1,6 @@
 package com.melamoud.tvtracker.ui.alerts
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -97,6 +98,15 @@ fun AlertsScreen(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             FilterChip(
+                selected = state.inbox,
+                onClick = { viewModel.setInbox(!state.inbox) },
+                label = {
+                    Text(
+                        if (state.newCount > 0) "Inbox (${state.newCount})" else "Inbox",
+                    )
+                },
+            )
+            FilterChip(
                 selected = state.hideRead,
                 onClick = { viewModel.setHideRead(!state.hideRead) },
                 label = { Text(if (state.hideRead) "Hide dismissed" else "Show dismissed") },
@@ -106,11 +116,16 @@ fun AlertsScreen(
                 onClick = { viewModel.setSort(if (state.sort == "desc") "asc" else "desc") },
                 label = { Text(if (state.sort == "desc") "Newest first" else "Oldest first") },
             )
-            FilterChip(
-                selected = state.groupShows,
-                onClick = { viewModel.setGroupShows(!state.groupShows) },
-                label = { Text(if (state.groupShows) "Grouped by show" else "One row each") },
-            )
+            if (!state.inbox) {
+                FilterChip(
+                    selected = state.groupShows,
+                    onClick = { viewModel.setGroupShows(!state.groupShows) },
+                    label = { Text(if (state.groupShows) "Grouped by show" else "One row each") },
+                )
+            }
+            if (state.newCount > 0) {
+                TextButton(onClick = viewModel::ackAll) { Text("Ack all (${state.newCount})") }
+            }
             if (state.unreadCount > 0) {
                 TextButton(onClick = viewModel::readAll) { Text("Dismiss all (${state.unreadCount})") }
             }
@@ -130,7 +145,11 @@ fun AlertsScreen(
             when {
                 state.loading && state.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 state.error != null && state.entries.isEmpty() -> Text(state.error ?: "", modifier = Modifier.padding(16.dp))
-                state.entries.isEmpty() -> Text(stringResource(R.string.empty_alerts), color = TextMuted, modifier = Modifier.padding(24.dp))
+                state.entries.isEmpty() -> Text(
+                    if (state.inbox) "No new alerts." else stringResource(R.string.empty_alerts),
+                    color = TextMuted,
+                    modifier = Modifier.padding(24.dp),
+                )
                 else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     state.entries.forEach { entry ->
                         if (entry.kind == "group") {
@@ -160,6 +179,8 @@ fun AlertsScreen(
                                     onProgress = onProgress,
                                     onOpenDetail = onOpenDetail,
                                     onToggleRead = { viewModel.toggleRead(item) },
+                                    onAck = { viewModel.ack(item) },
+                                    onUnack = { viewModel.unack(item) },
                                     onPin = {
                                         val mt = item.mediaType
                                         val id = item.traktId
@@ -184,6 +205,8 @@ fun AlertsScreen(
                                     onProgress = onProgress,
                                     onOpenDetail = onOpenDetail,
                                     onToggleRead = { viewModel.toggleRead(single) },
+                                    onAck = { viewModel.ack(single) },
+                                    onUnack = { viewModel.unack(single) },
                                     onPin = {
                                         val mt = single.mediaType
                                         val id = single.traktId
@@ -248,8 +271,14 @@ private fun AlertGroupCard(
     onFoundOn: (() -> Unit)? = null,
 ) {
     val dimmed = entry.unreadCount == 0
+    val isNew = entry.newCount > 0
+    val titleInk = if (isNew) Color(0xFF1A1200) else Color.Unspecified
     Card(
-        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isNew) AccentGold.copy(alpha = 0.16f) else SurfaceAlt,
+        ),
+        border = if (isNew) BorderStroke(3.dp, AccentGold) else null,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (isNew) 6.dp else 0.dp),
         modifier = Modifier
             .alpha(if (dimmed) 0.55f else 1f)
             .clickable(onClick = onToggle),
@@ -258,13 +287,23 @@ private fun AlertGroupCard(
             AlertPoster(baseUrl, entry.posterUrl, entry.title ?: "", entry.kindLabel ?: "Show")
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 FlowRow(
-                    Modifier.fillMaxWidth(),
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (isNew) {
+                                Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(AccentGold)
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            } else Modifier
+                        ),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         entry.title ?: "Show",
                         fontWeight = FontWeight.SemiBold,
+                        color = titleInk,
                         maxLines = 1,
                         softWrap = false,
                         overflow = TextOverflow.Ellipsis,
@@ -273,7 +312,7 @@ private fun AlertGroupCard(
                     entry.episodeCodes.forEachIndexed { index, code ->
                         Text(
                             text = if (index == 0) code else "· $code",
-                            color = AccentGold,
+                            color = if (isNew) titleInk else AccentGold,
                             fontWeight = FontWeight.Bold,
                             style = MaterialTheme.typography.titleSmall,
                             maxLines = 1,
@@ -282,6 +321,9 @@ private fun AlertGroupCard(
                     }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (entry.newCount > 0) {
+                        Text("${entry.newCount} new", color = AccentGold, style = MaterialTheme.typography.labelMedium)
+                    }
                     if (entry.unreadCount > 0) {
                         Text("${entry.unreadCount} active", color = AccentGold, style = MaterialTheme.typography.labelMedium)
                     }
@@ -370,6 +412,8 @@ private fun AlertItemCard(
     onProgress: (Int) -> Unit,
     onOpenDetail: (String, Int) -> Unit,
     onToggleRead: () -> Unit,
+    onAck: () -> Unit = {},
+    onUnack: () -> Unit = {},
     onPin: () -> Unit,
     onWatch: (() -> Unit)? = null,
     onLists: (() -> Unit)? = null,
@@ -381,8 +425,13 @@ private fun AlertItemCard(
             item.mediaTitle?.takeIf { it.isNotBlank() } ?: item.title.takeIf { it.isNotBlank() },
             item.episodeCode?.takeIf { it.isNotBlank() },
         ).joinToString(" ").ifBlank { item.title }
+    val titleInk = if (item.isNew) Color(0xFF1A1200) else Color.Unspecified
     Card(
-        colors = CardDefaults.cardColors(containerColor = SurfaceAlt),
+        colors = CardDefaults.cardColors(
+            containerColor = if (item.isNew) AccentGold.copy(alpha = 0.16f) else SurfaceAlt,
+        ),
+        border = if (item.isNew) BorderStroke(3.dp, AccentGold) else null,
+        elevation = CardDefaults.cardElevation(defaultElevation = if (item.isNew) 6.dp else 0.dp),
         modifier = Modifier
             .padding(start = if (nested) 20.dp else 0.dp)
             .alpha(if (item.isRead) 0.55f else 1f)
@@ -398,29 +447,43 @@ private fun AlertItemCard(
             }
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 FlowRow(
-                    Modifier.fillMaxWidth(),
+                    Modifier
+                        .fillMaxWidth()
+                        .then(
+                            if (item.isNew) {
+                                Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(AccentGold)
+                                    .padding(horizontal = 8.dp, vertical = 5.dp)
+                            } else Modifier
+                        ),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     Text(
                         item.mediaTitle?.takeIf { it.isNotBlank() } ?: item.title,
                         fontWeight = FontWeight.SemiBold,
+                        color = titleInk,
                     )
                     if (!item.episodeCode.isNullOrBlank()) {
-                        Text(item.episodeCode, color = AccentGold, fontWeight = FontWeight.Bold)
+                        Text(
+                            item.episodeCode,
+                            color = if (item.isNew) titleInk else AccentGold,
+                            fontWeight = FontWeight.Bold,
+                        )
                     }
                     if (!item.episodeName.isNullOrBlank()) {
-                        Text(item.episodeName, fontWeight = FontWeight.SemiBold)
+                        Text(item.episodeName, fontWeight = FontWeight.SemiBold, color = titleInk)
                     }
                     if (!item.typeLabel.isNullOrBlank()) {
                         Text(
                             item.typeLabel,
-                            color = TextMuted,
+                            color = if (item.isNew) Color(0xFF4A3A10) else TextMuted,
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.Normal,
                         )
                     }
-                    if (!item.isRead) {
+                    if (!item.isRead && !item.isNew) {
                         Text(
                             "Active",
                             color = AccentGold,
@@ -492,6 +555,23 @@ private fun AlertItemCard(
                             contentPadding = PaddingValues(horizontal = 10.dp),
                             modifier = Modifier.height(AlertActionHeight),
                         ) { Text("Rate", maxLines = 1, softWrap = false) }
+                    }
+                    if (item.isNew) {
+                        TextButton(
+                            onClick = onAck,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) {
+                            Text("Ack", maxLines = 1, softWrap = false)
+                        }
+                    } else if (!item.isRead) {
+                        TextButton(
+                            onClick = onUnack,
+                            contentPadding = PaddingValues(horizontal = 8.dp),
+                            modifier = Modifier.height(AlertActionHeight),
+                        ) {
+                            Text("Unack", maxLines = 1, softWrap = false)
+                        }
                     }
                     TextButton(
                         onClick = onToggleRead,

@@ -311,6 +311,7 @@ def serialize_alert_card(card: dict) -> dict:
         'trakt_id': trakt_id,
         'payload_key': n.payload_key if n else None,
         'is_read': bool(n.is_read) if n else False,
+        'is_new': bool(card.get('is_new')),
         'created_at': _iso(n.created_at) if n else None,
         'poster_url': poster_url,
         'media_title': media.title if media else None,
@@ -354,6 +355,7 @@ def serialize_alert_entry(entry: dict) -> dict:
             'alerts_pinned': bool(entry.get('alerts_pinned')),
             'episode_codes': list(entry.get('episode_codes') or []),
             'unread_count': int(entry.get('unread_count') or 0),
+            'new_count': int(entry.get('new_count') or 0),
             'items': [serialize_alert_card(c) for c in (entry.get('cards') or [])],
         }
     return {

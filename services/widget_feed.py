@@ -10,12 +10,14 @@ WIDGET_LIMIT = 80
 
 
 def build_widget_feed(user, mode: str) -> dict:
-    """Return {success, mode, items} for shows, movies, or alerts."""
+    """Return {success, mode, items} for shows, movies, alerts, or inbox."""
     key = (mode or 'shows').strip().lower()
-    if key not in ('shows', 'movies', 'alerts'):
+    if key not in ('shows', 'movies', 'alerts', 'inbox'):
         key = 'shows'
-    if key == 'alerts':
-        items = _alert_items(user)
+    if key == 'inbox':
+        items = _alert_items(user, inbox=True)
+    elif key == 'alerts':
+        items = _alert_items(user, inbox=False)
     elif key == 'movies':
         items = _media_items(user, 'movie')
     else:
@@ -164,13 +166,16 @@ def _movie_item(st, title: str, media) -> dict:
     }
 
 
-def _alert_items(user) -> list[dict]:
+def _alert_items(user, *, inbox: bool = False) -> list[dict]:
     from routes.user_routes import _collect_alert_cards, _group_alert_cards, _parse_season_episode
 
-    ctx = _collect_alert_cards()
+    ctx = _collect_alert_cards(force_inbox=inbox)
     cards = ctx.get('cards') or []
     sort = ctx.get('sort') or 'desc'
-    entries = _group_alert_cards(cards, group_shows=True, sort=sort)
+    if inbox:
+        entries = [{'kind': 'single', 'card': c} for c in cards]
+    else:
+        entries = _group_alert_cards(cards, group_shows=True, sort=sort)
     remaining_by_show = _remaining_by_show(
         user.id,
         [
@@ -225,6 +230,7 @@ def _alert_group(entry: dict, remaining_by_show: dict, parse_se) -> dict:
         'expandable': True,
         'child_count': count,
         'unread_count': unread,
+        'is_new': any(c.get('is_new') for c in (entry.get('cards') or [])),
         'group_key': f'show-{trakt_id}',
         'items': children,
     }
@@ -267,6 +273,7 @@ def _alert_single(card: dict, remaining_by_show: dict, parse_se) -> dict:
         'alert_id': getattr(n, 'id', None),
         'expandable': False,
         'child_count': 0,
+        'is_new': bool(card.get('is_new')),
         'items': [],
     }
 

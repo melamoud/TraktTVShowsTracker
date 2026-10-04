@@ -13,6 +13,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.ui.nav.AppNav
 import com.melamoud.tvtracker.ui.theme.TvTrackerTheme
 import com.melamoud.tvtracker.widget.TrackerWidgetProvider
@@ -41,7 +42,12 @@ class MainActivity : ComponentActivity() {
                     loggedIn = user != null
                     username = user?.username
                     isAdmin = user?.isAdmin ?: false
-                    container.setUnreadAlerts(user?.unreadAlerts ?: 0)
+                    container.setAlertCounts(
+                        AlertCounts(
+                            newCount = user?.newAlerts ?: 0,
+                            unreadCount = user?.unreadAlerts ?: 0,
+                        ),
+                    )
                     if (user != null) TrackerWidgetProvider.requestRefresh(this@MainActivity)
                     checking = false
                 }
@@ -55,11 +61,11 @@ class MainActivity : ComponentActivity() {
                         onOpenLoginUrl = ::openCustomTab,
                         onOauthToken = oauthToken,
                         onOauthConsumed = { oauthTokenState.value = null },
-                        onLoggedIn = { name, admin, unreadCount ->
+                        onLoggedIn = { name, admin, counts ->
                             loggedIn = true
                             username = name
                             isAdmin = admin
-                            container.setUnreadAlerts(unreadCount)
+                            container.setAlertCounts(counts)
                             TrackerWidgetProvider.requestRefresh(this@MainActivity)
                         },
                         onLogout = {
@@ -68,7 +74,7 @@ class MainActivity : ComponentActivity() {
                                 loggedIn = false
                                 username = null
                                 isAdmin = false
-                                container.setUnreadAlerts(0)
+                                container.setAlertCounts(AlertCounts())
                             }
                         },
                     )
@@ -108,7 +114,9 @@ class MainActivity : ComponentActivity() {
                 val traktId = parts.getOrNull(1)?.toIntOrNull()
                 if (traktId != null) container.requestOpen("progress", "show", traktId)
             }
-            "shows", "movies", "alerts", "search" -> container.requestOpen(dest)
+            "shows", "movies", "alerts", "inbox", "search" -> container.requestOpen(
+                if (dest == "inbox") "alerts" else dest,
+            )
         }
     }
 

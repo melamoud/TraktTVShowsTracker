@@ -3,6 +3,7 @@ package com.melamoud.tvtracker.ui.alerts
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.data.api.dto.AlertEntryDto
 import com.melamoud.tvtracker.data.api.dto.AlertItemDto
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
@@ -20,9 +21,11 @@ data class AlertsUiState(
     val items: List<AlertItemDto> = emptyList(),
     val entries: List<AlertEntryDto> = emptyList(),
     val unreadCount: Int = 0,
+    val newCount: Int = 0,
     val hideRead: Boolean = true,
     val sort: String = "desc",
     val groupShows: Boolean = true,
+    val inbox: Boolean = false,
     val expandedKeys: Set<String> = emptySet(),
     val foundOnChoices: List<String> = emptyList(),
     val rateTarget: AlertItemDto? = null,
@@ -33,13 +36,14 @@ data class AlertsUiState(
 
 class AlertsViewModel(
     private val repo: CatalogRepository,
-    private val onUnread: (Int) -> Unit,
+    private val onUnread: (AlertCounts) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(AlertsUiState())
     val state: StateFlow<AlertsUiState> = _state.asStateFlow()
     private var persistHideRead = false
     private var persistSort = false
     private var persistGroup = false
+    private var persistInbox = false
 
     fun reload() {
         viewModelScope.launch {
@@ -49,18 +53,21 @@ class AlertsViewModel(
                 hideRead = s.hideRead.takeIf { persistHideRead },
                 sort = s.sort.takeIf { persistSort },
                 groupShows = s.groupShows.takeIf { persistGroup },
+                inbox = s.inbox.takeIf { persistInbox },
             )
             _state.value = result.fold(
                 onSuccess = {
-                    onUnread(it.unreadCount)
+                    onUnread(AlertCounts(newCount = it.newCount, unreadCount = it.unreadCount))
                     s.copy(
                         loading = false,
                         items = it.items,
                         entries = it.entries.ifEmpty { fallbackEntries(it.items) },
                         unreadCount = it.unreadCount,
+                        newCount = it.newCount,
                         hideRead = it.hideRead,
                         sort = it.sort,
                         groupShows = it.groupShows,
+                        inbox = it.inbox,
                     )
                 },
                 onFailure = { s.copy(loading = false, error = it.message) },
@@ -86,6 +93,12 @@ class AlertsViewModel(
         reload()
     }
 
+    fun setInbox(value: Boolean) {
+        persistInbox = true
+        _state.value = _state.value.copy(inbox = value)
+        reload()
+    }
+
     fun toggleExpanded(key: String) {
         val cur = _state.value.expandedKeys
         _state.value = _state.value.copy(
@@ -100,9 +113,30 @@ class AlertsViewModel(
         }
     }
 
+    fun ack(item: AlertItemDto) {
+        viewModelScope.launch {
+            repo.alertAck(item.id)
+            reload()
+        }
+    }
+
+    fun unack(item: AlertItemDto) {
+        viewModelScope.launch {
+            repo.alertUnack(item.id)
+            reload()
+        }
+    }
+
     fun readAll() {
         viewModelScope.launch {
             repo.alertsReadAll()
+            reload()
+        }
+    }
+
+    fun ackAll() {
+        viewModelScope.launch {
+            repo.alertsAckAll()
             reload()
         }
     }
@@ -130,7 +164,7 @@ class AlertsViewModel(
         val tid = item.traktId ?: return
         viewModelScope.launch {
             repo.watched(mt, tid, true)
-            onUnread(repo.unreadAlerts())
+            onUnread(repo.alertCounts())
             reload()
         }
     }
@@ -238,7 +272,7 @@ class AlertsViewModel(
     }
 
     companion object {
-        fun factory(repo: CatalogRepository, onUnread: (Int) -> Unit) = object : ViewModelProvider.Factory {
+        fun factory(repo: CatalogRepository, onUnread: (AlertCounts) -> Unit) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = AlertsViewModel(repo, onUnread) as T
         }

@@ -94,16 +94,17 @@ def _serialize_calendar(cal):
     }
 
 
+from services.alerts import new_alert_count, unread_alert_count
+
 def _user_payload():
-    unread = Notification.query.filter_by(
-        user_id=current_user.id, is_read=False,
-    ).count()
+    unread = unread_alert_count(current_user.id)
     return {
         'id': current_user.id,
         'username': current_user.username,
         'is_admin': bool(getattr(current_user, 'is_admin', False)),
         'csrf_token': generate_csrf(),
         'unread_alerts': unread,
+        'new_alerts': new_alert_count(current_user.id),
     }
 
 
@@ -399,9 +400,11 @@ def api_alerts():
     return jsonify({
         'success': True,
         'unread_count': ctx.get('unread_count') or 0,
+        'new_count': ctx.get('new_count') or 0,
         'hide_read': bool(ctx.get('hide_read')),
         'sort': ctx.get('sort') or 'desc',
         'group_shows': bool(ctx.get('group_shows')),
+        'inbox': bool(ctx.get('inbox')),
         'items': [serialize_alert_card(card) for card in (ctx.get('cards') or [])],
         'entries': [serialize_alert_entry(e) for e in (ctx.get('entries') or [])],
     })
@@ -412,7 +415,16 @@ def api_alerts():
 def api_alerts_read_all():
     Notification.query.filter_by(
         user_id=current_user.id, is_read=False,
-    ).update({'is_read': True})
+    ).update({'is_read': True, 'is_new': False})
+    db.session.commit()
+    return jsonify({'success': True})
+
+
+@mobile_api_bp.route('/alerts/ack-all', methods=['POST'])
+@login_required
+def api_alerts_ack_all():
+    from services.alerts import ack_all_notifications
+    ack_all_notifications(current_user.id)
     db.session.commit()
     return jsonify({'success': True})
 
@@ -429,6 +441,34 @@ def api_alert_read(notif_id):
     set_notification_read(current_user.id, row, True)
     db.session.commit()
     return jsonify({'success': True, 'is_read': True})
+
+
+@mobile_api_bp.route('/alerts/<int:notif_id>/ack', methods=['POST'])
+@login_required
+def api_alert_ack(notif_id):
+    from services.alerts import ack_notification
+    row = Notification.query.filter_by(
+        id=notif_id, user_id=current_user.id,
+    ).first()
+    if not row:
+        return jsonify({'success': False, 'message': 'Alert not found'}), 404
+    ack_notification(current_user.id, row)
+    db.session.commit()
+    return jsonify({'success': True, 'is_new': False})
+
+
+@mobile_api_bp.route('/alerts/<int:notif_id>/unack', methods=['POST'])
+@login_required
+def api_alert_unack(notif_id):
+    from services.alerts import unack_notification
+    row = Notification.query.filter_by(
+        id=notif_id, user_id=current_user.id,
+    ).first()
+    if not row:
+        return jsonify({'success': False, 'message': 'Alert not found'}), 404
+    unack_notification(current_user.id, row)
+    db.session.commit()
+    return jsonify({'success': True, 'is_new': True})
 
 
 @mobile_api_bp.route('/alerts/<int:notif_id>/unread', methods=['POST'])

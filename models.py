@@ -499,6 +499,9 @@ class Notification(db.Model):
     # Same key as AlertEvent (ep:2:5, season:2, release:YYYY-MM-DD, …) for cleanup.
     payload_key = db.Column(db.String(200))
     is_read = db.Column(db.Boolean, default=False, nullable=False)
+    # New/unacked highlight + Inbox. SQLAlchemy default True for inserts;
+    # existing rows get 0 via schema DDL so they do not flood Inbox.
+    is_new = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 

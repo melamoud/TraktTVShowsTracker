@@ -46,6 +46,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.melamoud.tvtracker.BuildConfig
 import com.melamoud.tvtracker.R
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.di.AppContainer
 import com.melamoud.tvtracker.ui.alerts.AlertsScreen
 import com.melamoud.tvtracker.ui.alerts.AlertsViewModel
@@ -82,7 +83,7 @@ fun AppNav(
     onOpenLoginUrl: (String) -> Unit,
     onOauthToken: String?,
     onOauthConsumed: () -> Unit,
-    onLoggedIn: (String, Boolean, Int) -> Unit,
+    onLoggedIn: (String, Boolean, AlertCounts) -> Unit,
     onLogout: () -> Unit,
 ) {
     if (!loggedIn) {
@@ -106,10 +107,10 @@ fun AppNav(
     val currentRoute = backStack?.destination?.route
     val showChrome = currentRoute?.startsWith("progress/") != true &&
         currentRoute?.startsWith("detail/") != true
-    val unreadAlerts by container.unreadAlerts.collectAsStateWithLifecycle()
+    val alertCounts by container.alertCounts.collectAsStateWithLifecycle()
     val pendingActor by container.pendingActorSearch.collectAsStateWithLifecycle()
     val pendingOpen by container.pendingOpen.collectAsStateWithLifecycle()
-    val onUnread = container::setUnreadAlerts
+    val onUnread = container::setAlertCounts
 
     fun openDetail(mediaType: String, traktId: Int) {
         navController.navigate("detail/$mediaType/$traktId")
@@ -302,7 +303,9 @@ fun AppNav(
                         onClick = { go("alerts") },
                         icon = {
                             BadgedBox(badge = {
-                                if (unreadAlerts > 0) Badge { Text(unreadAlerts.toString()) }
+                                if (alertCounts.unreadCount > 0) {
+                                    Badge { Text("${alertCounts.newCount}/${alertCounts.unreadCount}") }
+                                }
                             }) {
                                 Icon(Icons.Default.Notifications, contentDescription = null)
                             }

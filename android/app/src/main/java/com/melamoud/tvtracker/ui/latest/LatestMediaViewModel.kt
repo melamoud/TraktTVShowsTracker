@@ -3,6 +3,7 @@ package com.melamoud.tvtracker.ui.latest
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.data.api.dto.ReviewMarkerDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
@@ -44,7 +45,7 @@ data class LatestMediaUiState(
 class LatestMediaViewModel(
     private val kind: String,
     private val repo: CatalogRepository,
-    private val onUnread: (Int) -> Unit,
+    private val onUnread: (AlertCounts) -> Unit,
 ) : ViewModel() {
     private val mediaType = if (kind == "shows") "show" else "movie"
     private val _state = MutableStateFlow(LatestMediaUiState())
@@ -208,7 +209,7 @@ class LatestMediaViewModel(
         _state.value = _state.value.copy(watchConfirm = null)
         viewModelScope.launch {
             repo.watched(mediaType, item.traktId, !item.watched)
-            onUnread(repo.unreadAlerts())
+            onUnread(repo.alertCounts())
             reload()
         }
     }
@@ -283,7 +284,7 @@ class LatestMediaViewModel(
     }
 
     companion object {
-        fun factory(kind: String, repo: CatalogRepository, onUnread: (Int) -> Unit) =
+        fun factory(kind: String, repo: CatalogRepository, onUnread: (AlertCounts) -> Unit) =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =

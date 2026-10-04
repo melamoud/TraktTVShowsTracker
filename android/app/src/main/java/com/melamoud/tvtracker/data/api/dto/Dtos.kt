@@ -8,6 +8,12 @@ data class UserDto(
     @SerializedName("is_admin") val isAdmin: Boolean = false,
     @SerializedName("csrf_token") val csrfToken: String? = null,
     @SerializedName("unread_alerts") val unreadAlerts: Int = 0,
+    @SerializedName("new_alerts") val newAlerts: Int = 0,
+)
+
+data class AlertCounts(
+    val newCount: Int = 0,
+    val unreadCount: Int = 0,
 )
 
 data class SimpleResponse(
@@ -384,6 +390,7 @@ data class AlertItemDto(
     @SerializedName("trakt_id") val traktId: Int? = null,
     @SerializedName("payload_key") val payloadKey: String? = null,
     @SerializedName("is_read") val isRead: Boolean = false,
+    @SerializedName("is_new") val isNew: Boolean = false,
     @SerializedName("created_at") val createdAt: String? = null,
     @SerializedName("poster_url") val posterUrl: String? = null,
     @SerializedName("media_title") val mediaTitle: String? = null,
@@ -415,6 +422,7 @@ data class AlertEntryDto(
     @SerializedName("alerts_pinned") val alertsPinned: Boolean = false,
     @SerializedName("episode_codes") val episodeCodes: List<String> = emptyList(),
     @SerializedName("unread_count") val unreadCount: Int = 0,
+    @SerializedName("new_count") val newCount: Int = 0,
     val items: List<AlertItemDto> = emptyList(),
     val item: AlertItemDto? = null,
 )
@@ -423,9 +431,11 @@ data class AlertsResponse(
     val success: Boolean,
     val message: String? = null,
     @SerializedName("unread_count") val unreadCount: Int = 0,
+    @SerializedName("new_count") val newCount: Int = 0,
     @SerializedName("hide_read") val hideRead: Boolean = true,
     val sort: String = "desc",
     @SerializedName("group_shows") val groupShows: Boolean = true,
+    val inbox: Boolean = false,
     val items: List<AlertItemDto> = emptyList(),
     val entries: List<AlertEntryDto> = emptyList(),
 )
@@ -575,6 +585,7 @@ data class WidgetItemDto(
     val expandable: Boolean = false,
     @SerializedName("child_count") val childCount: Int = 0,
     @SerializedName("unread_count") val unreadCount: Int = 0,
+    @SerializedName("is_new") val isNew: Boolean = false,
     val items: List<WidgetItemDto> = emptyList(),
 )
 

@@ -190,6 +190,38 @@ def test_alerts_mark_read(app, client, user):
         assert row.is_read is True
 
 
+def test_alerts_ack_and_unack_json(app, client, user):
+    login_client(client, app, user)
+    with app.app_context():
+        n = Notification(
+            user_id=user,
+            alert_type='release_day',
+            title='Released',
+            message='A movie is out',
+            media_type='movie',
+            trakt_id=9,
+            is_read=False,
+            is_new=True,
+        )
+        db.session.add(n)
+        db.session.commit()
+        nid = n.id
+    ack = client.post(f'/api/v1/alerts/{nid}/ack')
+    assert ack.status_code == 200
+    assert ack.get_json()['is_new'] is False
+    with app.app_context():
+        row = db.session.get(Notification, nid)
+        assert row.is_new is False
+        assert row.is_read is False
+    unack = client.post(f'/api/v1/alerts/{nid}/unack')
+    assert unack.status_code == 200
+    assert unack.get_json()['is_new'] is True
+    with app.app_context():
+        row = db.session.get(Notification, nid)
+        assert row.is_new is True
+        assert row.is_read is False
+
+
 def test_search_json_empty_query(app, client, user):
     login_client(client, app, user)
     resp = client.get('/api/v1/search')
@@ -348,6 +380,16 @@ def test_widget_shows_movies_alerts_and_does_not_persist_display(app, client, us
     assert group['expandable'] is True
     assert group['child_count'] == 2
     assert group['items']
+    assert group.get('is_new') is True
+    assert any(child.get('is_new') for child in group['items'])
+
+    inbox = client.get('/api/v1/widget?mode=inbox')
+    assert inbox.status_code == 200
+    inbox_body = inbox.get_json()
+    assert inbox_body['mode'] == 'inbox'
+    assert inbox_body['items']
+    assert all(item['kind'] != 'group' for item in inbox_body['items'])
+    assert all(item.get('is_new') for item in inbox_body['items'])
 
     with app.app_context():
         from services import view_prefs

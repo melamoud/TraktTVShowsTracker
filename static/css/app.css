@@ -60,9 +60,10 @@ a:hover { text-decoration: underline; }
 .topnav a.brand.active { color: var(--text); }
 .topnav a.brand.active span { color: var(--accent); }
 .badge {
-  display: inline-block; min-width: 1.2rem; padding: 0 .35rem;
+  display: inline-block; min-width: 1.2rem; padding: 0 .4rem;
   border-radius: 999px; background: var(--accent-2); color: #1a1200;
   font-size: .75rem; font-weight: 700; margin-left: .25rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .container { width: min(1200px, calc(100% - 2rem)); margin: 1.25rem auto 3rem; }
@@ -980,6 +981,56 @@ body.modal-open { overflow: hidden; }
   padding: .75rem .9rem;
   gap: .7rem;
 }
+.media-row.alert-row.is-new {
+  border: 3px solid #f0b429;
+  box-shadow: 0 0 0 1px #c49212, 0 0 16px rgba(240, 180, 41, 0.45);
+  background: rgba(240, 180, 41, 0.12);
+}
+.alert-group.is-new {
+  border: 3px solid #f0b429;
+  box-shadow: 0 0 0 1px #c49212, 0 0 16px rgba(240, 180, 41, 0.45);
+}
+.alert-group-head.is-new {
+  box-shadow: none;
+  background: transparent;
+}
+.alert-row.is-new .alert-title,
+.alert-group-head.is-new .alert-title {
+  background: #f0b429;
+  color: #1a1200;
+  padding: .28rem .55rem;
+  border-radius: 6px;
+  margin: 0 0 .4rem;
+}
+.alert-row.is-new .alert-title a,
+.alert-row.is-new .alert-title .alert-ep-code,
+.alert-row.is-new .alert-title .alert-ep-name,
+.alert-row.is-new .alert-title .alert-type,
+.alert-group-head.is-new .alert-title a,
+.alert-group-head.is-new .alert-title .alert-show-name,
+.alert-group-head.is-new .alert-title .alert-ep-code {
+  color: #1a1200;
+}
+.alert-row.is-new .alert-title .tag,
+.alert-group-head.is-new .alert-title .tag {
+  background: #1a1200;
+  color: #fde68a;
+  border-color: #1a1200;
+}
+.alert-inbox-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: .5rem .75rem;
+  margin: .35rem 0 .15rem;
+  padding: .55rem .75rem;
+  border-radius: 8px;
+  background: rgba(240, 180, 41, 0.12);
+  border: 1px solid rgba(240, 180, 41, 0.35);
+  color: #fde68a;
+  font-weight: 600;
+}
+.alert-inbox-banner form { margin: 0; }
 .media-list:has(.alert-row) { gap: .55rem; }
 .media-row.alert-row.no-poster { grid-template-columns: 1fr; }
 .alert-title {

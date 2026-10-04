@@ -559,3 +559,107 @@ def test_alerts_page_caches_poster_for_new_title(app, client, user):
     with app.app_context():
         media = CachedMedia.query.filter_by(media_type='movie', trakt_id=7701).one()
         assert media.poster_url == '/cache/posters/movie/7701'
+
+
+def test_alerts_inbox_is_ungrouped_new_only(app, client, user):
+    """Inbox shows the new child as a single row; the show group stays on All alerts."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=501, title='The Agency', year=2024,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=501, on_watchlist=True,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='New episode: The Agency',
+            message='S03E05 — Night Work · aired 2026-08-20',
+            media_type='show', trakt_id=501, payload_key='ep:3:5',
+            is_read=False, is_new=False, created_at=datetime(2026, 8, 20, 10, 0),
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='New episode: The Agency',
+            message='S03E06 — Aftermath · aired 2026-08-21',
+            media_type='show', trakt_id=501, payload_key='ep:3:6',
+            is_read=False, is_new=True, created_at=datetime(2026, 8, 21, 10, 0),
+        ))
+        db.session.commit()
+        new_id = Notification.query.filter_by(payload_key='ep:3:6').one().id
+
+    login_client(client, app, user)
+    all_html = client.get('/notifications?inbox=0').get_data(as_text=True)
+    assert 'alert-group' in all_html
+    assert 'S3E5' in all_html and 'S3E6' in all_html
+    assert 'is-new' in all_html
+    assert 'Ack' in all_html
+    assert 'tag found">New<' not in all_html
+
+    inbox_html = client.get('/notifications?inbox=1').get_data(as_text=True)
+    assert 'alert-group' not in inbox_html
+    assert 'S3E6' in inbox_html
+    assert 'S3E5' not in inbox_html
+    assert 'is-new' in inbox_html
+
+    ack = client.post(f'/notifications/{new_id}/ack')
+    assert ack.status_code in (200, 302)
+    after = client.get('/notifications?inbox=0').get_data(as_text=True)
+    assert 'S3E6' in after
+    assert 'alert-group' in after
+    inbox_after = client.get('/notifications?inbox=1').get_data(as_text=True)
+    assert 'S3E6' not in inbox_after
+
+
+def test_alerts_ack_all_clears_highlight_without_dismiss(app, client, user):
+    with app.app_context():
+        db.session.add(Notification(
+            user_id=user, alert_type='release_day',
+            title='Released: Other Film',
+            message='Movie release date was 2026-08-22.',
+            media_type='movie', trakt_id=88, is_read=False, is_new=True,
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=88, title='Other Film', year=2026,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    client.post('/notifications/ack-all')
+    html = client.get('/notifications?inbox=0&hide_read=1').get_data(as_text=True)
+    assert 'Other Film' in html
+    assert 'is-new' not in html
+    with app.app_context():
+        note = Notification.query.filter_by(user_id=user, trakt_id=88).one()
+        assert note.is_read is False
+        assert note.is_new is False
+    html = client.get('/notifications?inbox=0&hide_read=1').get_data(as_text=True)
+    assert 'Unack' in html
+    with app.app_context():
+        nid = Notification.query.filter_by(user_id=user, trakt_id=88).one().id
+    client.post(f'/notifications/{nid}/unack')
+    with app.app_context():
+        note = Notification.query.filter_by(user_id=user, trakt_id=88).one()
+        assert note.is_new is True
+        assert note.is_read is False
+    inbox = client.get('/notifications?inbox=1').get_data(as_text=True)
+    assert 'Other Film' in inbox
+    assert 'Ack' in inbox
+
+
+def test_alerts_nav_badge_is_new_over_unread(app, client, user):
+    with app.app_context():
+        db.session.add(Notification(
+            user_id=user, alert_type='release_day', title='New one',
+            message='x', media_type='movie', trakt_id=1, is_read=False, is_new=True,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='release_day', title='Old active',
+            message='y', media_type='movie', trakt_id=2, is_read=False, is_new=False,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'title="New / active"' in html
+    assert '>1/2</span>' in html
+    me = client.get('/api/v1/me').get_json()
+    assert me['user']['new_alerts'] == 1
+    assert me['user']['unread_alerts'] == 2

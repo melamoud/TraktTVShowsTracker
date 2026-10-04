@@ -3,6 +3,7 @@ package com.melamoud.tvtracker.ui.search
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.data.api.dto.PersonDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
@@ -45,7 +46,7 @@ data class SearchUiState(
 
 class SearchViewModel(
     private val repo: CatalogRepository,
-    private val onUnread: (Int) -> Unit,
+    private val onUnread: (AlertCounts) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(SearchUiState())
     val state: StateFlow<SearchUiState> = _state.asStateFlow()
@@ -269,7 +270,7 @@ class SearchViewModel(
         _state.value = _state.value.copy(watchConfirm = null)
         viewModelScope.launch {
             repo.watched(item.mediaType ?: "movie", item.traktId, !item.watched)
-            onUnread(repo.unreadAlerts())
+            onUnread(repo.alertCounts())
             search()
         }
     }
@@ -300,7 +301,7 @@ class SearchViewModel(
     }
 
     companion object {
-        fun factory(repo: CatalogRepository, onUnread: (Int) -> Unit) = object : ViewModelProvider.Factory {
+        fun factory(repo: CatalogRepository, onUnread: (AlertCounts) -> Unit) = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T = SearchViewModel(repo, onUnread) as T
         }

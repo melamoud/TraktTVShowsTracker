@@ -372,7 +372,7 @@ def mark_episode_alerts_read(
     )
     for note in notes:
         if _notification_payload_key(note) == payload:
-            note.is_read = True
+            dismiss_note(note)
             marked += 1
 
     season_notes = (
@@ -394,7 +394,7 @@ def mark_episode_alerts_read(
         if _season_drop_episodes_cleared(
             user.id, show_trakt_id, season, just_watched=(season, episode),
         ):
-            note.is_read = True
+            dismiss_note(note)
             marked += 1
 
     if marked:
@@ -431,13 +431,13 @@ def mark_season_alerts_read(user: User, show_trakt_id: int, season: int) -> int:
         if not key:
             continue
         if note.alert_type == ALERT_EPISODE_AIRED and key.startswith(prefix):
-            note.is_read = True
+            dismiss_note(note)
             marked += 1
         elif note.alert_type == ALERT_SEASON_AIRED and key == f'season:{season}':
-            note.is_read = True
+            dismiss_note(note)
             marked += 1
         elif note.alert_type == ALERT_SEASON_STREAMING and key == f'seasonstream:{season}':
-            note.is_read = True
+            dismiss_note(note)
             marked += 1
     if marked:
         try:
@@ -468,7 +468,7 @@ def mark_show_alerts_read(user: User, show_trakt_id: int) -> int:
     if not notes:
         return 0
     for note in notes:
-        note.is_read = True
+        dismiss_note(note)
     try:
         db.session.commit()
     except Exception as exc:
@@ -513,7 +513,7 @@ def mark_cached_watched_alerts_read(
         watched_keys = watched_keys_from_payload(load_progress_payload(user.id, trakt_id))
         for note in group:
             if finished:
-                note.is_read = True
+                dismiss_note(note)
                 marked += 1
                 continue
             payload = _notification_payload_key(note)
@@ -526,7 +526,7 @@ def mark_cached_watched_alerts_read(
                 except (TypeError, ValueError):
                     continue
                 if key in watched_keys:
-                    note.is_read = True
+                    dismiss_note(note)
                     marked += 1
             elif note.alert_type == ALERT_SEASON_AIRED and payload.startswith('season:'):
                 try:
@@ -534,7 +534,7 @@ def mark_cached_watched_alerts_read(
                 except (TypeError, ValueError):
                     continue
                 if _season_drop_watched(user.id, trakt_id, s_num, watched_keys):
-                    note.is_read = True
+                    dismiss_note(note)
                     marked += 1
             elif note.alert_type == ALERT_SEASON_STREAMING and payload.startswith('seasonstream:'):
                 try:
@@ -542,7 +542,7 @@ def mark_cached_watched_alerts_read(
                 except (TypeError, ValueError):
                     continue
                 if _season_already_watched(user.id, trakt_id, s_num):
-                    note.is_read = True
+                    dismiss_note(note)
                     marked += 1
     if marked:
         try:
@@ -571,7 +571,7 @@ def mark_movie_alerts_read(user: User, movie_trakt_id: int) -> int:
     if not notes:
         return 0
     for note in notes:
-        note.is_read = True
+        dismiss_note(note)
     try:
         db.session.commit()
     except Exception as exc:
@@ -667,7 +667,7 @@ def _mark_watched_alerts_read(user: User, *, rate_limited: bool = False) -> int:
         }
         for note in movie_notes:
             if note.trakt_id and int(note.trakt_id) in watched_ids:
-                note.is_read = True
+                dismiss_note(note)
                 marked += 1
 
     show_notes = (
@@ -729,7 +729,7 @@ def _mark_watched_alerts_read(user: User, *, rate_limited: bool = False) -> int:
                 except (TypeError, ValueError):
                     continue
                 if key in watched_keys:
-                    note.is_read = True
+                    dismiss_note(note)
                     marked += 1
             elif note.alert_type == ALERT_SEASON_AIRED and payload.startswith('season:'):
                 try:
@@ -737,7 +737,7 @@ def _mark_watched_alerts_read(user: User, *, rate_limited: bool = False) -> int:
                 except (TypeError, ValueError):
                     continue
                 if _season_drop_watched(user.id, trakt_id, s_num, watched_keys):
-                    note.is_read = True
+                    dismiss_note(note)
                     marked += 1
             elif note.alert_type == ALERT_SEASON_STREAMING and payload.startswith('seasonstream:'):
                 try:
@@ -745,7 +745,7 @@ def _mark_watched_alerts_read(user: User, *, rate_limited: bool = False) -> int:
                 except (TypeError, ValueError):
                     continue
                 if _season_already_watched(user.id, trakt_id, s_num):
-                    note.is_read = True
+                    dismiss_note(note)
                     marked += 1
     return marked
 
@@ -816,8 +816,35 @@ def _parse_air_date(value) -> date | None:
         return None
 
 
-def set_notification_read(user_id: int, row: Notification, is_read: bool) -> None:
-    """Mark one alert read/unread. Streaming cards for the same title stay in sync."""
+def dismiss_note(note: Notification) -> None:
+    """Hide from Alerts (Dismiss). Also acks so it does not stay in Inbox."""
+    note.is_read = True
+    note.is_new = False
+
+
+def new_alert_count(user_id: int) -> int:
+    """Unacked alerts that are still active (not dismissed)."""
+    return Notification.query.filter_by(
+        user_id=user_id, is_read=False, is_new=True,
+    ).count()
+
+
+def unread_alert_count(user_id: int) -> int:
+    """Active (not dismissed) alerts."""
+    return Notification.query.filter_by(
+        user_id=user_id, is_read=False,
+    ).count()
+
+
+def alert_badge_label(new_count: int, unread_count: int) -> str | None:
+    """Nav badge: new/unread, e.g. ``3/12``. Hidden when nothing is active."""
+    if unread_count <= 0:
+        return None
+    return f'{int(new_count)}/{int(unread_count)}'
+
+
+def _notification_sync_targets(user_id: int, row: Notification) -> list:
+    """Streaming cards for the same title stay in sync."""
     targets = [row]
     if (
         row.alert_type in (ALERT_NEW_STREAMING, ALERT_SEASON_STREAMING)
@@ -835,8 +862,39 @@ def set_notification_read(user_id: int, row: Notification, is_read: bool) -> Non
         siblings = q.all()
         if siblings:
             targets = siblings
-    for note in targets:
+    return targets
+
+
+def set_notification_read(user_id: int, row: Notification, is_read: bool) -> None:
+    """Mark one alert dismissed/restored. Streaming cards for the same title stay in sync."""
+    for note in _notification_sync_targets(user_id, row):
         note.is_read = is_read
+        if is_read:
+            note.is_new = False
+
+
+def ack_notification(user_id: int, row: Notification) -> None:
+    """Clear the new highlight; the alert stays in the list until Dismiss."""
+    _set_notification_new(user_id, row, False)
+
+
+def unack_notification(user_id: int, row: Notification) -> None:
+    """Put an active alert back in Inbox. Dismissed rows stay dismissed."""
+    _set_notification_new(user_id, row, True)
+
+
+def _set_notification_new(user_id: int, row: Notification, is_new: bool) -> None:
+    for note in _notification_sync_targets(user_id, row):
+        if is_new and note.is_read:
+            continue
+        note.is_new = is_new
+
+
+def ack_all_notifications(user_id: int) -> int:
+    """Ack every new alert for this user. Does not dismiss."""
+    return Notification.query.filter_by(user_id=user_id, is_new=True).update(
+        {'is_new': False},
+    )
 
 
 def notify_admins_new_user(new_user: User) -> int:
@@ -1011,6 +1069,7 @@ def _upsert_streaming_card(
         lead.payload_key = payload_key
         lead.link = link
         lead.is_read = False
+        lead.is_new = True
         lead.created_at = datetime.utcnow()
         for extra in notes[1:]:
             db.session.delete(extra)

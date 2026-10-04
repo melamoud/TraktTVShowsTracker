@@ -47,6 +47,25 @@ private class TrackerWidgetFactory(
         val child = item.kind == "child"
         views.setViewPadding(R.id.widget_row, if (child) 28 else 4, 4, 4, 4)
         views.setTextViewText(R.id.widget_row_title, item.title)
+        if (item.isNew) {
+            views.setInt(
+                R.id.widget_row,
+                "setBackgroundColor",
+                android.graphics.Color.rgb(0xF0, 0xB4, 0x29),
+            )
+            views.setTextColor(R.id.widget_row_title, android.graphics.Color.parseColor("#1A1200"))
+            views.setTextColor(R.id.widget_row_subtitle, android.graphics.Color.parseColor("#4A3A10"))
+        } else {
+            views.setInt(R.id.widget_row, "setBackgroundColor", android.graphics.Color.TRANSPARENT)
+            views.setTextColor(
+                R.id.widget_row_title,
+                androidx.core.content.ContextCompat.getColor(context, R.color.text_primary),
+            )
+            views.setTextColor(
+                R.id.widget_row_subtitle,
+                androidx.core.content.ContextCompat.getColor(context, R.color.text_muted),
+            )
+        }
         views.setTextViewText(R.id.widget_row_subtitle, item.subtitle.orEmpty())
         views.setViewVisibility(
             R.id.widget_row_subtitle,

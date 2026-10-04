@@ -3,33 +3,52 @@
 {% block content %}
 {% set q_hide = 1 if hide_read else 0 %}
 {% set q_group = 1 if group_shows else 0 %}
+{% set q_inbox = 1 if inbox else 0 %}
 <div class="toolbar">
   {% set heading = 'Alerts' %}
   {% set help_topic = 'release_alerts' %}
   {% include '_page_heading.html' %}
   <div class="pill-row">
+    {% if inbox %}
+      <span class="pill on" title="Only new (unacked) alerts, one row each">Inbox{% if new_count %} ({{ new_count }}){% endif %}</span>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=q_group, inbox=0) }}" title="Show the full Alerts list">All alerts</a>
+    {% else %}
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=q_group, inbox=1) }}" title="Show only new alerts as single rows">Inbox{% if new_count %} ({{ new_count }}){% endif %}</a>
+    {% endif %}
     {% if hide_read %}
       <span class="pill on" title="Active alerts stay brighter; dismissed rows are hidden">Hiding dismissed</span>
-      <a class="pill" href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group) }}" title="Show dismissed alerts (dimmed)">Show dismissed</a>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group, inbox=q_inbox) }}" title="Show dismissed alerts (dimmed)">Show dismissed</a>
     {% else %}
-      <a class="pill" href="{{ url_for('user.notifications', hide_read=1, sort=sort, group_shows=q_group) }}" title="Hide dismissed alerts">Hide dismissed</a>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=1, sort=sort, group_shows=q_group, inbox=q_inbox) }}" title="Hide dismissed alerts">Hide dismissed</a>
       <span class="pill on" title="Active alerts are brighter; dimmed rows were dismissed">Showing all</span>
     {% endif %}
     {% if sort == 'asc' %}
       <span class="pill on" title="Oldest alerts first (pinned titles still stay on top)">Oldest first</span>
-      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort='desc', group_shows=q_group) }}" title="Newest alerts first">Newest first</a>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort='desc', group_shows=q_group, inbox=q_inbox) }}" title="Newest alerts first">Newest first</a>
     {% else %}
       <span class="pill on" title="Newest alerts first (pinned titles still stay on top)">Newest first</span>
-      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort='asc', group_shows=q_group) }}" title="Oldest alerts first">Oldest first</a>
+      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort='asc', group_shows=q_group, inbox=q_inbox) }}" title="Oldest alerts first">Oldest first</a>
     {% endif %}
-    {% if group_shows %}
-      <span class="pill on" title="Multiple episode alerts for the same show are collapsed">Grouped by show</span>
-      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=0) }}" title="Show every alert as its own row">Ungroup</a>
-    {% else %}
-      <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=1) }}" title="Collapse a show’s episode alerts into one row">Group by show</a>
-      <span class="pill on">One row each</span>
+    {% if not inbox %}
+      {% if group_shows %}
+        <span class="pill on" title="Multiple episode alerts for the same show are collapsed">Grouped by show</span>
+        <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=0, inbox=q_inbox) }}" title="Show every alert as its own row">Ungroup</a>
+      {% else %}
+        <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=1, inbox=q_inbox) }}" title="Collapse a show’s episode alerts into one row">Group by show</a>
+        <span class="pill on">One row each</span>
+      {% endif %}
     {% endif %}
   </div>
+  {% if new_count and not inbox %}
+    <div class="alert-inbox-banner">
+      <span>{{ new_count }} new</span>
+      <form method="post" action="{{ url_for('user.notifications_ack_all') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-small btn-primary" type="submit" title="Drop the gold highlight on every new alert; they stay in this list">Ack all</button>
+      </form>
+      <a class="btn btn-small" href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=q_group, inbox=1) }}">Show inbox</a>
+    </div>
+  {% endif %}
   <div class="actions" style="margin:0;">
     {% if current_user.is_admin %}
       <form method="post" action="{{ url_for('admin.run_release_check') }}">
@@ -38,10 +57,16 @@
         <button class="btn btn-small btn-primary" type="submit">Run alert check now</button>
       </form>
     {% endif %}
+    {% if inbox and new_count %}
+      <form method="post" action="{{ url_for('user.notifications_ack_all') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-small btn-primary" type="submit" title="Drop the gold highlight on every new alert">Ack all ({{ new_count }})</button>
+      </form>
+    {% endif %}
     {% if unread_count %}
       <form method="post" action="{{ url_for('user.notifications_read_all') }}">
         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-        <button class="btn btn-small" type="submit" title="Clear every active alert from the badge (does not delete them or mark titles watched)">Dismiss all ({{ unread_count }})</button>
+        <button class="btn btn-small" type="submit" title="Hide every active alert (does not delete them or mark titles watched)">Dismiss all ({{ unread_count }})</button>
       </form>
     {% endif %}
   </div>
@@ -50,12 +75,12 @@
 <div class="media-list">
   {% for entry in entries %}
     {% if entry.kind == 'group' %}
-      <article class="alert-group {% if entry.alerts_pinned %}is-pinned{% endif %}"
+      <article class="alert-group {% if entry.alerts_pinned %}is-pinned{% endif %} {% if entry.new_count %}is-new{% endif %}"
                data-group-key="show-{{ entry.trakt_id }}"
                data-media-type="show"
                data-trakt-id="{{ entry.trakt_id }}"
                data-title="{{ entry.title|e }}">
-        <div class="media-row alert-row alert-group-head {% if entry.unread_count == 0 %}dimmed{% endif %}">
+        <div class="media-row alert-row alert-group-head {% if entry.unread_count == 0 %}dimmed{% endif %} {% if entry.new_count %}is-new{% endif %}">
           {% if entry.media %}
             <div class="media-poster-col">
               <span class="media-poster">
@@ -79,8 +104,11 @@
                 {% for code in entry.episode_codes %}
                   <span class="alert-ep-code">{{ code }}</span>
                 {% endfor %}
+                {% if entry.new_count %}
+                  <span class="tag found">{{ entry.new_count }} new</span>
+                {% endif %}
                 {% if entry.unread_count %}
-                  <span class="tag found">{{ entry.unread_count }} unread</span>
+                  <span class="tag found">{{ entry.unread_count }} active</span>
                 {% endif %}
               </span>
             </h2>
@@ -139,8 +167,10 @@
       {% include '_alert_card.html' %}
     {% endif %}
   {% else %}
-    {% if hide_read %}
-      <p class="muted">No active alerts.{% if unread_count == 0 %} <a href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group) }}">Show dismissed</a> to browse older ones.{% endif %}</p>
+    {% if inbox %}
+      <p class="muted">No new alerts. <a href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=q_group, inbox=0) }}">Show all alerts</a></p>
+    {% elif hide_read %}
+      <p class="muted">No active alerts.{% if unread_count == 0 %} <a href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group, inbox=q_inbox) }}">Show dismissed</a> to browse older ones.{% endif %}</p>
     {% else %}
       <p class="muted">No alerts yet.</p>
     {% endif %}

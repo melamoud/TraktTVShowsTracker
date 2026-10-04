@@ -84,6 +84,7 @@ def create_app(config_object=Config):
         from sqlalchemy.orm import joinedload
 
         unread = 0
+        alert_badge = None
         user_service_names = []
         found_on_service_choices = []
         found_on_service_urls = {}
@@ -91,11 +92,14 @@ def create_app(config_object=Config):
         show_prefs_reminder = False
         favorite_actors = []
         if getattr(current_user, 'is_authenticated', False):
-            from models import Notification, StreamingService, UserStreamingService
+            from models import StreamingService, UserStreamingService
             from services.cast_service import list_favorite_actors
             from services.found_on_links import service_link_maps
             from services.streaming_matcher import user_needs_prefs_reminder
-            unread = Notification.query.filter_by(user_id=current_user.id, is_read=False).count()
+            from services.alerts import alert_badge_label, new_alert_count, unread_alert_count
+            unread = unread_alert_count(current_user.id)
+            new_count = new_alert_count(current_user.id)
+            alert_badge = alert_badge_label(new_count, unread)
             owned = (
                 UserStreamingService.query
                 .options(joinedload(UserStreamingService.service))
@@ -119,6 +123,7 @@ def create_app(config_object=Config):
         return {
             'app_name': 'TraktTV Shows Tracker',
             'unread_notifications': unread,
+            'alert_badge': alert_badge,
             'user_streaming_service_names': user_service_names,
             'found_on_service_choices': found_on_service_choices,
             'found_on_service_urls': found_on_service_urls,
@@ -245,6 +250,8 @@ def _ensure_schema(app):
                  'ALTER TABLE notifications ADD COLUMN trakt_id INTEGER'),
                 ('payload_key',
                  'ALTER TABLE notifications ADD COLUMN payload_key VARCHAR(200)'),
+                ('is_new',
+                 'ALTER TABLE notifications ADD COLUMN is_new BOOLEAN DEFAULT 0 NOT NULL'),
             ):
                 if col not in ncols:
                     n_alters.append(ddl)

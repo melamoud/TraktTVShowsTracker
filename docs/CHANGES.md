@@ -1,5 +1,24 @@
 # Changes log
 
+## 2026-10-04 — New alerts use a gold frame (1.0.15)
+
+- Unacked alerts are a thick gold card frame plus a gold title bar (web and Android). The small “New” chip is gone
+- Widget Inbox/Alerts new rows use a solid gold background
+- Updated [Alerts](help/user/release_alerts.md), [Notifications](help/user/notifications.md), and [Android app](help/user/android.md)
+
+## 2026-10-04 — Alerts badge is new/unread; Unack (1.0.14)
+
+- Nav badge is **new/active** (`3/12`), not new-only. Same on the website and Android
+- **Unack** on an active acked alert puts it back in Inbox (web and app). No Unack-all
+- Updated [Alerts](help/user/release_alerts.md), [Notifications](help/user/notifications.md), and [Android app](help/user/android.md)
+
+## 2026-10-04 — Alerts Inbox and Ack (1.0.13)
+
+- New alerts stay in place with a gold highlight; **Ack** drops the highlight without hiding the card. **Inbox** filters to those gold rows only (ungrouped — a show group does not move)
+- Alerts that already existed are not marked new
+- Home-screen widget gains a fourth mode, **Inbox**, and gold-highlights new rows on the Alerts view
+- Updated [Alerts](help/user/release_alerts.md), [Notifications](help/user/notifications.md), [Android app](help/user/android.md), and [Overview](help/user/overview.md)
+
 ## 2026-10-04 — Write review loads again (Trakt comments URL)
 
 - Opening **Write review…** called `/users/me/comments/shows`, which Trakt now rejects with 400. The path is `/users/me/comments/all/shows` (same for movies and episodes)

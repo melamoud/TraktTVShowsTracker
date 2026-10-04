@@ -3,6 +3,7 @@ package com.melamoud.tvtracker.ui.detail
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.data.api.dto.CastMemberDto
 import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
@@ -38,7 +39,7 @@ class DetailViewModel(
     private val mediaType: String,
     private val traktId: Int,
     private val repo: CatalogRepository,
-    private val onUnread: (Int) -> Unit,
+    private val onUnread: (AlertCounts) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(DetailUiState())
     val state: StateFlow<DetailUiState> = _state.asStateFlow()
@@ -67,7 +68,7 @@ class DetailViewModel(
         _state.value = _state.value.copy(watchConfirm = false)
         viewModelScope.launch {
             repo.watched(mediaType, traktId, !current.watched)
-            onUnread(repo.unreadAlerts())
+            onUnread(repo.alertCounts())
             reload()
         }
     }
@@ -188,7 +189,7 @@ class DetailViewModel(
     }
 
     companion object {
-        fun factory(mediaType: String, traktId: Int, repo: CatalogRepository, onUnread: (Int) -> Unit) =
+        fun factory(mediaType: String, traktId: Int, repo: CatalogRepository, onUnread: (AlertCounts) -> Unit) =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =

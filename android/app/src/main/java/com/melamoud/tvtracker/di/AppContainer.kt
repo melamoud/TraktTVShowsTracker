@@ -10,6 +10,7 @@ import com.melamoud.tvtracker.data.api.PersistentCookieJar
 import com.melamoud.tvtracker.data.api.SessionCaptureInterceptor
 import com.melamoud.tvtracker.data.api.TvTrackerApi
 import com.melamoud.tvtracker.data.api.buildSslConfig
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.data.auth.SessionStore
 import com.melamoud.tvtracker.data.repo.AuthRepository
 import com.melamoud.tvtracker.data.repo.CatalogRepository
@@ -75,11 +76,14 @@ class AppContainer(context: Context) {
     val authRepository = AuthRepository(api, sessionStore, cookieJar)
     val catalogRepository = CatalogRepository(api)
 
-    private val _unreadAlerts = MutableStateFlow(0)
-    val unreadAlerts: StateFlow<Int> = _unreadAlerts.asStateFlow()
+    private val _alertCounts = MutableStateFlow(AlertCounts())
+    val alertCounts: StateFlow<AlertCounts> = _alertCounts.asStateFlow()
 
-    fun setUnreadAlerts(count: Int) {
-        _unreadAlerts.value = count.coerceAtLeast(0)
+    fun setAlertCounts(counts: AlertCounts) {
+        _alertCounts.value = AlertCounts(
+            newCount = counts.newCount.coerceAtLeast(0),
+            unreadCount = counts.unreadCount.coerceAtLeast(0),
+        )
     }
 
     private val _pendingActorSearch = MutableStateFlow<ActorSearchRequest?>(null)

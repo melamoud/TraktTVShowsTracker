@@ -8,12 +8,14 @@ import com.melamoud.tvtracker.data.api.dto.WidgetItemDto
 enum class WidgetMode(val api: String, val title: String) {
     SHOWS("shows", "Shows Progress"),
     MOVIES("movies", "Movies"),
-    ALERTS("alerts", "Alerts");
+    ALERTS("alerts", "Alerts"),
+    INBOX("inbox", "Inbox");
 
     fun next(): WidgetMode = when (this) {
         SHOWS -> MOVIES
         MOVIES -> ALERTS
-        ALERTS -> SHOWS
+        ALERTS -> INBOX
+        INBOX -> SHOWS
     }
 
     companion object {

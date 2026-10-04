@@ -1720,6 +1720,7 @@ def _merge_streaming_alert_cards(cards: list[dict]) -> list[dict]:
             lead['type_label'] = f"Now streaming on {' · '.join(vendors)}"
         lead['headline'] = ''
         lead['merged_ids'] = [c['n'].id for c in items]
+        lead['is_new'] = any(c.get('is_new') for c in items)
         out.append(lead)
     return out
 
@@ -1941,6 +1942,7 @@ def _group_alert_cards(cards: list[dict], *, group_shows: bool, sort: str) -> li
                 'alerts_pinned': bool(first.get('alerts_pinned')),
                 'episode_codes': _unread_episode_codes(items),
                 'unread_count': sum(1 for c in items if not c['n'].is_read),
+                'new_count': sum(1 for c in items if c.get('is_new')),
                 'cards': items,
             })
         else:
@@ -1991,9 +1993,14 @@ def _include_streaming_siblings(user_id, rows, pair_by_notif, title_to_pair):
     return rows, pair_by_notif
 
 
-def _collect_alert_cards() -> dict:
-    """Build Alerts page/API payload for the current user."""
+def _collect_alert_cards(*, force_inbox=None) -> dict:
+    """Build Alerts page/API payload for the current user.
+
+    ``force_inbox`` True/False skips the Inbox view pref (widget). None uses
+    the query arg / saved preference.
+    """
     from services import view_prefs
+    from services.alerts import new_alert_count
 
     hide_read = view_prefs.resolve_bool(
         current_user, 'alerts', 'hide_read', 'hide_read', default=True,
@@ -2005,10 +2012,19 @@ def _collect_alert_cards() -> dict:
     group_shows = view_prefs.resolve_bool(
         current_user, 'alerts', 'group_shows', 'group_shows', default=True,
     )
+    if force_inbox is None:
+        inbox = view_prefs.resolve_bool(
+            current_user, 'alerts', 'inbox', 'inbox', default=False,
+        )
+    else:
+        inbox = bool(force_inbox)
     q = Notification.query.filter_by(user_id=current_user.id)
     unread_count = q.filter_by(is_read=False).count()
+    new_count = new_alert_count(current_user.id)
     if hide_read:
         q = q.filter_by(is_read=False)
+    if inbox:
+        q = q.filter_by(is_new=True)
     time_order = (
         Notification.created_at.asc() if sort == 'asc'
         else Notification.created_at.desc()
@@ -2036,8 +2052,13 @@ def _collect_alert_cards() -> dict:
         unread_count = Notification.query.filter_by(
             user_id=current_user.id, is_read=False,
         ).count()
+        new_count = new_alert_count(current_user.id)
         if hide_read:
             rows = [n for n in rows if not n.is_read]
+            pair_by_notif = {n.id: pair_by_notif[n.id] for n in rows if n.id in pair_by_notif}
+            pairs = set(pair_by_notif.values())
+        if inbox:
+            rows = [n for n in rows if getattr(n, 'is_new', False)]
             pair_by_notif = {n.id: pair_by_notif[n.id] for n in rows if n.id in pair_by_notif}
             pairs = set(pair_by_notif.values())
     rows, pair_by_notif = _include_streaming_siblings(
@@ -2164,18 +2185,24 @@ def _collect_alert_cards() -> dict:
             ),
             'headline': copy['headline'],
             'alerts_pinned': bool(st and getattr(st, 'alerts_pinned', False)),
+            'is_new': bool(getattr(n, 'is_new', False) and not n.is_read),
         })
     cards.sort(key=lambda c: _alert_sort_key(c, sort))
     cards = _merge_streaming_alert_cards(cards)
     cards.sort(key=lambda c: _alert_sort_key(c, sort))
-    entries = _group_alert_cards(cards, group_shows=group_shows, sort=sort)
+    if inbox:
+        cards = [c for c in cards if c.get('is_new')]
+    display_group = False if inbox else group_shows
+    entries = _group_alert_cards(cards, group_shows=display_group, sort=sort)
     return {
         'cards': cards,
         'entries': entries,
         'unread_count': unread_count,
+        'new_count': new_count,
         'hide_read': hide_read,
         'sort': sort,
         'group_shows': group_shows,
+        'inbox': inbox,
     }
 
 
@@ -2189,17 +2216,30 @@ def notifications():
 @user_bp.route('/notifications/read-all', methods=['POST'])
 @login_required
 def notifications_read_all():
-    """Mark all notifications as read."""
-    Notification.query.filter_by(user_id=current_user.id, is_read=False).update({'is_read': True})
+    """Dismiss all active alerts."""
+    Notification.query.filter_by(user_id=current_user.id, is_read=False).update(
+        {'is_read': True, 'is_new': False},
+    )
     db.session.commit()
-    flash('All notifications marked read.', 'success')
+    flash('All alerts dismissed.', 'success')
+    return redirect(url_for('user.notifications'))
+
+
+@user_bp.route('/notifications/ack-all', methods=['POST'])
+@login_required
+def notifications_ack_all():
+    """Ack every new alert. They stay in the list without the gold highlight."""
+    from services.alerts import ack_all_notifications
+    ack_all_notifications(current_user.id)
+    db.session.commit()
+    flash('All new alerts acknowledged.', 'success')
     return redirect(url_for('user.notifications'))
 
 
 @user_bp.route('/notifications/<int:notif_id>/read', methods=['POST'])
 @login_required
 def notification_read(notif_id):
-    """Mark one notification as read; optionally open its link."""
+    """Mark one notification as dismissed; optionally open its link."""
     from services.alerts import set_notification_read
     row = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
     set_notification_read(current_user.id, row, True)
@@ -2209,10 +2249,32 @@ def notification_read(notif_id):
     return redirect(url_for('user.notifications'))
 
 
+@user_bp.route('/notifications/<int:notif_id>/ack', methods=['POST'])
+@login_required
+def notification_ack(notif_id):
+    """Clear the new highlight; the alert stays in the list."""
+    from services.alerts import ack_notification
+    row = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
+    ack_notification(current_user.id, row)
+    db.session.commit()
+    return redirect(url_for('user.notifications'))
+
+
+@user_bp.route('/notifications/<int:notif_id>/unack', methods=['POST'])
+@login_required
+def notification_unack(notif_id):
+    """Put this active alert back in Inbox."""
+    from services.alerts import unack_notification
+    row = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
+    unack_notification(current_user.id, row)
+    db.session.commit()
+    return redirect(url_for('user.notifications'))
+
+
 @user_bp.route('/notifications/<int:notif_id>/unread', methods=['POST'])
 @login_required
 def notification_unread(notif_id):
-    """Mark one notification as unread."""
+    """Restore a dismissed alert (does not put it back in Inbox)."""
     from services.alerts import set_notification_read
     row = Notification.query.filter_by(id=notif_id, user_id=current_user.id).first_or_404()
     set_notification_read(current_user.id, row, False)

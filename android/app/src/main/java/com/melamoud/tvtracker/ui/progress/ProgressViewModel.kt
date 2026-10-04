@@ -3,6 +3,7 @@ package com.melamoud.tvtracker.ui.progress
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.data.api.dto.EpisodeDto
 import com.melamoud.tvtracker.data.api.dto.ProgressResponse
 import com.melamoud.tvtracker.data.repo.CatalogRepository
@@ -22,7 +23,7 @@ data class ProgressUiState(
 class ProgressViewModel(
     private val traktId: Int,
     private val repo: CatalogRepository,
-    private val onUnread: (Int) -> Unit,
+    private val onUnread: (AlertCounts) -> Unit,
 ) : ViewModel() {
     private val _state = MutableStateFlow(ProgressUiState())
     val state: StateFlow<ProgressUiState> = _state.asStateFlow()
@@ -48,7 +49,7 @@ class ProgressViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = true)
             repo.episodeWatched(ids, traktId, season, ep.number, !ep.watched)
-            onUnread(repo.unreadAlerts())
+            onUnread(repo.alertCounts())
             _state.value = _state.value.copy(busy = false)
             reload()
         }
@@ -58,7 +59,7 @@ class ProgressViewModel(
         viewModelScope.launch {
             _state.value = _state.value.copy(busy = true)
             repo.seasonWatched(traktId, season, watched)
-            onUnread(repo.unreadAlerts())
+            onUnread(repo.alertCounts())
             _state.value = _state.value.copy(busy = false)
             reload()
         }
@@ -93,7 +94,7 @@ class ProgressViewModel(
     }
 
     companion object {
-        fun factory(traktId: Int, repo: CatalogRepository, onUnread: (Int) -> Unit) =
+        fun factory(traktId: Int, repo: CatalogRepository, onUnread: (AlertCounts) -> Unit) =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
                 override fun <T : ViewModel> create(modelClass: Class<T>): T =

@@ -3,6 +3,7 @@ package com.melamoud.tvtracker.ui.login
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.data.repo.AuthRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,7 @@ data class LoginUiState(
     val username: String? = null,
     val isAdmin: Boolean = false,
     val unreadAlerts: Int = 0,
+    val newAlerts: Int = 0,
 )
 
 class LoginViewModel(
@@ -52,6 +54,7 @@ class LoginViewModel(
                         username = it.username,
                         isAdmin = it.isAdmin,
                         unreadAlerts = it.unreadAlerts,
+                        newAlerts = it.newAlerts,
                     )
                 },
                 onFailure = { _state.value.copy(loading = false, error = it.message) },

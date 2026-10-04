@@ -25,7 +25,7 @@
     <a href="{{ url_for('catalog.search') }}" class="{% if ep == 'catalog.search' %}active{% endif %}"{% if ep == 'catalog.search' %} aria-current="page"{% endif %}
        title="Search Trakt for new titles (not your lists).">Search</a>
     <a href="{{ url_for('user.preferences') }}" class="{% if ep in ('user.preferences', 'user.preferences_setup') %}active{% endif %}"{% if ep in ('user.preferences', 'user.preferences_setup') %} aria-current="page"{% endif %}>Preferences</a>
-    <a href="{{ url_for('user.notifications') }}" class="{% if ep == 'user.notifications' %}active{% endif %}"{% if ep == 'user.notifications' %} aria-current="page"{% endif %}>Alerts{% if unread_notifications %}<span class="badge">{{ unread_notifications }}</span>{% endif %}</a>
+    <a href="{{ url_for('user.notifications') }}" class="{% if ep == 'user.notifications' %}active{% endif %}"{% if ep == 'user.notifications' %} aria-current="page"{% endif %}>Alerts{% if alert_badge %}<span class="badge" title="New / active">{{ alert_badge }}</span>{% endif %}</a>
     <a href="{{ url_for('user.help_page') }}" class="{% if ep == 'user.help_page' %}active{% endif %}"{% if ep == 'user.help_page' %} aria-current="page"{% endif %}>Help</a>
     {% if current_user.is_admin %}
       <a href="{{ url_for('admin.dashboard') }}" class="{% if ep.startswith('admin.') %}active{% endif %}"{% if ep.startswith('admin.') %} aria-current="page"{% endif %}>Admin</a>

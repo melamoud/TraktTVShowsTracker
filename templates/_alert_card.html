@@ -2,7 +2,7 @@
 {% set n = card.n %}
 {% set m = card.media %}
 {% set nested = nested|default(false) %}
-<article class="media-row alert-row {% if n.is_read %}dimmed{% endif %} {% if card.alerts_pinned %}is-pinned{% endif %} {% if nested %}alert-nested{% endif %}">
+<article class="media-row alert-row {% if n.is_read %}dimmed{% endif %} {% if card.alerts_pinned %}is-pinned{% endif %} {% if nested %}alert-nested{% endif %} {% if card.is_new %}is-new{% endif %}">
   {% if m and not nested %}
     <div class="media-poster-col">
       <a class="media-poster"
@@ -35,7 +35,7 @@
           <span class="alert-ep-name">{{ card.episode_name }}</span>
         {% endif %}
         <span class="alert-type">{{ card.type_label }}</span>
-        {% if not n.is_read %}<span class="tag found">Active</span>{% endif %}
+        {% if not n.is_read and not card.is_new %}<span class="tag found">Active</span>{% endif %}
       </span>
     </h2>
     {% set match = card.match %}
@@ -105,6 +105,17 @@
                   data-title="{{ (m.title if m else n.title)|e }}"
                   title="Keep this title’s alerts at the top">Pin</button>
         {% endif %}
+      {% endif %}
+      {% if card.is_new %}
+        <form method="post" action="{{ url_for('user.notification_ack', notif_id=n.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-small btn-primary" type="submit" title="Drop the gold highlight; this alert stays in the list">Ack</button>
+        </form>
+      {% elif not n.is_read %}
+        <form method="post" action="{{ url_for('user.notification_unack', notif_id=n.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <button class="btn btn-small" type="submit" title="Put this alert back in Inbox">Unack</button>
+        </form>
       {% endif %}
       {% if n.is_read %}
         <form method="post" action="{{ url_for('user.notification_unread', notif_id=n.id) }}">

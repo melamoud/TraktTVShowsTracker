@@ -104,13 +104,23 @@ interface TvTrackerApi {
         @Query("hide_read") hideRead: Int? = null,
         @Query("sort") sort: String? = null,
         @Query("group_shows") groupShows: Int? = null,
+        @Query("inbox") inbox: Int? = null,
     ): AlertsResponse
 
     @POST("/api/v1/alerts/read-all")
     suspend fun alertsReadAll(): SimpleResponse
 
+    @POST("/api/v1/alerts/ack-all")
+    suspend fun alertsAckAll(): SimpleResponse
+
     @POST("/api/v1/alerts/{id}/read")
     suspend fun alertRead(@Path("id") id: Int): SimpleResponse
+
+    @POST("/api/v1/alerts/{id}/ack")
+    suspend fun alertAck(@Path("id") id: Int): SimpleResponse
+
+    @POST("/api/v1/alerts/{id}/unack")
+    suspend fun alertUnack(@Path("id") id: Int): SimpleResponse
 
     @POST("/api/v1/alerts/{id}/unread")
     suspend fun alertUnread(@Path("id") id: Int): SimpleResponse
