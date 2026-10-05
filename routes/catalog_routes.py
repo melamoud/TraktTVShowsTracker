@@ -899,14 +899,20 @@ def _latest_visible_rows(
     hide_lists: bool = False,
     *,
     min_year: int | None = None,
+    include_reviewed: bool = False,
 ) -> tuple[list[dict], dict]:
     """
     Decorate feed rows and apply filters. Returns (rows, stats).
 
     Year is applied in SQL first so we do not decorate thousands of old stubs.
+    Unless the caller is showing reviewed history, the marker timestamp is
+    applied in SQL too (``trakt_listed_at >= marker``). Same-timestamp rows
+    under the marker stay in that result and are dropped in Python afterward.
+    Watched, lists, genres, and match filters still run on that smaller set.
     """
     from sqlalchemy import or_
 
+    from services.catalog_badges import limit_to_marker_timestamp
     from services.streaming_matcher import media_passes_discovery_year
 
     cached_total = feed_count(media_type)
@@ -917,6 +923,8 @@ def _latest_visible_rows(
             CachedMedia.year.is_(None),
             CachedMedia.year >= int(min_year),
         ))
+    if not include_reviewed:
+        query = limit_to_marker_timestamp(query, _marker(media_type))
     items = query.all()
     # released_at-only years (year NULL) still need the Python check.
     if min_year is not None:
@@ -1024,7 +1032,9 @@ def _latest_page_data(media_type: str) -> dict:
     from services.tmdb_client import is_configured as tmdb_is_configured
 
     rows_all, filter_stats = _latest_visible_rows(
-        media_type, hide_watched, match_only, hide_lists, min_year=min_year,
+        media_type, hide_watched, match_only, hide_lists,
+        min_year=min_year,
+        include_reviewed=show_reviewed,
     )
     from services.availability import filter_rows_by_avail, normalize_avail
 

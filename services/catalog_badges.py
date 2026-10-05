@@ -141,9 +141,23 @@ def _listed_ids(user_id: int, media_type: str, trakt_ids: list[int]) -> set[int]
     return {int(r[0]) for r in rows}
 
 
+def limit_to_marker_timestamp(query, marker):
+    """Keep rows with ``trakt_listed_at >=`` the marker timestamp.
+
+    Rows that share that timestamp and sort below the marker stay in the
+    result. Callers drop those in Python. No cutoff when the marker is missing.
+    Do not use this when the screen is showing reviewed (older) titles.
+    """
+    listed_at = getattr(marker, 'trakt_listed_at', None) if marker is not None else None
+    if listed_at is None:
+        return query
+    return query.filter(CachedMedia.trakt_listed_at >= listed_at)
+
+
 def _count_latest(user: User, media_type: str) -> dict[str, int | str] | None:
     """Latest pile: recent years + hide watched + hide personal lists + unreviewed."""
     min_year = discovery_year_cutoff()
+    marker = ReviewMarker.query.filter_by(user_id=user.id, media_type=media_type).first()
     query = (
         CachedMedia.query
         .filter_by(media_type=media_type, feed_source=_FEED_SOURCE)
@@ -156,6 +170,7 @@ def _count_latest(user: User, media_type: str) -> dict[str, int | str] | None:
             CachedMedia.id.desc(),
         )
     )
+    query = limit_to_marker_timestamp(query, marker)
     items = [m for m in query.all() if media_passes_discovery_year(m, min_year)]
     ids = [int(m.trakt_id) for m in items]
     watched = _watched_ids(user.id, media_type, ids)
@@ -170,14 +185,14 @@ def _count_latest(user: User, media_type: str) -> dict[str, int | str] | None:
             continue
         remaining.append(media)
 
-    marker = ReviewMarker.query.filter_by(user_id=user.id, media_type=media_type).first()
     if marker and remaining:
         marker_id = int(marker.trakt_id)
         marker_index = next(
             (i for i, m in enumerate(remaining) if int(m.trakt_id) == marker_id),
             None,
         )
-        # Marker missing from the pile (watched/listed/year) → leave undimmed.
+        # Same-timestamp rows at/under the marker are dropped here.
+        # If the marker title itself was filtered out, those ties stay.
         if marker_index is not None:
             remaining = remaining[:marker_index]
 

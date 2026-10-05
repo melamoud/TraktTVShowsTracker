@@ -94,6 +94,27 @@ def test_latest_marker_excludes_reviewed_from_y(app, user):
         assert row['label'] == '1/1'
 
 
+def test_latest_marker_same_timestamp_counts_only_rows_above(app, user):
+    """Badge uses the marker timestamp cutoff, then drops same-second rows under it."""
+    with app.app_context():
+        invalidate_catalog_badges()
+        _set_genres(user, ['Drama'])
+        ts = datetime(2026, 10, 4, 12, 0, 0)
+        db.session.add(_movie(1, title='Below Tie', listed=ts))
+        db.session.add(_movie(2, title='Marker', listed=ts))
+        db.session.add(_movie(3, title='Above Tie', genres=['Drama'], listed=ts))
+        db.session.add(_movie(4, title='Older', genres=['Drama'], listed=ts - timedelta(hours=1)))
+        db.session.add(_movie(5, title='Newer', genres=['Drama'], listed=ts + timedelta(hours=1)))
+        db.session.add(ReviewMarker(
+            user_id=user, media_type='movie', trakt_id=2,
+            trakt_listed_at=ts, title='Marker',
+        ))
+        db.session.commit()
+        row = catalog_nav_badges(_user(user))['latest_movies']
+        assert row['remaining'] == 2
+        assert row['matches'] == 2
+
+
 def test_latest_watched_and_lists_excluded_from_y(app, user):
     with app.app_context():
         invalidate_catalog_badges()
