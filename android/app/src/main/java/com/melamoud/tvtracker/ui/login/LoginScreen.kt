@@ -48,12 +48,12 @@ fun LoginScreen(
     onLoggedIn: (String, Boolean, AlertCounts) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    LaunchedEffect(state.loggedIn, state.username, state.isAdmin, state.unreadAlerts, state.newAlerts) {
+    LaunchedEffect(state.loggedIn, state.username, state.isAdmin, state.navCounts) {
         if (state.loggedIn) {
             onLoggedIn(
                 state.username.orEmpty(),
                 state.isAdmin,
-                AlertCounts(newCount = state.newAlerts, unreadCount = state.unreadAlerts),
+                state.navCounts,
             )
         }
     }

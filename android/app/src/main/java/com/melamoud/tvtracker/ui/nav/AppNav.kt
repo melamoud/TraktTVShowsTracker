@@ -170,6 +170,7 @@ fun AppNav(
                         ) {
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.latest_movies)) },
+                                trailingIcon = overflowBadge(alertCounts.latestMoviesBadge),
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("latest_movies") {
@@ -181,6 +182,7 @@ fun AppNav(
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.latest_shows)) },
+                                trailingIcon = overflowBadge(alertCounts.latestShowsBadge),
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("latest_shows") {
@@ -192,6 +194,7 @@ fun AppNav(
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.recommended_movies)) },
+                                trailingIcon = overflowBadge(alertCounts.recommendedMoviesBadge),
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("recommended_movies") {
@@ -203,6 +206,7 @@ fun AppNav(
                             )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.recommended_shows)) },
+                                trailingIcon = overflowBadge(alertCounts.recommendedShowsBadge),
                                 onClick = {
                                     menuOpen = false
                                     navController.navigate("recommended_shows") {
@@ -461,6 +465,11 @@ fun AppNav(
             }
         }
     }
+}
+
+private fun overflowBadge(label: String?): (@Composable () -> Unit)? {
+    if (label.isNullOrBlank()) return null
+    return { Badge { Text(label) } }
 }
 
 @Composable

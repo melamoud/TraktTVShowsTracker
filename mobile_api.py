@@ -98,7 +98,7 @@ from services.alerts import new_alert_count, unread_alert_count
 
 def _user_payload():
     unread = unread_alert_count(current_user.id)
-    return {
+    payload = {
         'id': current_user.id,
         'username': current_user.username,
         'is_admin': bool(getattr(current_user, 'is_admin', False)),
@@ -106,6 +106,12 @@ def _user_payload():
         'unread_alerts': unread,
         'new_alerts': new_alert_count(current_user.id),
     }
+    try:
+        from services.catalog_badges import catalog_badge_api_fields
+        payload.update(catalog_badge_api_fields(current_user))
+    except Exception:
+        current_app.logger.exception('Catalog badge fields for /me failed')
+    return payload
 
 
 def _start_user_session(user):

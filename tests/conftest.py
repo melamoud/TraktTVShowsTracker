@@ -63,6 +63,8 @@ def app():
         yield application
         db.session.remove()
         db.drop_all()
+        from services.catalog_badges import invalidate_catalog_badges
+        invalidate_catalog_badges()
 
 
 @pytest.fixture

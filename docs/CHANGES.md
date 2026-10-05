@@ -1,5 +1,13 @@
 # Changes log
 
+## 2026-10-04 — Latest / Recs nav badges (1.0.16)
+
+- Nav badges are **matches / remaining pile** (`3/12`), not matches-only and not the reviewed history
+- **Latest:** purple matches over unreviewed titles (above the review marker), after hide watched, hide personal lists, hidden genres, and recent years. Tooltip: Matches / unreviewed
+- **Recommended:** purple matches over remaining cached recs, after hide watched, hide lists including wishlist, and hidden genres. Tooltip: Matches / remaining. No badge until recs have been cached
+- Same counts on the website nav, Android ⋮ menu, and `/api/v1/me`
+- Updated [Latest movies](help/user/latest_movies.md), [Latest shows](help/user/latest_shows.md), [Recommended movies](help/user/recommended_movies.md), [Recommended shows](help/user/recommended_shows.md), [Overview](help/user/overview.md), and [Android app](help/user/android.md)
+
 ## 2026-10-04 — New alerts use a gold frame (1.0.15)
 
 - Unacked alerts are a thick gold card frame plus a gold title bar (web and Android). The small “New” chip is gone

@@ -80,9 +80,15 @@ class AppContainer(context: Context) {
     val alertCounts: StateFlow<AlertCounts> = _alertCounts.asStateFlow()
 
     fun setAlertCounts(counts: AlertCounts) {
+        val prev = _alertCounts.value
+        val takeCatalog = counts.fromMe
         _alertCounts.value = AlertCounts(
             newCount = counts.newCount.coerceAtLeast(0),
             unreadCount = counts.unreadCount.coerceAtLeast(0),
+            latestMoviesBadge = if (takeCatalog) counts.latestMoviesBadge else prev.latestMoviesBadge,
+            latestShowsBadge = if (takeCatalog) counts.latestShowsBadge else prev.latestShowsBadge,
+            recommendedMoviesBadge = if (takeCatalog) counts.recommendedMoviesBadge else prev.recommendedMoviesBadge,
+            recommendedShowsBadge = if (takeCatalog) counts.recommendedShowsBadge else prev.recommendedShowsBadge,
         )
     }
 

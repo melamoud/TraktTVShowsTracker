@@ -6,6 +6,7 @@ import com.melamoud.tvtracker.data.api.dto.ActionRequest
 import com.melamoud.tvtracker.data.api.dto.AdminSchedulerSaveRequest
 import com.melamoud.tvtracker.data.api.dto.AdminStreamingServiceActionRequest
 import com.melamoud.tvtracker.data.api.dto.AlertCounts
+import com.melamoud.tvtracker.data.api.dto.toAlertCounts
 import com.melamoud.tvtracker.data.api.dto.AlertsResponse
 import com.melamoud.tvtracker.data.api.dto.CommentResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
@@ -117,10 +118,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
     suspend fun alertCounts(): AlertCounts =
         runCatching {
             val user = api.me().user
-            AlertCounts(
-                newCount = user?.newAlerts ?: 0,
-                unreadCount = user?.unreadAlerts ?: 0,
-            )
+            user?.toAlertCounts() ?: AlertCounts()
         }.getOrDefault(AlertCounts())
 
     suspend fun alerts(

@@ -9,11 +9,37 @@ data class UserDto(
     @SerializedName("csrf_token") val csrfToken: String? = null,
     @SerializedName("unread_alerts") val unreadAlerts: Int = 0,
     @SerializedName("new_alerts") val newAlerts: Int = 0,
+    @SerializedName("latest_movies_matches") val latestMoviesMatches: Int = 0,
+    @SerializedName("latest_movies_remaining") val latestMoviesRemaining: Int = 0,
+    @SerializedName("latest_shows_matches") val latestShowsMatches: Int = 0,
+    @SerializedName("latest_shows_remaining") val latestShowsRemaining: Int = 0,
+    @SerializedName("recommended_movies_matches") val recommendedMoviesMatches: Int = 0,
+    @SerializedName("recommended_movies_remaining") val recommendedMoviesRemaining: Int = 0,
+    @SerializedName("recommended_shows_matches") val recommendedShowsMatches: Int = 0,
+    @SerializedName("recommended_shows_remaining") val recommendedShowsRemaining: Int = 0,
 )
 
 data class AlertCounts(
     val newCount: Int = 0,
     val unreadCount: Int = 0,
+    val latestMoviesBadge: String? = null,
+    val latestShowsBadge: String? = null,
+    val recommendedMoviesBadge: String? = null,
+    val recommendedShowsBadge: String? = null,
+    val fromMe: Boolean = false,
+)
+
+fun catalogBadgeLabel(matches: Int, remaining: Int): String? =
+    if (remaining > 0) "$matches/$remaining" else null
+
+fun UserDto.toAlertCounts() = AlertCounts(
+    newCount = newAlerts,
+    unreadCount = unreadAlerts,
+    latestMoviesBadge = catalogBadgeLabel(latestMoviesMatches, latestMoviesRemaining),
+    latestShowsBadge = catalogBadgeLabel(latestShowsMatches, latestShowsRemaining),
+    recommendedMoviesBadge = catalogBadgeLabel(recommendedMoviesMatches, recommendedMoviesRemaining),
+    recommendedShowsBadge = catalogBadgeLabel(recommendedShowsMatches, recommendedShowsRemaining),
+    fromMe = true,
 )
 
 data class SimpleResponse(

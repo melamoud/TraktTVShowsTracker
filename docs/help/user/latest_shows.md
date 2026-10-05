@@ -1,6 +1,6 @@
 # Latest shows
 
-Same idea as [Latest movies](latest_movies): Trakt `/shows/updates` — recently added/changed **in Trakt’s database**, not airdate calendars. Same lazy sync and defaults (**recent years** + **Matches only** + **Hide list titles**).
+Same idea as [Latest movies](latest_movies): Trakt `/shows/updates` — recently added/changed **in Trakt’s database**, not airdate calendars. Same lazy sync and defaults (**recent years** + **Matches only** + **Hide list titles**). The nav badge is **matches / unreviewed**, the same remaining pile as Latest movies.
 
 Defaults to **Matches only** (purple genres/keywords). Use **Show all** for the full noisy feed. Titles already saved to your personal Trakt lists are hidden by default; use **Show list titles** to see them. Genres you **hide** in Preferences stay off this page even on Show all. Cards have a **Hide recommendation** button (Trakt “Not interested”) that removes the title from future Trakt recommendations even if it is not on the Recs page; the title stays in Latest until it pages out naturally.
 

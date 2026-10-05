@@ -2,6 +2,8 @@
 
 Personalized series picks from Trakt — the same Recommendations feed as on Trakt.tv.
 
+The nav badge is **matches / remaining**, the same remaining cached pile as [Recommended movies](recommended_movies). It stays hidden until this account has a recommendations cache.
+
 ## Source
 
 Uses Trakt’s `/recommendations/shows` API (requires your Trakt login).

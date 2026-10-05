@@ -2,6 +2,8 @@
 
 Shows titles recently **added or changed in Trakt’s database**, newest Trakt activity first.
 
+The nav badge is **matches / unreviewed** (e.g. `3/12`): purple preference matches over the remaining Latest pile. It follows hide watched, hide list titles, hidden genres, recent years, and the review marker (only titles *above* the marker). It does **not** shrink when you toggle All titles, genre/keyword filters, availability chips, or title search.
+
 ## Matches only + recent years (defaults)
 
 Trakt can add **hundreds of updates per day**, and most are **metadata edits on old titles** — Trakt has **no** “first inserted” flag.

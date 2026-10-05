@@ -85,6 +85,10 @@ def create_app(config_object=Config):
 
         unread = 0
         alert_badge = None
+        latest_movies_badge = None
+        latest_shows_badge = None
+        recommended_movies_badge = None
+        recommended_shows_badge = None
         user_service_names = []
         found_on_service_choices = []
         found_on_service_urls = {}
@@ -100,6 +104,15 @@ def create_app(config_object=Config):
             unread = unread_alert_count(current_user.id)
             new_count = new_alert_count(current_user.id)
             alert_badge = alert_badge_label(new_count, unread)
+            try:
+                from services.catalog_badges import catalog_badge_labels
+                labels = catalog_badge_labels(current_user)
+                latest_movies_badge = labels.get('latest_movies_badge')
+                latest_shows_badge = labels.get('latest_shows_badge')
+                recommended_movies_badge = labels.get('recommended_movies_badge')
+                recommended_shows_badge = labels.get('recommended_shows_badge')
+            except Exception:
+                app.logger.exception('Catalog nav badges failed')
             owned = (
                 UserStreamingService.query
                 .options(joinedload(UserStreamingService.service))
@@ -124,6 +137,10 @@ def create_app(config_object=Config):
             'app_name': 'TraktTV Shows Tracker',
             'unread_notifications': unread,
             'alert_badge': alert_badge,
+            'latest_movies_badge': latest_movies_badge,
+            'latest_shows_badge': latest_shows_badge,
+            'recommended_movies_badge': recommended_movies_badge,
+            'recommended_shows_badge': recommended_shows_badge,
             'user_streaming_service_names': user_service_names,
             'found_on_service_choices': found_on_service_choices,
             'found_on_service_urls': found_on_service_urls,

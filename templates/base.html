@@ -16,10 +16,10 @@
   {% set ep = request.endpoint or '' %}
   <nav class="topnav" aria-label="Main">
     <a class="brand{% if ep == 'catalog.home' %} active{% endif %}" href="{{ url_for('catalog.home') }}">TraktTV <span>Shows Tracker</span></a>
-    <a href="{{ url_for('catalog.latest_movies') }}" class="{% if ep == 'catalog.latest_movies' %}active{% endif %}"{% if ep == 'catalog.latest_movies' %} aria-current="page"{% endif %}>Latest movies</a>
-    <a href="{{ url_for('catalog.latest_shows') }}" class="{% if ep == 'catalog.latest_shows' %}active{% endif %}"{% if ep == 'catalog.latest_shows' %} aria-current="page"{% endif %}>Latest shows</a>
-    <a href="{{ url_for('catalog.recommended_movies') }}" class="{% if ep == 'catalog.recommended_movies' %}active{% endif %}"{% if ep == 'catalog.recommended_movies' %} aria-current="page"{% endif %}>Rec movies</a>
-    <a href="{{ url_for('catalog.recommended_shows') }}" class="{% if ep == 'catalog.recommended_shows' %}active{% endif %}"{% if ep == 'catalog.recommended_shows' %} aria-current="page"{% endif %}>Rec shows</a>
+    <a href="{{ url_for('catalog.latest_movies') }}" class="{% if ep == 'catalog.latest_movies' %}active{% endif %}"{% if ep == 'catalog.latest_movies' %} aria-current="page"{% endif %}>Latest movies{% if latest_movies_badge %}<span class="badge" title="Matches / unreviewed">{{ latest_movies_badge }}</span>{% endif %}</a>
+    <a href="{{ url_for('catalog.latest_shows') }}" class="{% if ep == 'catalog.latest_shows' %}active{% endif %}"{% if ep == 'catalog.latest_shows' %} aria-current="page"{% endif %}>Latest shows{% if latest_shows_badge %}<span class="badge" title="Matches / unreviewed">{{ latest_shows_badge }}</span>{% endif %}</a>
+    <a href="{{ url_for('catalog.recommended_movies') }}" class="{% if ep == 'catalog.recommended_movies' %}active{% endif %}"{% if ep == 'catalog.recommended_movies' %} aria-current="page"{% endif %}>Rec movies{% if recommended_movies_badge %}<span class="badge" title="Matches / remaining">{{ recommended_movies_badge }}</span>{% endif %}</a>
+    <a href="{{ url_for('catalog.recommended_shows') }}" class="{% if ep == 'catalog.recommended_shows' %}active{% endif %}"{% if ep == 'catalog.recommended_shows' %} aria-current="page"{% endif %}>Rec shows{% if recommended_shows_badge %}<span class="badge" title="Matches / remaining">{{ recommended_shows_badge }}</span>{% endif %}</a>
     <a href="{{ url_for('user.my_movies') }}" class="{% if ep == 'user.my_movies' %}active{% endif %}"{% if ep == 'user.my_movies' %} aria-current="page"{% endif %}>My movies</a>
     <a href="{{ url_for('user.my_shows') }}" class="{% if ep in ('user.my_shows', 'user.series_progress') %}active{% endif %}"{% if ep in ('user.my_shows', 'user.series_progress') %} aria-current="page"{% endif %}>My shows</a>
     <a href="{{ url_for('catalog.search') }}" class="{% if ep == 'catalog.search' %}active{% endif %}"{% if ep == 'catalog.search' %} aria-current="page"{% endif %}

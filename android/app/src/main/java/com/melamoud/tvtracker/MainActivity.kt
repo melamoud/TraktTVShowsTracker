@@ -14,6 +14,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.core.view.WindowCompat
 import com.melamoud.tvtracker.data.api.dto.AlertCounts
+import com.melamoud.tvtracker.data.api.dto.toAlertCounts
 import com.melamoud.tvtracker.ui.nav.AppNav
 import com.melamoud.tvtracker.ui.theme.TvTrackerTheme
 import com.melamoud.tvtracker.widget.TrackerWidgetProvider
@@ -42,12 +43,7 @@ class MainActivity : ComponentActivity() {
                     loggedIn = user != null
                     username = user?.username
                     isAdmin = user?.isAdmin ?: false
-                    container.setAlertCounts(
-                        AlertCounts(
-                            newCount = user?.newAlerts ?: 0,
-                            unreadCount = user?.unreadAlerts ?: 0,
-                        ),
-                    )
+                    container.setAlertCounts(user?.toAlertCounts() ?: AlertCounts())
                     if (user != null) TrackerWidgetProvider.requestRefresh(this@MainActivity)
                     checking = false
                 }
@@ -74,7 +70,7 @@ class MainActivity : ComponentActivity() {
                                 loggedIn = false
                                 username = null
                                 isAdmin = false
-                                container.setAlertCounts(AlertCounts())
+                                container.setAlertCounts(AlertCounts(fromMe = true))
                             }
                         },
                     )

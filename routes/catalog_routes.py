@@ -255,6 +255,15 @@ def _list_names_map(media_type: str, trakt_ids: list[int]) -> dict[int, list[str
     return out
 
 
+def _invalidate_catalog_badges() -> None:
+    """Drop the inject TTL so Latest/Recs nav badges recompute after pile changes."""
+    try:
+        from services.catalog_badges import invalidate_catalog_badges
+        invalidate_catalog_badges(current_user.id)
+    except Exception:
+        pass
+
+
 def _marker(media_type: str) -> ReviewMarker | None:
     """Return the user's review marker for a catalog page."""
     return ReviewMarker.query.filter_by(user_id=current_user.id, media_type=media_type).first()
@@ -693,6 +702,7 @@ def _recommendations_page_data(media_type: str) -> dict:
             save_recommendations_cache,
         )
         payload = None
+        recs_cache_wrote = False
         if not force_recs:
             payload = load_recommendations_cache(
                 current_user.id, media_type, genre_filter,
@@ -712,6 +722,7 @@ def _recommendations_page_data(media_type: str) -> dict:
             save_recommendations_cache(
                 current_user.id, media_type, genre_filter, payload or [],
             )
+            recs_cache_wrote = True
             log_cache_event(
                 'recs', 'fetch', user=current_user, item=recs_item,
                 reason='force' if force_recs else 'stale', calls=span(),
@@ -723,6 +734,8 @@ def _recommendations_page_data(media_type: str) -> dict:
             if row:
                 items.append(row)
         db.session.commit()
+        if recs_cache_wrote:
+            _invalidate_catalog_badges()
     except Exception as exc:
         fetch_error = str(exc)
         current_app.logger.warning('Recommendations fetch failed: %s', exc)
@@ -1743,6 +1756,7 @@ def api_review_marker(media_type, trakt_id):
         marker.title = media.title
         marker.created_at = datetime.utcnow()
     db.session.commit()
+    _invalidate_catalog_badges()
     return jsonify({'success': True, 'title': media.title, 'listed_at': media.trakt_listed_at.isoformat()})
 
 
@@ -1760,6 +1774,7 @@ def api_review_marker_clear(media_type):
             db.session.delete(row)
             deleted += 1
     db.session.commit()
+    _invalidate_catalog_badges()
     return jsonify({'success': True, 'deleted': deleted})
 
 
@@ -1798,6 +1813,7 @@ def api_review_marker_caught_up(media_type):
             marker.created_at = datetime.utcnow()
         results[mt] = {'title': newest.title, 'trakt_id': newest.trakt_id}
     db.session.commit()
+    _invalidate_catalog_badges()
     return jsonify({'success': True, 'markers': results})
 
 
@@ -1852,6 +1868,7 @@ def api_hide_recommendation(media_type, trakt_id):
             from services.trakt_cache import drop_recommendation_from_cache
             drop_recommendation_from_cache(current_user.id, media_type, trakt_id)
             db.session.commit()
+            _invalidate_catalog_badges()
         except Exception:
             db.session.rollback()
         return jsonify({'success': True, 'hidden': True, 'trakt_id': int(trakt_id)})

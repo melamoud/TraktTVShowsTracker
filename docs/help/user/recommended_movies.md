@@ -2,6 +2,8 @@
 
 Personalized movie picks from Trakt — the same Recommendations feed as on Trakt.tv.
 
+The nav badge is **matches / remaining** (e.g. `3/12`): purple preference matches over cached recs after hide watched, hide wishlist / titles already on your lists, and hidden genres. Genre tabs, Matches only, availability chips, and title search do not change the badge. If recommendations have not been cached yet, the badge is hidden.
+
 ## Source
 
 Uses Trakt’s `/recommendations/movies` API (requires your Trakt login). Results are ordered by Trakt’s recommendation ranking.
