@@ -19,10 +19,28 @@ DEFAULT_STREAMING_SERVICES = [
 ]
 
 COMMON_GENRES = [
-    'action', 'adventure', 'animation', 'comedy', 'crime', 'documentary',
+    'action', 'adventure', 'animation', 'anime', 'comedy', 'crime', 'documentary',
     'drama', 'family', 'fantasy', 'history', 'horror', 'music', 'mystery',
     'romance', 'science fiction', 'thriller', 'war', 'western', 'reality',
 ]
+
+
+def extra_genre_terms(selected, choices=None) -> list[str]:
+    """Saved genres that are not checkbox labels.
+
+    Match is exact and case-insensitive, so ``anime`` is not ``animation``.
+    """
+    known = {str(g).casefold() for g in (COMMON_GENRES if choices is None else choices)}
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in selected or []:
+        term = str(raw).strip()
+        key = term.casefold()
+        if not key or key in known or key in seen:
+            continue
+        seen.add(key)
+        out.append(term)
+    return out
 
 
 def seed_default_streaming_services() -> int:

@@ -23,7 +23,7 @@
       {% endfor %}
     </div>
     <label style="margin-top:.75rem;">Extra genres (comma-separated)
-      <input type="text" name="genres" placeholder="noir, true crime">
+      <input type="text" name="genres" value="{{ extra_genres_text|default('') }}" placeholder="noir, true crime">
     </label>
   </section>
 

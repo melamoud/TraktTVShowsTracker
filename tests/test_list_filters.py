@@ -38,6 +38,7 @@ def test_parse_genre_filters_or_labels():
 
 def test_normalize_genre_label():
     assert normalize_genre_label('Science Fiction') == 'science fiction'
+    assert normalize_genre_label('anime') == 'anime'
     assert normalize_genre_label('unknown-genre') is None
 
 

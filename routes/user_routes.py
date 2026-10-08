@@ -67,7 +67,7 @@ from models import (
 )
 from services import trakt_client
 from services.alerts import STREAMING_OFFER_TYPES, _STREAM_ADDED_DATE_RE
-from services.seed import COMMON_GENRES
+from services.seed import COMMON_GENRES, extra_genre_terms
 from services.streaming_matcher import (
     WATCHLIST_LIST_ID,
     filter_visible_list_ids,
@@ -165,6 +165,7 @@ def preferences_setup():
         user_genres=user_genres,
         user_keywords=user_keywords,
         keywords_text=', '.join(user_keywords),
+        extra_genres_text=', '.join(extra_genre_terms(user_genres)),
     )
 
 
@@ -426,6 +427,8 @@ def preferences():
         user_genres=user_genres,
         user_keywords=user_keywords,
         user_excluded_genres=user_excluded_genres,
+        extra_genres_text=', '.join(extra_genre_terms(user_genres)),
+        extra_excluded_text=', '.join(extra_genre_terms(user_excluded_genres)),
         keywords_text=', '.join(user_keywords),
         marker_prompt=marker_prompt,
         markers=markers,

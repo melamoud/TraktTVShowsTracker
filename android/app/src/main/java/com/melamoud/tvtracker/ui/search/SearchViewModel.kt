@@ -22,7 +22,7 @@ data class SearchUiState(
     val year: String = "",
     val genres: Set<String> = emptySet(),
     val genreChoices: List<String> = listOf(
-        "action", "adventure", "animation", "comedy", "crime", "documentary",
+        "action", "adventure", "animation", "anime", "comedy", "crime", "documentary",
         "drama", "family", "fantasy", "history", "horror", "music", "mystery",
         "romance", "science fiction", "thriller", "war", "western", "reality",
     ),

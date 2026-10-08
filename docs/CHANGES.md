@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-10-08 — Anime is its own hide genre (1.0.17)
+
+- **Anime** is a separate genre from **animation**. Hiding animation no longer stands in for anime, and adding anime does not clear animation
+- Extra genres typed on Preferences stay in the box after save, so a later save does not drop them
+- Updated [Preferences](help/user/preferences.md)
+
 ## 2026-10-04 — Latest marker loads only newer titles
 
 - Setting a review marker no longer rebuilds the whole Latest feed. Website, Android, and nav badges load titles at or newer than the marker timestamp; same-second titles under the marker are still dropped afterward

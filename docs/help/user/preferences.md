@@ -52,6 +52,8 @@ These drive the purple **Preference match** highlight and the default Latest **M
 
 A reverse of the list above. Checked genres are **never** shown on **Latest** or **Recommended** movies/shows, and they **never** get in-app alerts — even if the title also matches a liked genre, a keyword, or a favorite actor. Example: hide **animation**, and a new drama with a favorite actor that is also tagged animation stays off those pages and does not alert.
 
+**Anime** is its own genre, separate from **animation**. Hiding animation does not hide anime shows (and the other way around). Check **anime** to keep those off Latest, Recommendations, and alerts. Genres you type in the extra box stay listed there after you save.
+
 If you check the same genre in both lists, **hide wins** (it is dropped from “genres you care about” on save). My lists, Search, and title pages are unchanged so you can still open something you already saved.
 
 Does not apply to titles with no cached genres yet (nothing to hide on).

@@ -90,6 +90,64 @@ def test_latest_show_all_hides_excluded_genre(app, client, user):
     assert 'Drawn Drama' not in html
 
 
+def test_extra_genre_terms_keeps_anime_distinct_from_animation():
+    """'anime' must not be treated as the 'animation' checkbox."""
+    from services.seed import extra_genre_terms
+    assert extra_genre_terms(['animation', 'anime', 'kids'], ['animation']) == ['anime', 'kids']
+    assert extra_genre_terms(['animation', 'Anime']) == []
+
+
+def test_prefs_page_shows_anime_checkbox_without_clearing_animation(app, client, user):
+    """Saved anime and animation both stay checked; adding anime does not drop animation."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).first()
+        prefs.excluded_genres_json = '["animation"]'
+        db.session.commit()
+
+    login_client(client, app, user)
+    resp = client.post(
+        '/preferences',
+        data={
+            'exclude_genre_checks': ['animation', 'anime'],
+        },
+        follow_redirects=True,
+    )
+    html = resp.data.decode('utf-8')
+    assert 'value="anime"' in html
+    assert 'value="animation"' in html
+    # Both boxes stay checked (anime is not a rewrite of animation).
+    assert 'value="anime" checked' in html or 'value="anime"  checked' in html
+    assert 'value="animation" checked' in html or 'value="animation"  checked' in html
+    with app.app_context():
+        import json
+        hidden = [x.lower() for x in json.loads(
+            UserPreference.query.filter_by(user_id=user).one().excluded_genres_json or '[]'
+        )]
+        assert 'anime' in hidden
+        assert 'animation' in hidden
+
+
+def test_latest_hides_anime_but_not_other_animation(app, client, user):
+    """Hiding anime drops anime-tagged titles and leaves animation-only titles."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).first()
+        prefs.excluded_genres_json = '["anime"]'
+        db.session.add(_add_movie('One Piece Movie', 1, datetime(2026, 8, 3), genres=['anime', 'action']))
+        db.session.add(_add_movie('Bluey Movie', 2, datetime(2026, 8, 2), genres=['animation', 'family']))
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.catalog_routes.feed_count', return_value=2), patch(
+        'routes.catalog_routes.ensure_catalog_through_marker'
+    ), patch('routes.catalog_routes.catalog_has_more_older', return_value=False), patch(
+        'services.sync_jobs.enrich_media_list_for_display'
+    ):
+        resp = client.get('/latest/movies?match_only=0')
+    html = resp.data.decode('utf-8')
+    assert 'Bluey Movie' in html
+    assert 'One Piece Movie' not in html
+
+
 def test_prefs_save_excluded_genre_wins_overlap(app, client, user):
     """A genre in both lists is kept only on the hide list."""
     login_client(client, app, user)

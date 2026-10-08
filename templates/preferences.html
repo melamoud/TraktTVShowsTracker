@@ -97,33 +97,35 @@
 
   <section>
     <h2 title="Used for purple matches and Latest Matches only">Genres you care about</h2>
+    {% set liked_fold = user_genres|map('lower')|list %}
     <div class="checks">
       {% for g in common_genres %}
         <label>
-          <input type="checkbox" name="genre_checks" value="{{ g }}" {% if g in user_genres %}checked{% endif %}>
+          <input type="checkbox" name="genre_checks" value="{{ g }}" {% if g|lower in liked_fold %}checked{% endif %}>
           {{ g }}
         </label>
       {% endfor %}
     </div>
     <label style="margin-top:.75rem;">Extra genres (comma-separated)
-      <input type="text" name="genres" placeholder="noir, true crime">
+      <input type="text" name="genres" value="{{ extra_genres_text|default('') }}" placeholder="noir, true crime">
     </label>
   </section>
 
   <section>
     {% set user_excluded_genres = user_excluded_genres|default([]) %}
     <h2 title="Hidden on Latest, Recommendations, and alerts — even when a title matches liked genres, keywords, or a favorite actor">Hide these genres</h2>
-    <p class="meta">Wins over everything else. A drama with a favorite actor that is also animation stays off Latest, Recs, and alerts if you hide animation.</p>
+    <p class="meta">Wins over everything else. Anime and animation are separate: hiding animation still leaves anime shows on Latest. Check <strong>anime</strong> to hide those.</p>
+    {% set excluded_fold = user_excluded_genres|map('lower')|list %}
     <div class="checks">
       {% for g in common_genres %}
         <label>
-          <input type="checkbox" name="exclude_genre_checks" value="{{ g }}" {% if g in user_excluded_genres %}checked{% endif %}>
+          <input type="checkbox" name="exclude_genre_checks" value="{{ g }}" {% if g|lower in excluded_fold %}checked{% endif %}>
           {{ g }}
         </label>
       {% endfor %}
     </div>
     <label style="margin-top:.75rem;">Extra genres to hide (comma-separated)
-      <input type="text" name="exclude_genres" placeholder="anime, kids">
+      <input type="text" name="exclude_genres" value="{{ extra_excluded_text|default('') }}" placeholder="kids, donghua">
     </label>
   </section>
 
