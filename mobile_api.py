@@ -934,7 +934,57 @@ def api_preferences_save():
     prefs.updated_at = datetime.utcnow()
     db.session.commit()
     db.session.expire(current_user)
+    try:
+        from services.external_calendar import sync_external_calendar_quietly
+        sync_external_calendar_quietly(current_user)
+    except Exception:
+        current_app.logger.exception('Calendar sync after mobile preferences save failed')
 
+    return jsonify({'success': True})
+
+
+@mobile_api_bp.route('/google-calendar', methods=['GET'])
+@login_required
+def api_google_calendar():
+    """Connected Google account, chosen calendar, and writable calendars."""
+    from services.external_calendar import calendar_settings
+    payload = calendar_settings(current_user)
+    payload['success'] = True
+    return jsonify(payload)
+
+
+@mobile_api_bp.route('/google-calendar/connect', methods=['POST'])
+@login_required
+def api_google_calendar_connect():
+    """Return the Google account-chooser URL for the Android custom tab."""
+    from services.google_calendar import GoogleCalendarError, begin_oauth
+    try:
+        url = begin_oauth(current_user.id, 'android')
+    except GoogleCalendarError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'success': True, 'authorize_url': url})
+
+
+@mobile_api_bp.route('/google-calendar/select', methods=['POST'])
+@login_required
+def api_google_calendar_select():
+    """Save the calendar id and sync meetings for known dates."""
+    from services.external_calendar import select_google_calendar
+    from services.google_calendar import GoogleCalendarError
+    calendar_id = (_json_body().get('calendar_id') or '').strip()
+    try:
+        name = select_google_calendar(current_user, calendar_id)
+    except GoogleCalendarError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'success': True, 'calendar_name': name})
+
+
+@mobile_api_bp.route('/google-calendar/disconnect', methods=['POST'])
+@login_required
+def api_google_calendar_disconnect():
+    """Disconnect Google Calendar and remove upcoming meetings this app created."""
+    from services.external_calendar import disconnect_google_calendar
+    disconnect_google_calendar(current_user)
     return jsonify({'success': True})
 
 

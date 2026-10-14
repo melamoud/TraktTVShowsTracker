@@ -89,6 +89,15 @@ class Config:
     TRAKT_API_BASE = 'https://api.trakt.tv'
     TRAKT_API_VERSION = '2'
 
+    # Google Calendar (optional). Create an OAuth client at
+    # https://console.cloud.google.com/apis/credentials — Calendar API enabled.
+    GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+    GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+    GOOGLE_CALENDAR_REDIRECT_URI = os.environ.get(
+        'GOOGLE_CALENDAR_REDIRECT_URI',
+        f'https://localhost:{os.environ.get("PORT", "8300")}/auth/google/callback',
+    )
+
     # TMDB Watch Providers (region US for MVP)
     TMDB_API_KEY = os.environ.get('TMDB_API_KEY', '')
     TMDB_API_BASE = 'https://api.themoviedb.org/3'

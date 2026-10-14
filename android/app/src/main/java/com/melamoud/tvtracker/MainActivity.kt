@@ -110,7 +110,7 @@ class MainActivity : ComponentActivity() {
                 val traktId = parts.getOrNull(1)?.toIntOrNull()
                 if (traktId != null) container.requestOpen("progress", "show", traktId)
             }
-            "shows", "movies", "alerts", "inbox", "search" -> container.requestOpen(
+            "shows", "movies", "alerts", "inbox", "search", "preferences" -> container.requestOpen(
                 if (dest == "inbox") "alerts" else dest,
             )
         }

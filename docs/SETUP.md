@@ -17,6 +17,19 @@ End users only need a Trakt account. **You** (the operator) also need an API app
 5. Later for production: `https://tvtracker.melamoud.com/auth/callback`
 6. Copy Client ID and Client Secret into `.env`
 
+### Google Calendar (optional)
+
+Each person connects their own Google account from Preferences and picks one calendar. They should create a calendar in Google that is only for TV Tracker and pick that one, so the meetings stay off their personal calendar. The steps below are done **once, by the person who runs the server**. Other users never open Google Cloud.
+
+1. In [Google Cloud Console](https://console.cloud.google.com/apis/credentials), create a project (or open the one you already use).
+2. Enable the **Google Calendar API** on that project: open [Google Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com) and click **Enable**. If Preferences says it cannot list calendars, this step was skipped.
+3. Create an **OAuth client ID** of type **Web application**
+4. Authorized redirect URI (local): `https://localhost:8300/auth/google/callback`
+5. Production: `https://tvtracker.melamoud.com:8300/auth/google/callback` (must match `GOOGLE_CALENDAR_REDIRECT_URI`)
+6. Put the client id and secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+
+If you use the app while signed into more than one Google account, the connect button asks which account to use.
+
 ## 2. Install and configure
 
 ```bat

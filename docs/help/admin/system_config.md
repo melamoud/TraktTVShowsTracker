@@ -36,6 +36,7 @@ After the first start, the database copy of the scheduler settings is the source
 ## Other important `.env` keys
 
 - `TRAKT_CLIENT_ID` / `TRAKT_CLIENT_SECRET` / `TRAKT_REDIRECT_URI`
+- `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_CALENDAR_REDIRECT_URI` — optional; lets each user connect a Google account and pick a calendar for movie and episode meetings
 - `TMDB_API_KEY` / `STREAMING_REGION=US`
 - `ADMIN_TRAKT_USERNAMES` — first matching login becomes admin
 - `ADMIN_ALLOW_ENV_PROMOTE=0` — keep at 0 so nobody else becomes admin just by editing env later

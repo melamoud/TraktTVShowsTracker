@@ -1640,6 +1640,9 @@ def run_media_alerts(app: Flask) -> int:
         except Exception:
             db.session.rollback()
             raise
+        from services.external_calendar import sync_external_calendar_quietly
+        for user in users:
+            sync_external_calendar_quietly(user)
     logger.info('Media alerts created %s notifications', notified)
     return notified
 

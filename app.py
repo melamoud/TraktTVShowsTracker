@@ -193,6 +193,10 @@ def _ensure_schema(app):
                 cm_alters.append(
                     'ALTER TABLE cached_media ADD COLUMN cast_fetched_at DATETIME'
                 )
+            if 'provider_checked_at' not in cols:
+                cm_alters.append(
+                    'ALTER TABLE cached_media ADD COLUMN provider_checked_at DATETIME'
+                )
             if cm_alters:
                 with db.engine.begin() as conn:
                     for stmt in cm_alters:

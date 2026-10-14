@@ -15,6 +15,9 @@ import com.melamoud.tvtracker.data.api.dto.CreateListRequest
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteResponse
 import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
+import com.melamoud.tvtracker.data.api.dto.GoogleCalendarConnectResponse
+import com.melamoud.tvtracker.data.api.dto.GoogleCalendarSelectRequest
+import com.melamoud.tvtracker.data.api.dto.GoogleCalendarStatusDto
 import com.melamoud.tvtracker.data.api.dto.FoundOnChoicesResponse
 import com.melamoud.tvtracker.data.api.dto.FoundOnResponse
 import com.melamoud.tvtracker.data.api.dto.LatestMediaResponse
@@ -234,6 +237,18 @@ interface TvTrackerApi {
 
     @GET("/api/v1/preferences")
     suspend fun preferences(): PreferencesResponse
+
+    @GET("/api/v1/google-calendar")
+    suspend fun googleCalendar(): GoogleCalendarStatusDto
+
+    @POST("/api/v1/google-calendar/connect")
+    suspend fun googleCalendarConnect(): GoogleCalendarConnectResponse
+
+    @POST("/api/v1/google-calendar/select")
+    suspend fun googleCalendarSelect(@Body body: GoogleCalendarSelectRequest): SimpleResponse
+
+    @POST("/api/v1/google-calendar/disconnect")
+    suspend fun googleCalendarDisconnect(): SimpleResponse
 
     @POST("/api/v1/preferences")
     suspend fun savePreferences(@Body body: PreferencesSaveRequest): SimpleResponse

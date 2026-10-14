@@ -11,6 +11,9 @@ import com.melamoud.tvtracker.data.api.dto.AlertsResponse
 import com.melamoud.tvtracker.data.api.dto.CommentResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
 import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
+import com.melamoud.tvtracker.data.api.dto.GoogleCalendarConnectResponse
+import com.melamoud.tvtracker.data.api.dto.GoogleCalendarSelectRequest
+import com.melamoud.tvtracker.data.api.dto.GoogleCalendarStatusDto
 import com.melamoud.tvtracker.data.api.dto.FoundOnChoicesResponse
 import com.melamoud.tvtracker.data.api.dto.FoundOnResponse
 import com.melamoud.tvtracker.data.api.dto.LatestMediaResponse
@@ -31,6 +34,22 @@ import com.melamoud.tvtracker.data.api.dto.WidgetResponse
 class CatalogRepository(private val api: TvTrackerApi) {
     suspend fun preferences(): Result<PreferencesResponse> =
         runCatching { api.preferences() }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun googleCalendar(): Result<GoogleCalendarStatusDto> =
+        runCatching { api.googleCalendar() }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun googleCalendarConnect(): Result<GoogleCalendarConnectResponse> =
+        runCatching { api.googleCalendarConnect() }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun googleCalendarSelect(calendarId: String): Result<SimpleResponse> =
+        runCatching { api.googleCalendarSelect(GoogleCalendarSelectRequest(calendarId)) }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun googleCalendarDisconnect(): Result<SimpleResponse> =
+        runCatching { api.googleCalendarDisconnect() }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
     suspend fun savePreferences(body: PreferencesSaveRequest): Result<SimpleResponse> =

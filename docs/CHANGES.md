@@ -1,5 +1,17 @@
 # Changes log
 
+## 2026-10-14 — Dedicated calendar for meetings (1.0.21)
+
+- Preferences on the website and in the Android app recommends a Google calendar used only for TV Tracker, so movie and episode meetings stay off your personal calendar
+- Updated [Google Calendar](help/user/calendar.md) and [Preferences](help/user/preferences.md)
+
+## 2026-10-14 — Google Calendar meetings (1.0.19)
+
+- Preferences (web and Android) can connect a Google account and pick one calendar
+- Wishlist and Auto-select lists get an all-day meeting when a movie is in theaters, when a movie later appears on a streaming service you use, and when a show episode airs on one of those services. Movies already streaming the first time they are seen are not copied onto today
+- The meeting includes the overview, genres, runtime, and cast
+- Server needs `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` before Connect works
+
 ## 2026-10-13 — Card action buttons scroll sideways (1.0.18)
 
 - Watch / Rate / Dismiss and the other card actions stay one full label each. When they don’t fit, swipe the row left or right. No scrollbar; an arrow on the edge means more buttons are that way

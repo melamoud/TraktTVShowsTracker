@@ -416,6 +416,7 @@ fun AppNav(
                     vm,
                     baseUrl = container.baseUrl,
                     onHelp = { navController.navigate("help") },
+                    onOpenUrl = onOpenLoginUrl,
                 )
             }
             composable("help") {

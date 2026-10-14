@@ -231,6 +231,34 @@ data class MarkersDto(
     val show: MarkerDto? = null,
 )
 
+data class GoogleCalendarChoiceDto(
+    val id: String,
+    val name: String,
+    val primary: Boolean = false,
+)
+
+data class GoogleCalendarStatusDto(
+    val success: Boolean = false,
+    val message: String? = null,
+    val configured: Boolean = false,
+    val connected: Boolean = false,
+    val email: String? = null,
+    @SerializedName("calendar_id") val calendarId: String? = null,
+    @SerializedName("calendar_name") val calendarName: String? = null,
+    val calendars: List<GoogleCalendarChoiceDto> = emptyList(),
+    val error: String? = null,
+)
+
+data class GoogleCalendarConnectResponse(
+    val success: Boolean,
+    val message: String? = null,
+    @SerializedName("authorize_url") val authorizeUrl: String? = null,
+)
+
+data class GoogleCalendarSelectRequest(
+    @SerializedName("calendar_id") val calendarId: String,
+)
+
 data class PreferencesResponse(
     val success: Boolean,
     val message: String? = null,

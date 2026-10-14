@@ -37,6 +37,56 @@
 </div>
 {% endif %}
 
+<section class="form-grid" style="margin-top:1.25rem;">
+  <h2>Google Calendar</h2>
+  <p class="meta">
+    When a movie release or streaming date is known — or a show episode airs on a service you use —
+    TV Tracker adds an all-day meeting to the calendar you pick. That happens for titles on
+    <strong>Wishlist</strong> and any list marked <strong>Auto-select</strong>. Other personal lists are skipped.
+    The meeting includes the overview, genres, runtime, and cast.
+    Create a calendar in Google that is only for TV Tracker, and pick that one, so these meetings stay off your personal calendar.
+  </p>
+  {% if not gcal.configured %}
+    <p class="meta">Google Calendar is not set up on this server yet. An admin needs a Google OAuth client (<code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>).</p>
+  {% elif not gcal.connected %}
+    <form method="post" action="{{ url_for('auth.google_calendar_start') }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-primary" type="submit">Connect Google account</button>
+    </form>
+    <p class="meta">Google will ask which account to use. Then come back here and pick the calendar.</p>
+  {% else %}
+    <p>Connected as <strong>{{ gcal.email }}</strong>
+      {% if gcal.calendar_name %} · writing to <strong>{{ gcal.calendar_name }}</strong>{% endif %}
+    </p>
+    <form method="post" action="{{ url_for('auth.google_calendar_disconnect') }}"
+          onsubmit="return confirm('Disconnect this Google account? Upcoming meetings this app created are removed. Past meetings stay. You can connect again from scratch.');">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-danger" type="submit">Disconnect Google account</button>
+    </form>
+    {% if gcal.error %}
+      <p class="meta" style="color:var(--danger, #e85d5d);">{{ gcal.error }}</p>
+    {% endif %}
+    {% if gcal.calendars %}
+      <form method="post" action="{{ url_for('auth.google_calendar_select') }}" class="actions" style="flex-wrap:wrap;align-items:center;">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <label>
+          Calendar
+          <select name="calendar_id">
+            {% for cal in gcal.calendars %}
+              <option value="{{ cal.id }}" {% if cal.id == gcal.calendar_id %}selected{% endif %}>
+                {{ cal.name }}{% if cal.primary %} (primary){% endif %}
+              </option>
+            {% endfor %}
+          </select>
+        </label>
+        <button class="btn btn-primary" type="submit">Use this calendar</button>
+      </form>
+    {% elif not gcal.error %}
+      <p class="meta">This Google account has no calendar you can edit.</p>
+    {% endif %}
+  {% endif %}
+</section>
+
 <form method="post" class="form-grid" style="margin-top:1.25rem;" novalidate>
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 

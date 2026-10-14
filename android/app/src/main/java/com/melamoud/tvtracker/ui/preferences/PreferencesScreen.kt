@@ -31,6 +31,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -48,6 +49,8 @@ import coil.compose.AsyncImage
 import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.data.api.absoluteUrl
 import com.melamoud.tvtracker.data.api.dto.CustomServiceDto
+import com.melamoud.tvtracker.ui.components.ConfirmDialog
+import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.theme.Danger
 import com.melamoud.tvtracker.ui.theme.Ok
 import com.melamoud.tvtracker.ui.theme.SurfaceAlt
@@ -59,6 +62,7 @@ fun PreferencesScreen(
     viewModel: PreferencesViewModel,
     baseUrl: String,
     onHelp: () -> Unit,
+    onOpenUrl: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -78,6 +82,77 @@ fun PreferencesScreen(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        ReloadOnResume(viewModel::load)
+        var confirmDisconnect by remember { mutableStateOf(false) }
+        if (confirmDisconnect) {
+            ConfirmDialog(
+                title = "Disconnect Google Calendar?",
+                message = "Upcoming meetings this app created are removed. Past meetings stay on the calendar.",
+                confirmLabel = "Disconnect",
+                destructive = true,
+                onConfirm = {
+                    confirmDisconnect = false
+                    viewModel.disconnectGoogle()
+                },
+                onDismiss = { confirmDisconnect = false },
+            )
+        }
+        val gcal = state.googleCalendar
+        ExpandableSection("Google Calendar") {
+            Text(
+                "Meetings are added for movies (in theaters or on your streaming services) and for episodes of shows on your services. Only Wishlist and Auto-select lists. The meeting includes cast and the other details TV Tracker knows. Create a calendar in Google that is only for TV Tracker, and pick that one, so these meetings stay off your personal calendar.",
+                color = TextMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            when {
+                gcal == null -> CircularProgressIndicator()
+                !gcal.configured -> Text(
+                    "Google Calendar is not set up on this server yet.",
+                    color = TextMuted,
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                !gcal.connected -> {
+                    Button(
+                        onClick = { viewModel.connectGoogle(onOpenUrl) },
+                        enabled = !state.googleCalendarBusy,
+                    ) { Text("Connect Google account") }
+                    Text(
+                        "Google asks which account to use. Then pick a calendar here.",
+                        color = TextMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    gcal.error?.let { Text(it, color = Danger) }
+                }
+                else -> {
+                    Text("Connected as ${gcal.email.orEmpty()}")
+                    if (!gcal.calendarName.isNullOrBlank()) {
+                        Text("Writing to ${gcal.calendarName}", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+                    }
+                    OutlinedButton(
+                        onClick = { confirmDisconnect = true },
+                        enabled = !state.googleCalendarBusy,
+                    ) { Text("Disconnect Google account") }
+                    gcal.error?.let { Text(it, color = Danger) }
+                    gcal.calendars.forEach { cal ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            RadioButton(
+                                selected = cal.id == gcal.calendarId,
+                                onClick = { viewModel.selectGoogleCalendar(cal.id) },
+                                enabled = !state.googleCalendarBusy,
+                            )
+                            Text(if (cal.primary) "${cal.name} (primary)" else cal.name)
+                        }
+                    }
+                    if (gcal.calendars.isEmpty() && gcal.error == null) {
+                        Text("This account has no calendar you can edit.", color = TextMuted)
+                    }
+                }
+            }
+        }
+
         state.error?.let { Text(it, color = Danger) }
         state.saveError?.let { Text(it, color = Danger) }
         if (state.saved) {

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.melamoud.tvtracker.data.api.dto.AlertPrefsDto
 import com.melamoud.tvtracker.data.api.dto.CustomServiceDto
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorDto
+import com.melamoud.tvtracker.data.api.dto.GoogleCalendarStatusDto
 import com.melamoud.tvtracker.data.api.dto.ListPreferenceDto
 import com.melamoud.tvtracker.data.api.dto.ListPrefsSaveRequest
 import com.melamoud.tvtracker.data.api.dto.MarkerActionDto
@@ -39,6 +40,8 @@ data class PreferencesUiState(
     val prefsReminderSnoozeUntil: String? = null,
     val markers: MarkersDto = MarkersDto(),
     val actorBusy: Boolean = false,
+    val googleCalendar: GoogleCalendarStatusDto? = null,
+    val googleCalendarBusy: Boolean = false,
 )
 
 class PreferencesViewModel(
@@ -74,6 +77,82 @@ class PreferencesViewModel(
                     )
                 },
                 onFailure = { _state.value = _state.value.copy(loading = false, error = it.message) },
+            )
+            loadGoogleCalendar()
+        }
+    }
+
+    fun loadGoogleCalendar() {
+        viewModelScope.launch {
+            repo.googleCalendar().fold(
+                onSuccess = {
+                    _state.value = _state.value.copy(googleCalendar = it, googleCalendarBusy = false)
+                },
+                onFailure = {
+                    _state.value = _state.value.copy(
+                        googleCalendarBusy = false,
+                        googleCalendar = GoogleCalendarStatusDto(
+                            success = false,
+                            error = it.message ?: "Could not load Google Calendar",
+                        ),
+                    )
+                },
+            )
+        }
+    }
+
+    fun connectGoogle(onUrl: (String) -> Unit) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(googleCalendarBusy = true, saveError = null)
+            repo.googleCalendarConnect().fold(
+                onSuccess = { resp ->
+                    val url = resp.authorizeUrl
+                    if (resp.success && !url.isNullOrBlank()) {
+                        _state.value = _state.value.copy(googleCalendarBusy = false)
+                        onUrl(url)
+                    } else {
+                        _state.value = _state.value.copy(
+                            googleCalendarBusy = false,
+                            saveError = resp.message ?: "Could not start Google sign-in",
+                        )
+                    }
+                },
+                onFailure = {
+                    _state.value = _state.value.copy(googleCalendarBusy = false, saveError = it.message)
+                },
+            )
+        }
+    }
+
+    fun selectGoogleCalendar(calendarId: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(googleCalendarBusy = true, saveError = null)
+            repo.googleCalendarSelect(calendarId).fold(
+                onSuccess = { resp ->
+                    if (!resp.success) {
+                        _state.value = _state.value.copy(
+                            googleCalendarBusy = false,
+                            saveError = resp.message ?: "Could not save the calendar",
+                        )
+                    } else {
+                        loadGoogleCalendar()
+                    }
+                },
+                onFailure = {
+                    _state.value = _state.value.copy(googleCalendarBusy = false, saveError = it.message)
+                },
+            )
+        }
+    }
+
+    fun disconnectGoogle() {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(googleCalendarBusy = true, saveError = null)
+            repo.googleCalendarDisconnect().fold(
+                onSuccess = { loadGoogleCalendar() },
+                onFailure = {
+                    _state.value = _state.value.copy(googleCalendarBusy = false, saveError = it.message)
+                },
             )
         }
     }

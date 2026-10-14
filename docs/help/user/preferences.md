@@ -58,6 +58,18 @@ If you check the same genre in both lists, **hide wins** (it is dropped from “
 
 Does not apply to titles with no cached genres yet (nothing to hide on).
 
+## Google Calendar
+
+Connect a Google account and pick one calendar. Create a calendar in Google that is only for TV Tracker, and pick that one, so these meetings stay off your personal calendar. TV Tracker then adds an all-day meeting when it learns a date for a title on **Wishlist** or a list you marked **Auto-select**. A title that is only on some other personal list is skipped.
+
+- **Movie in theaters / upcoming release** — meeting on the release date (including dates still inside the 30-day theater window)
+- **Movie on a streaming service you use** — meeting when it newly appears on Netflix, Prime, or any other service you checked. If the release is still in the future, the meeting is on that day. Movies already streaming the first time they are seen do not get a catch-up meeting
+- **Show episode** — meeting on the air date when the show is on at least one of your streaming services. Air dates come from the dates the app has already loaded (about the next month, plus any later dates you opened on My calendar)
+
+The meeting text includes the overview, year, runtime, genres, network, cast (with character names), and which of your services have it. Favorite actors are marked. Disconnect removes upcoming meetings this app created. Past meetings stay.
+
+The server needs a Google OAuth client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`). Until that is set, Preferences says Google Calendar is not configured.
+
 ## Alerts
 
 Toggle which in-app alert **types** you want. Each type has its own checkbox (all default on):

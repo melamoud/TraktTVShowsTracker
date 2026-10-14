@@ -1668,6 +1668,11 @@ def api_lists_membership(media_type, trakt_id):
             )
         except Exception:
             pass
+        try:
+            from services.external_calendar import sync_external_calendar_quietly
+            sync_external_calendar_quietly(current_user)
+        except Exception:
+            current_app.logger.exception('Calendar sync after list change failed')
         return jsonify({
             'success': True,
             'on_watchlist': on_watchlist,

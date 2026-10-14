@@ -46,6 +46,15 @@ class User(UserMixin, db.Model):
     alert_events = db.relationship('AlertEvent', backref='user', cascade='all, delete-orphan')
     sessions = db.relationship('UserSession', backref='user', cascade='all, delete-orphan')
     search_cache = db.relationship('UserSearchCache', backref='user', cascade='all, delete-orphan')
+    google_calendar = db.relationship(
+        'UserGoogleCalendar', backref='user', uselist=False, cascade='all, delete-orphan',
+    )
+    external_calendar_events = db.relationship(
+        'ExternalCalendarEvent', backref='user', cascade='all, delete-orphan',
+    )
+    calendar_streaming_seen = db.relationship(
+        'CalendarStreamingSeen', backref='user', cascade='all, delete-orphan',
+    )
 
     def get_id(self):
         """Flask-Login user id."""
@@ -200,6 +209,7 @@ class CachedMedia(db.Model):
     trakt_listed_at = db.Column(db.DateTime, index=True)  # feed sort time (release/premiere)
     feed_source = db.Column(db.String(32), index=True)  # release_calendar | updates | watchlist
     cast_fetched_at = db.Column(db.DateTime)  # when MediaCastMember rows were last synced
+    provider_checked_at = db.Column(db.DateTime)  # last TMDB watch-provider refresh
     first_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     raw_json = db.Column(db.Text)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -531,6 +541,83 @@ class UserSession(db.Model):
     last_seen_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     ended_at = db.Column(db.DateTime)
     revoked = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class UserGoogleCalendar(db.Model):
+    """Google account + calendar this user writes show/movie meetings to."""
+
+    __tablename__ = 'user_google_calendars'
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    account_email = db.Column(db.String(200))
+    access_token_enc = db.Column(db.Text)
+    refresh_token_enc = db.Column(db.Text)
+    token_expires_at = db.Column(db.DateTime)
+    calendar_id = db.Column(db.String(300))
+    calendar_name = db.Column(db.String(300))
+    connected_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ExternalCalendarEvent(db.Model):
+    """A Google Calendar event this app created for a movie or episode."""
+
+    __tablename__ = 'external_calendar_events'
+    __table_args__ = (
+        db.UniqueConstraint(
+            'user_id', 'media_type', 'trakt_id', 'kind',
+            'season_number', 'episode_number',
+            name='uq_external_calendar_event',
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    media_type = db.Column(db.String(16), nullable=False)  # movie | show
+    trakt_id = db.Column(db.Integer, nullable=False)
+    kind = db.Column(db.String(16), nullable=False)  # theater | streaming | episode
+    season_number = db.Column(db.Integer, default=0, nullable=False)
+    episode_number = db.Column(db.Integer, default=0, nullable=False)
+    event_date = db.Column(db.Date, nullable=False)
+    google_event_id = db.Column(db.String(256))
+    calendar_id = db.Column(db.String(300))
+    content_hash = db.Column(db.String(64))
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class CalendarStreamingSeen(db.Model):
+    """
+    Streaming services already observed for a movie.
+
+    The first observation is a baseline: movies already on a service do not get
+    a meeting. A service that appears later does.
+    """
+
+    __tablename__ = 'calendar_streaming_seen'
+    __table_args__ = (
+        db.UniqueConstraint(
+            'user_id', 'trakt_id', name='uq_calendar_streaming_seen',
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    trakt_id = db.Column(db.Integer, nullable=False)
+    vendors_json = db.Column(db.Text, nullable=False, default='[]')
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class GoogleOAuthState(db.Model):
+    """Short-lived OAuth state so web and Android can finish Google sign-in."""
+
+    __tablename__ = 'google_oauth_states'
+
+    state = db.Column(db.String(80), primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    client_kind = db.Column(db.String(16), nullable=False)  # web | android
+    expires_at = db.Column(db.DateTime, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 
 class AppMeta(db.Model):

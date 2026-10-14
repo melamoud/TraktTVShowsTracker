@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Google Calendar — TV Tracker</title>
+  <style>
+    body {
+      font-family: "Segoe UI", sans-serif;
+      background: #0b0d12;
+      color: #e8edf7;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+    }
+    .panel { max-width: 28rem; padding: 2rem; text-align: center; }
+    a.btn {
+      display: inline-block;
+      margin-top: 1rem;
+      padding: .7rem 1.2rem;
+      background: #3dd6c6;
+      color: #0b0d12;
+      font-weight: 700;
+      text-decoration: none;
+      border-radius: 8px;
+    }
+    .muted { color: #9aa6bf; }
+  </style>
+</head>
+<body>
+  <div class="panel">
+    {% if ok %}
+      <h1>Google account connected</h1>
+      {% if email %}<p>{{ email }}</p>{% endif %}
+      <p class="muted">Return to TV Tracker and choose which calendar should get the meetings.</p>
+      <p><a class="btn" href="tvtracker://open/preferences">Open TV Tracker</a></p>
+      <script>window.location = "tvtracker://open/preferences";</script>
+    {% else %}
+      <h1>Google Calendar</h1>
+      <p class="muted">{{ message or 'Could not connect the Google account.' }}</p>
+      <p><a class="btn" href="tvtracker://open/preferences">Back to the app</a></p>
+      <p><a href="/preferences">Back to Preferences on the web</a></p>
+    {% endif %}
+  </div>
+</body>
+</html>

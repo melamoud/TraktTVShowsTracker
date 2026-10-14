@@ -1481,6 +1481,7 @@ def sync_providers_for_media(media: CachedMedia) -> list[str]:
             checked_at=datetime.utcnow(),
         ))
         names.append(name)
+    media.provider_checked_at = datetime.utcnow()
     try:
         db.session.commit()
     except IntegrityError:

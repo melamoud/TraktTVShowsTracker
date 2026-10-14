@@ -12,8 +12,8 @@ android {
         applicationId = "com.melamoud.tvtracker"
         minSdk = 26
         targetSdk = 35
-        versionCode = 19
-        versionName = "1.0.18"
+        versionCode = 22
+        versionName = "1.0.21"
         buildConfigField("String", "BASE_URL", "\"https://tvtracker.melamoud.com:8300\"")
     }
 

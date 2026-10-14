@@ -172,6 +172,99 @@ def mobile_done():
     return render_template('auth_mobile_done.html', token=token)
 
 
+@auth_bp.route('/auth/google/calendar', methods=['POST'])
+@login_required
+def google_calendar_start():
+    """Start Google OAuth so the user can pick an account."""
+    from flask_login import current_user
+    from services.google_calendar import GoogleCalendarError, begin_oauth
+
+    try:
+        return redirect(begin_oauth(current_user.id, 'web'))
+    except GoogleCalendarError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('user.preferences'))
+
+
+@auth_bp.route('/auth/google/callback')
+def google_calendar_callback():
+    """Finish Google OAuth from the website or the Android custom tab."""
+    from services.google_calendar import GoogleCalendarError, complete_oauth
+
+    if request.args.get('error'):
+        return render_template(
+            'google_calendar_done.html',
+            ok=False,
+            message='Google sign-in was cancelled.',
+        )
+    try:
+        user, kind = complete_oauth(
+            request.args.get('state') or '',
+            request.args.get('code') or '',
+        )
+    except GoogleCalendarError as exc:
+        return render_template(
+            'google_calendar_done.html', ok=False, message=str(exc),
+        )
+    if kind == 'android':
+        return render_template(
+            'google_calendar_done.html',
+            ok=True,
+            email=user.google_calendar.account_email if user.google_calendar else '',
+        )
+    # The browser often drops the session cookie on the hop back from Google.
+    # The OAuth state was created while this user was logged in, so sign them
+    # back in here instead of sending them through Trakt again.
+    from flask_login import login_user
+    login_user(user, remember=True)
+    session_token = secrets.token_hex(32)
+    db.session.add(UserSession(
+        user_id=user.id,
+        session_token=session_token,
+        ip_address=request.headers.get('X-Forwarded-For', request.remote_addr),
+        user_agent=(request.headers.get('User-Agent') or '')[:400],
+    ))
+    db.session.commit()
+    session['app_session_token'] = session_token
+    email = user.google_calendar.account_email if user.google_calendar else 'your Google account'
+    flash(f'Connected {email}. Choose a calendar below.', 'success')
+    return redirect(url_for('user.preferences'))
+
+
+@auth_bp.route('/auth/google/calendar/select', methods=['POST'])
+@login_required
+def google_calendar_select():
+    """Save the calendar the user picked and sync known dates."""
+    from flask_login import current_user
+    from services.external_calendar import select_google_calendar
+    from services.google_calendar import GoogleCalendarError
+
+    try:
+        name = select_google_calendar(
+            current_user, request.form.get('calendar_id') or '',
+        )
+    except GoogleCalendarError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('user.preferences'))
+    flash(
+        f'Calendar set to {name}. Meetings are being added in the background.',
+        'success',
+    )
+    return redirect(url_for('user.preferences'))
+
+
+@auth_bp.route('/auth/google/calendar/disconnect', methods=['POST'])
+@login_required
+def google_calendar_disconnect():
+    """Stop writing meetings and remove upcoming ones this app created."""
+    from flask_login import current_user
+    from services.external_calendar import disconnect_google_calendar
+
+    disconnect_google_calendar(current_user)
+    flash('Google Calendar disconnected. Past meetings were left in place.', 'success')
+    return redirect(url_for('user.preferences'))
+
+
 @auth_bp.route('/logout')
 @login_required
 def logout():

@@ -383,6 +383,11 @@ def preferences():
             prefs.prefs_reminder_snooze_until = None
         db.session.commit()
         db.session.expire(current_user)
+        try:
+            from services.external_calendar import sync_external_calendar_quietly
+            sync_external_calendar_quietly(current_user)
+        except Exception:
+            current_app.logger.exception('Calendar sync after preferences save failed')
         flash('Preferences saved.', 'success')
         if match_filters_changed:
             session['marker_prompt_after_prefs'] = True
@@ -417,7 +422,9 @@ def preferences():
         'show': ReviewMarker.query.filter_by(user_id=current_user.id, media_type='show').first(),
     }
     from services.cast_service import list_favorite_actors
+    from services.external_calendar import calendar_settings
     favorite_actors = list_favorite_actors(current_user)
+    gcal = calendar_settings(current_user)
     return render_template(
         'preferences.html',
         defaults=defaults,
@@ -450,6 +457,7 @@ def preferences():
         ),
         alert_new_user_login=bool(getattr(prefs, 'alert_new_user_login', True)),
         favorite_actors=favorite_actors,
+        gcal=gcal,
     )
 
 
