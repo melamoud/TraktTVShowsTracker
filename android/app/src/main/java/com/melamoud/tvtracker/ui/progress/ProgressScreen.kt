@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
+import com.melamoud.tvtracker.ui.components.ScrollableActionRow
 import com.melamoud.tvtracker.ui.components.ReviewDialog
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
 import com.melamoud.tvtracker.ui.theme.Ok
@@ -121,7 +122,7 @@ fun ProgressScreen(
                     items(data.seasons, key = { it.number }) { season ->
                         val expanded = open[season.number] ?: season.defaultOpen
                         Column {
-                            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            ScrollableActionRow {
                                 TextButton(onClick = { open[season.number] = !expanded }) {
                                     Text("${season.label}  ${season.completed}/${season.aired}", fontWeight = FontWeight.SemiBold)
                                 }

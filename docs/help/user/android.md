@@ -2,6 +2,8 @@
 
 The TV Tracker Android app connects to the same server as the website (`tvtracker.melamoud.com`) and uses your Trakt login. It keeps the same data as the web client, with a compact mobile layout.
 
+Action buttons on a card (and on the title page, and a season’s **Mark season watched** row) stay on one line. Swipe that row left or right when they don’t fit — there is no scrollbar. An arrow at the left or right edge means more buttons are off that side. The arrow is only a hint; swipe the row itself.
+
 ## What it does
 
 - **My Shows / My Movies** — the same list filters as the web (status, **Lists…**, **Upcoming / Theater / Streaming**, title search), each as a compact dropdown with checkmarks. Choices are remembered on the server (same as the website). **List** vs **Newest aired** is the same server sort as the website (pins on top; movies by release date; shows by latest episode air date). Switching that menu reloads from the server. Cards show **Found on** (tap a service to open it), **Progress**, and **Watch**; pin, set lists, **Found on…** (with **Search** per service), rate, and favorite are in the ⋮ menu. Tap the card to open the **title page**.

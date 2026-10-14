@@ -50,6 +50,7 @@ import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
 import com.melamoud.tvtracker.ui.components.FoundOnDialog
+import com.melamoud.tvtracker.ui.components.ScrollableActionRow
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
@@ -302,7 +303,6 @@ private fun DetailHero(item: MediaItemDto, detail: MediaDetailResponse, baseUrl:
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DetailActions(
     item: MediaItemDto,
@@ -320,10 +320,7 @@ private fun DetailActions(
     onProgress: () -> Unit,
     onOpenUrl: (String) -> Unit,
 ) {
-    FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
+    ScrollableActionRow(itemSpacing = 8.dp) {
         ActionBtn("Set lists…", onClick = onLists)
         ActionBtn(if (item.rating != null) "Rate ${item.rating}/10" else "Rate…", onClick = onRate)
         ActionBtn(if (item.favorited) "Unfavorite" else "Favorite", onClick = onFavorite)

@@ -68,6 +68,7 @@ import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
+import com.melamoud.tvtracker.ui.components.ScrollableActionRow
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
 import com.melamoud.tvtracker.ui.components.ServiceLinksLine
 import com.melamoud.tvtracker.ui.theme.AccentGold
@@ -333,10 +334,7 @@ private fun AlertGroupCard(
                         style = MaterialTheme.typography.labelMedium,
                     )
                 }
-                FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
+                ScrollableActionRow {
                     OutlinedButton(
                         onClick = onProgress,
                         contentPadding = PaddingValues(horizontal = 10.dp),
@@ -357,7 +355,7 @@ private fun AlertGroupCard(
                         Text(
                             if (expanded) "Hide alerts" else "Show ${entry.items.size} alerts",
                             maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
+                            softWrap = false,
                         )
                     }
                     OutlinedButton(
@@ -529,10 +527,7 @@ private fun AlertItemCard(
                         fallbackLabels = item.myProviders,
                     )
                 }
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
+                ScrollableActionRow {
                     if (item.mediaType == "show" && item.traktId != null) {
                         OutlinedButton(
                             onClick = { onProgress(item.traktId) },

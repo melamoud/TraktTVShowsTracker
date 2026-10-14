@@ -164,11 +164,7 @@ fun MediaCard(
                         color = TextMuted,
                     )
                 }
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
+                ScrollableActionRow(Modifier.padding(top = 4.dp)) {
                     if (setListsInline) {
                         OutlinedButton(
                             onClick = onLists,

@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-10-13 — Card action buttons scroll sideways (1.0.18)
+
+- Watch / Rate / Dismiss and the other card actions stay one full label each. When they don’t fit, swipe the row left or right. No scrollbar; an arrow on the edge means more buttons are that way
+- Same row on My, Search, Latest, Recommended, Alerts (including the show-group row), the title page, and the season header on Progress
+- Updated [Android app](help/user/android.md)
+
 ## 2026-10-08 — Anime is its own hide genre (1.0.17)
 
 - **Anime** is a separate genre from **animation**. Hiding animation no longer stands in for anime, and adding anime does not clear animation
