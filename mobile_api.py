@@ -979,6 +979,25 @@ def api_google_calendar_select():
     return jsonify({'success': True, 'calendar_name': name})
 
 
+@mobile_api_bp.route('/google-calendar/reminder', methods=['POST'])
+@login_required
+def api_google_calendar_reminder():
+    """Save popup, email, or none, and how long before each meeting."""
+    from services.external_calendar import save_calendar_reminder
+    from services.google_calendar import GoogleCalendarError
+    body = _json_body()
+    try:
+        label = save_calendar_reminder(
+            current_user,
+            body.get('method') or '',
+            body.get('amount'),
+            body.get('unit') or '',
+        )
+    except GoogleCalendarError as exc:
+        return jsonify({'success': False, 'message': str(exc)}), 400
+    return jsonify({'success': True, 'message': label})
+
+
 @mobile_api_bp.route('/google-calendar/disconnect', methods=['POST'])
 @login_required
 def api_google_calendar_disconnect():

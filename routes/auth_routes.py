@@ -253,6 +253,28 @@ def google_calendar_select():
     return redirect(url_for('user.preferences'))
 
 
+@auth_bp.route('/auth/google/calendar/reminder', methods=['POST'])
+@login_required
+def google_calendar_reminder():
+    """Save popup, email, or none, and how long before each meeting."""
+    from flask_login import current_user
+    from services.external_calendar import save_calendar_reminder
+    from services.google_calendar import GoogleCalendarError
+
+    try:
+        label = save_calendar_reminder(
+            current_user,
+            request.form.get('reminder_method') or '',
+            request.form.get('reminder_amount') or '',
+            request.form.get('reminder_unit') or '',
+        )
+    except GoogleCalendarError as exc:
+        flash(str(exc), 'danger')
+        return redirect(url_for('user.preferences'))
+    flash(f'Meeting reminder set to {label}.', 'success')
+    return redirect(url_for('user.preferences'))
+
+
 @auth_bp.route('/auth/google/calendar/disconnect', methods=['POST'])
 @login_required
 def google_calendar_disconnect():

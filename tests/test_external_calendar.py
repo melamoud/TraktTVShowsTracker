@@ -422,3 +422,85 @@ def test_android_connect_returns_account_chooser(app, client, user):
     status = client.get('/api/v1/google-calendar').get_json()
     assert status['configured'] is True
     assert status['connected'] is False
+    assert status['reminder_method'] == 'popup'
+    assert status['reminder_amount'] == 1
+    assert status['reminder_unit'] == 'days'
+
+
+def test_default_reminder_is_popup_one_day_before(app, user):
+    today = local_today()
+    with app.app_context():
+        _link(user)
+        _movie(42, 'Dune', today + timedelta(days=40), with_cast=False)
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=42, on_watchlist=True,
+        ))
+        db.session.commit()
+        fake = FakeGoogle()
+        sync_external_calendar(_user(user), client=fake)
+        assert fake.inserted[0][2]['reminders'] == {
+            'useDefault': False,
+            'overrides': [{'method': 'popup', 'minutes': 1440}],
+        }
+
+
+def test_changing_reminder_updates_the_meeting(app, user):
+    today = local_today()
+    with app.app_context():
+        _link(user)
+        _movie(42, 'Dune', today + timedelta(days=40), with_cast=False)
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=42, on_watchlist=True,
+        ))
+        db.session.commit()
+        fake = FakeGoogle()
+        sync_external_calendar(_user(user), client=fake)
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.calendar_reminder_method = 'email'
+        prefs.calendar_reminder_minutes = 120
+        db.session.commit()
+        sync_external_calendar(_user(user), client=fake)
+        assert fake.patched[0][2]['reminders'] == {
+            'useDefault': False,
+            'overrides': [{'method': 'email', 'minutes': 120}],
+        }
+        prefs.calendar_reminder_method = 'none'
+        db.session.commit()
+        sync_external_calendar(_user(user), client=fake)
+        assert fake.patched[-1][2]['reminders'] == {
+            'useDefault': False,
+            'overrides': [],
+        }
+
+
+def test_preferences_saves_meeting_reminder(app, client, user):
+    login_client(client, app, user)
+    html = client.get('/preferences').get_data(as_text=True)
+    assert 'Save reminder' in html
+    assert 'Reminder for every meeting' in html
+    saved = client.post('/auth/google/calendar/reminder', data={
+        'reminder_method': 'email',
+        'reminder_amount': '2',
+        'reminder_unit': 'hours',
+    })
+    assert saved.status_code == 302
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        assert prefs.calendar_reminder_method == 'email'
+        assert prefs.calendar_reminder_minutes == 120
+    too_far = client.post('/auth/google/calendar/reminder', data={
+        'reminder_method': 'popup',
+        'reminder_amount': '40',
+        'reminder_unit': 'days',
+    })
+    assert too_far.status_code == 302
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        assert prefs.calendar_reminder_minutes == 120
+    api = client.post('/api/v1/google-calendar/reminder', json={
+        'method': 'popup',
+        'amount': 30,
+        'unit': 'minutes',
+    })
+    assert api.status_code == 200
+    assert api.get_json()['message'] == 'Popup, 30 minutes before'

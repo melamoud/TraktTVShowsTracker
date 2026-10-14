@@ -102,6 +102,9 @@ class UserPreference(db.Model):
     alert_favorite_actor = db.Column(db.Boolean, default=True, nullable=False)  # new catalog title with a favorite actor
     alert_favorite_actor_match_only = db.Column(db.Boolean, default=True, nullable=False)  # only genre/keyword matches
     alert_new_user_login = db.Column(db.Boolean, default=True, nullable=False)  # admins only
+    # Google Calendar reminder applied to every meeting this app creates.
+    calendar_reminder_method = db.Column(db.String(16), default='popup', nullable=False)  # popup|email|none
+    calendar_reminder_minutes = db.Column(db.Integer, default=1440, nullable=False)  # before midnight of the meeting day
 
 
 class StreamingService(db.Model):

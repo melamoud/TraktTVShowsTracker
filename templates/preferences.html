@@ -46,6 +46,34 @@
     The meeting includes the overview, genres, runtime, and cast.
     Create a calendar in Google that is only for TV Tracker, and pick that one, so these meetings stay off your personal calendar.
   </p>
+  <form method="post" action="{{ url_for('auth.google_calendar_reminder') }}" class="actions" style="flex-wrap:wrap;align-items:center;">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>
+      Reminder for every meeting
+      <select name="reminder_method">
+        <option value="popup" {% if gcal.reminder_method == 'popup' %}selected{% endif %}>Popup</option>
+        <option value="email" {% if gcal.reminder_method == 'email' %}selected{% endif %}>Email</option>
+        <option value="none" {% if gcal.reminder_method == 'none' %}selected{% endif %}>None</option>
+      </select>
+    </label>
+    <label>
+      How long before
+      <input type="number" name="reminder_amount" min="0" max="40320" required value="{{ gcal.reminder_amount }}">
+    </label>
+    <label>
+      Unit
+      <select name="reminder_unit">
+        <option value="minutes" {% if gcal.reminder_unit == 'minutes' %}selected{% endif %}>minutes</option>
+        <option value="hours" {% if gcal.reminder_unit == 'hours' %}selected{% endif %}>hours</option>
+        <option value="days" {% if gcal.reminder_unit == 'days' %}selected{% endif %}>days</option>
+      </select>
+    </label>
+    <button class="btn btn-primary" type="submit">Save reminder</button>
+  </form>
+  <p class="meta">
+    The default is a popup 1 day before. Meetings are all-day, so the time is before midnight at the start of that day.
+    1 day before is midnight on the day before. At most 28 days.
+  </p>
   {% if not gcal.configured %}
     <p class="meta">Google Calendar is not set up on this server yet. An admin needs a Google OAuth client (<code>GOOGLE_CLIENT_ID</code> / <code>GOOGLE_CLIENT_SECRET</code>).</p>
   {% elif not gcal.connected %}

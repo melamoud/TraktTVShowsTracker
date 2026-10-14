@@ -12,6 +12,7 @@ import com.melamoud.tvtracker.data.api.dto.CommentResponse
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorResponse
 import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
 import com.melamoud.tvtracker.data.api.dto.GoogleCalendarConnectResponse
+import com.melamoud.tvtracker.data.api.dto.GoogleCalendarReminderRequest
 import com.melamoud.tvtracker.data.api.dto.GoogleCalendarSelectRequest
 import com.melamoud.tvtracker.data.api.dto.GoogleCalendarStatusDto
 import com.melamoud.tvtracker.data.api.dto.FoundOnChoicesResponse
@@ -46,6 +47,10 @@ class CatalogRepository(private val api: TvTrackerApi) {
 
     suspend fun googleCalendarSelect(calendarId: String): Result<SimpleResponse> =
         runCatching { api.googleCalendarSelect(GoogleCalendarSelectRequest(calendarId)) }
+            .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
+
+    suspend fun googleCalendarReminder(method: String, amount: Int, unit: String): Result<SimpleResponse> =
+        runCatching { api.googleCalendarReminder(GoogleCalendarReminderRequest(method, amount, unit)) }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
     suspend fun googleCalendarDisconnect(): Result<SimpleResponse> =

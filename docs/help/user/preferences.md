@@ -66,7 +66,11 @@ Connect a Google account and pick one calendar. Create a calendar in Google that
 - **Movie on a streaming service you use** — meeting when it newly appears on Netflix, Prime, or any other service you checked. If the release is still in the future, the meeting is on that day. Movies already streaming the first time they are seen do not get a catch-up meeting
 - **Show episode** — meeting on the air date when the show is on at least one of your streaming services. Air dates come from the dates the app has already loaded (about the next month, plus any later dates you opened on My calendar)
 
-The meeting text includes the overview, year, runtime, genres, network, cast (with character names), and which of your services have it. Favorite actors are marked. Disconnect removes upcoming meetings this app created. Past meetings stay.
+The meeting text includes the overview, year, runtime, genres, network, cast (with character names), and which of your services have it. Favorite actors are marked.
+
+**Reminder for every meeting** is **Popup**, **Email**, or **None**. The default is a popup 1 day before. Change how long before (minutes, hours, or days, up to 28) and save. Meetings are all-day, so the time is before midnight at the start of that day.
+
+Disconnect removes upcoming meetings this app created. Past meetings stay.
 
 The server needs a Google OAuth client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`). Until that is set, Preferences says Google Calendar is not configured.
 

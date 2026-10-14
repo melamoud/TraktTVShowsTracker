@@ -20,6 +20,12 @@ Episode dates are the ones the app has already loaded from Trakt (about the next
 
 Adding the title to Wishlist or an Auto-select list creates the meeting immediately when the date is already known. If the date shows up later, the regular alert check writes the meeting then.
 
+## Reminder
+
+Every meeting uses one notification: **Popup**, **Email**, or **None**. The default is a popup **1 day** before. Change the number and choose minutes, hours, or days (up to 28 days), then **Save reminder**. That updates meetings already on the calendar.
+
+Meetings are all-day, so the time is before midnight at the start of that day. 1 day before is midnight on the day before.
+
 ## What the meeting says
 
 The title is the movie or the show plus season and episode. The description includes the overview, year, runtime, genres, network, cast (actor and character; favorite actors are marked), which of your services have it, and a link back to the title in TV Tracker.

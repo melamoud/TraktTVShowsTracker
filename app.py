@@ -254,6 +254,16 @@ def _ensure_schema(app):
                     "ALTER TABLE user_preferences ADD COLUMN excluded_genres_json "
                     "TEXT DEFAULT '[]'"
                 )
+            if 'calendar_reminder_method' not in cols:
+                alters.append(
+                    "ALTER TABLE user_preferences ADD COLUMN calendar_reminder_method "
+                    "VARCHAR(16) DEFAULT 'popup' NOT NULL"
+                )
+            if 'calendar_reminder_minutes' not in cols:
+                alters.append(
+                    'ALTER TABLE user_preferences ADD COLUMN calendar_reminder_minutes '
+                    'INTEGER DEFAULT 1440 NOT NULL'
+                )
             if alters:
                 with db.engine.begin() as conn:
                     for stmt in alters:

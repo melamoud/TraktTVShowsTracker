@@ -145,6 +145,32 @@ class PreferencesViewModel(
         }
     }
 
+    fun saveGoogleReminder(method: String, amount: String, unit: String) {
+        val count = amount.trim().toIntOrNull()
+        if (count == null || count < 0) {
+            _state.value = _state.value.copy(saveError = "Enter a whole number for how long before.")
+            return
+        }
+        viewModelScope.launch {
+            _state.value = _state.value.copy(googleCalendarBusy = true, saveError = null)
+            repo.googleCalendarReminder(method, count, unit).fold(
+                onSuccess = { resp ->
+                    if (!resp.success) {
+                        _state.value = _state.value.copy(
+                            googleCalendarBusy = false,
+                            saveError = resp.message ?: "Could not save the reminder",
+                        )
+                    } else {
+                        loadGoogleCalendar()
+                    }
+                },
+                onFailure = {
+                    _state.value = _state.value.copy(googleCalendarBusy = false, saveError = it.message)
+                },
+            )
+        }
+    }
+
     fun disconnectGoogle() {
         viewModelScope.launch {
             _state.value = _state.value.copy(googleCalendarBusy = true, saveError = null)

@@ -104,6 +104,15 @@ fun PreferencesScreen(
                 color = TextMuted,
                 style = MaterialTheme.typography.bodySmall,
             )
+            if (gcal != null) {
+                MeetingReminderEditor(
+                    method = gcal.reminderMethod,
+                    amount = gcal.reminderAmount,
+                    unit = gcal.reminderUnit,
+                    busy = state.googleCalendarBusy,
+                    onSave = viewModel::saveGoogleReminder,
+                )
+            }
             when {
                 gcal == null -> CircularProgressIndicator()
                 !gcal.configured -> Text(
@@ -419,6 +428,59 @@ fun PreferencesScreen(
             modifier = Modifier.fillMaxWidth(),
         ) { Text("Help") }
     }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun MeetingReminderEditor(
+    method: String,
+    amount: Int,
+    unit: String,
+    busy: Boolean,
+    onSave: (String, String, String) -> Unit,
+) {
+    var chosenMethod by remember(method) { mutableStateOf(if (method.isBlank()) "popup" else method) }
+    var chosenAmount by remember(amount) { mutableStateOf(amount.toString()) }
+    var chosenUnit by remember(unit) { mutableStateOf(if (unit.isBlank()) "days" else unit) }
+    Text("Reminder for every meeting", style = MaterialTheme.typography.bodyMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("popup" to "Popup", "email" to "Email", "none" to "None").forEach { (value, label) ->
+            FilterChip(
+                selected = chosenMethod == value,
+                onClick = { chosenMethod = value },
+                label = { Text(label) },
+                enabled = !busy,
+            )
+        }
+    }
+    Text("How long before", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+    OutlinedTextField(
+        value = chosenAmount,
+        onValueChange = { raw -> chosenAmount = raw.filter { it.isDigit() }.take(5) },
+        label = { Text("Amount") },
+        singleLine = true,
+        enabled = !busy,
+        modifier = Modifier.fillMaxWidth(),
+    )
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        listOf("minutes" to "Minutes", "hours" to "Hours", "days" to "Days").forEach { (value, label) ->
+            FilterChip(
+                selected = chosenUnit == value,
+                onClick = { chosenUnit = value },
+                label = { Text(label) },
+                enabled = !busy,
+            )
+        }
+    }
+    Text(
+        "Meetings are all-day, so this is before midnight at the start of that day. 1 day before is midnight the day before.",
+        color = TextMuted,
+        style = MaterialTheme.typography.bodySmall,
+    )
+    Button(
+        onClick = { onSave(chosenMethod, chosenAmount, chosenUnit) },
+        enabled = !busy,
+    ) { Text("Save reminder") }
 }
 
 @Composable

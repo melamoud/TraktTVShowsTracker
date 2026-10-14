@@ -54,6 +54,10 @@ logger = logging.getLogger('app')
 
 _CAST_LIMIT = 12
 _STREAMING_OFFERS = ('flatrate', 'ads', 'free')
+_REMINDER_METHODS = ('popup', 'email', 'none')
+_REMINDER_UNITS = ('minutes', 'hours', 'days')
+_MAX_REMINDER_MINUTES = 40320  # 28 days, Google Calendar's limit
+_DEFAULT_REMINDER_MINUTES = 1440  # 1 day before the all-day meeting
 
 
 @dataclass
@@ -83,6 +87,61 @@ class PlannedMeeting:
     def content_hash(self) -> str:
         blob = f'{self.event_date.isoformat()}\n{self.summary}\n{self.description}'
         return hashlib.sha256(blob.encode('utf-8')).hexdigest()
+
+
+def meeting_reminder(user: User) -> tuple[str, int]:
+    """Notification method and minutes-before for every meeting."""
+    prefs = getattr(user, 'preferences', None)
+    method = 'popup'
+    minutes = _DEFAULT_REMINDER_MINUTES
+    if prefs is not None:
+        raw = (getattr(prefs, 'calendar_reminder_method', None) or 'popup').strip().lower()
+        if raw in _REMINDER_METHODS:
+            method = raw
+        raw_minutes = getattr(prefs, 'calendar_reminder_minutes', None)
+        if raw_minutes is not None:
+            try:
+                minutes = int(raw_minutes)
+            except (TypeError, ValueError):
+                minutes = _DEFAULT_REMINDER_MINUTES
+    return method, max(0, min(minutes, _MAX_REMINDER_MINUTES))
+
+
+def split_reminder_minutes(minutes: int) -> tuple[int, str]:
+    """Turn stored minutes into a number plus minutes, hours, or days."""
+    minutes = max(0, min(int(minutes), _MAX_REMINDER_MINUTES))
+    if minutes and minutes % 1440 == 0:
+        return minutes // 1440, 'days'
+    if minutes and minutes % 60 == 0:
+        return minutes // 60, 'hours'
+    return minutes, 'minutes'
+
+
+def combine_reminder_minutes(amount, unit: str) -> int:
+    """Validate a lead time. Raises GoogleCalendarError when it is not usable."""
+    unit = (unit or '').strip().lower()
+    if unit not in _REMINDER_UNITS:
+        raise GoogleCalendarError('Choose minutes, hours, or days.')
+    try:
+        count = int(amount)
+    except (TypeError, ValueError):
+        raise GoogleCalendarError('Enter a whole number for how long before.')
+    if count < 0:
+        raise GoogleCalendarError('Time before cannot be negative.')
+    factor = {'minutes': 1, 'hours': 60, 'days': 1440}[unit]
+    minutes = count * factor
+    if minutes > _MAX_REMINDER_MINUTES:
+        raise GoogleCalendarError('Reminders can be at most 28 days before the meeting.')
+    return minutes
+
+
+def reminder_label(method: str, minutes: int) -> str:
+    if method == 'none':
+        return 'No reminder'
+    amount, unit = split_reminder_minutes(minutes)
+    word = {'minutes': 'minute', 'hours': 'hour', 'days': 'day'}[unit] if amount == 1 else unit
+    kind = 'Email' if method == 'email' else 'Popup'
+    return f'{kind}, {amount} {word} before'
 
 
 def calendar_list_ids(user: User) -> list[str]:
@@ -403,13 +462,21 @@ def plan_meetings(user: User, today: date | None = None) -> list[PlannedMeeting]
     return planned
 
 
-def _google_body(plan: PlannedMeeting) -> dict:
+def _google_body(plan: PlannedMeeting, method: str, minutes: int) -> dict:
     end = plan.event_date + timedelta(days=1)
+    if method == 'none':
+        reminders = {'useDefault': False, 'overrides': []}
+    else:
+        reminders = {
+            'useDefault': False,
+            'overrides': [{'method': method, 'minutes': minutes}],
+        }
     return {
         'summary': plan.summary,
         'description': plan.description[:8000],
         'start': {'date': plan.event_date.isoformat()},
         'end': {'date': end.isoformat()},
+        'reminders': reminders,
         'extendedProperties': {
             'private': {
                 'tvtracker': (
@@ -419,6 +486,11 @@ def _google_body(plan: PlannedMeeting) -> dict:
             },
         },
     }
+
+
+def _stored_hash(plan: PlannedMeeting, method: str, minutes: int) -> str:
+    blob = f'{plan.content_hash}\n{method}\n{minutes}'
+    return hashlib.sha256(blob.encode('utf-8')).hexdigest()
 
 
 def _row_key(row: ExternalCalendarEvent) -> tuple:
@@ -446,6 +518,7 @@ def sync_external_calendar(user: User, client=None) -> dict:
         client = load_client(link)
 
     today = local_today()
+    reminder_method, reminder_minutes = meeting_reminder(user)
     planned = {item.key: item for item in plan_meetings(user, today)}
     for media in _load_media('movie', _eligible_ids(user, 'movie')):
         if _providers_known(media):
@@ -458,13 +531,14 @@ def sync_external_calendar(user: User, client=None) -> dict:
 
     for key, plan in planned.items():
         row = existing.get(key)
-        body = _google_body(plan)
+        body = _google_body(plan, reminder_method, reminder_minutes)
+        event_hash = _stored_hash(plan, reminder_method, reminder_minutes)
         if (
             row
             and row.google_event_id
             and row.calendar_id == link.calendar_id
             and row.event_date == plan.event_date
-            and row.content_hash == plan.content_hash
+            and row.content_hash == event_hash
         ):
             continue
         if row and row.google_event_id and row.calendar_id and row.calendar_id != link.calendar_id:
@@ -500,7 +574,7 @@ def sync_external_calendar(user: User, client=None) -> dict:
             created += 1
         row.event_date = plan.event_date
         row.calendar_id = link.calendar_id
-        row.content_hash = plan.content_hash
+        row.content_hash = event_hash
         row.updated_at = datetime.utcnow()
         db.session.commit()
 
@@ -623,6 +697,28 @@ def select_google_calendar(user: User, calendar_id: str) -> str:
     return match['name']
 
 
+def save_calendar_reminder(user: User, method: str, amount, unit: str) -> str:
+    """Store the reminder used on every meeting, then update Google in the background."""
+    from models import UserPreference
+
+    method = (method or '').strip().lower()
+    if method not in _REMINDER_METHODS:
+        raise GoogleCalendarError('Choose popup, email, or none.')
+    minutes = combine_reminder_minutes(amount, unit)
+    prefs = UserPreference.query.filter_by(user_id=user.id).first()
+    if not prefs:
+        prefs = UserPreference(user_id=user.id)
+        db.session.add(prefs)
+    prefs.calendar_reminder_method = method
+    prefs.calendar_reminder_minutes = minutes
+    prefs.updated_at = datetime.utcnow()
+    db.session.commit()
+    link = UserGoogleCalendar.query.filter_by(user_id=user.id).first()
+    if link and link.calendar_id and link.refresh_token_enc:
+        schedule_external_calendar_sync(user.id)
+    return reminder_label(method, minutes)
+
+
 def calendar_settings(user: User) -> dict:
     """Preferences / Android payload for the connected account and calendars."""
     link = UserGoogleCalendar.query.filter_by(user_id=user.id).first()
@@ -637,6 +733,8 @@ def calendar_settings(user: User) -> dict:
         except Exception:
             logger.exception('Could not list Google calendars for user %s', user.id)
             error = 'Could not load calendars from Google.'
+    method, minutes = meeting_reminder(user)
+    amount, unit = split_reminder_minutes(minutes)
     return {
         'configured': google_configured(),
         'connected': connected,
@@ -645,4 +743,8 @@ def calendar_settings(user: User) -> dict:
         'calendar_name': link.calendar_name if link else None,
         'calendars': calendars,
         'error': error,
+        'reminder_method': method,
+        'reminder_minutes': minutes,
+        'reminder_amount': amount,
+        'reminder_unit': unit,
     }

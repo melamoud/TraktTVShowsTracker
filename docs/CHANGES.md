@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-10-14 — Meeting reminders (1.0.22)
+
+- Preferences sets one reminder for every Google Calendar meeting: **Popup**, **Email**, or **None**
+- Default is a popup 1 day before. The lead time can be minutes, hours, or days (up to 28 days)
+- Saving the reminder updates meetings already on the calendar
+- Updated [Google Calendar](help/user/calendar.md)
+
 ## 2026-10-14 — Dedicated calendar for meetings (1.0.21)
 
 - Preferences on the website and in the Android app recommends a Google calendar used only for TV Tracker, so movie and episode meetings stay off your personal calendar

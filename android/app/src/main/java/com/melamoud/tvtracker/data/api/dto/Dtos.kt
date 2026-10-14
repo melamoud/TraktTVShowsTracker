@@ -247,6 +247,15 @@ data class GoogleCalendarStatusDto(
     @SerializedName("calendar_name") val calendarName: String? = null,
     val calendars: List<GoogleCalendarChoiceDto> = emptyList(),
     val error: String? = null,
+    @SerializedName("reminder_method") val reminderMethod: String = "popup",
+    @SerializedName("reminder_amount") val reminderAmount: Int = 1,
+    @SerializedName("reminder_unit") val reminderUnit: String = "days",
+)
+
+data class GoogleCalendarReminderRequest(
+    val method: String,
+    val amount: Int,
+    val unit: String,
 )
 
 data class GoogleCalendarConnectResponse(
