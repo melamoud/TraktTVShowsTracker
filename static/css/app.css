@@ -388,10 +388,24 @@ a.tag.stream:hover {
 
 .form-grid { display: grid; gap: .85rem; }
 label { display: grid; gap: .35rem; font-weight: 600; }
-input[type=text], input[type=url], textarea, select {
+input[type=text], input[type=url], input[type=number], textarea, select {
   width: 100%; padding: .55rem .7rem; border-radius: 8px;
   border: 1px solid var(--line); background: var(--bg0); color: var(--text);
 }
+.reminder-form {
+  display: grid;
+  gap: .85rem;
+  max-width: 22rem;
+}
+.reminder-form select { max-width: 16rem; }
+.reminder-when {
+  display: flex;
+  gap: .5rem;
+  align-items: center;
+  max-width: 16rem;
+}
+.reminder-when input { width: 5.5rem; flex: 0 0 5.5rem; }
+.reminder-when select { flex: 1; min-width: 0; }
 .checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: .35rem .75rem; }
 .checks label { font-weight: 500; display: flex; gap: .4rem; align-items: center; }
 

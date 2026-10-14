@@ -541,37 +541,48 @@ def sync_external_calendar(user: User, client=None) -> dict:
             and row.content_hash == event_hash
         ):
             continue
-        if row and row.google_event_id and row.calendar_id and row.calendar_id != link.calendar_id:
-            try:
-                client.delete_event(row.calendar_id, row.google_event_id)
-            except GoogleCalendarError:
-                logger.warning(
-                    'Could not remove meeting %s from previous calendar',
-                    row.google_event_id,
-                )
-            row.google_event_id = None
-        if row and row.google_event_id and row.calendar_id == link.calendar_id:
-            try:
-                client.patch_event(link.calendar_id, row.google_event_id, body)
-            except GoogleCalendarError as exc:
-                if exc.status_code != 404:
-                    raise
-                row.google_event_id = client.insert_event(link.calendar_id, body)
-            updated += 1
-        else:
-            event_id = client.insert_event(link.calendar_id, body)
-            if not row:
-                row = ExternalCalendarEvent(
-                    user_id=user.id,
-                    media_type=plan.media_type,
-                    trakt_id=plan.trakt_id,
-                    kind=plan.kind,
-                    season_number=plan.season_number,
-                    episode_number=plan.episode_number,
-                )
-                db.session.add(row)
-            row.google_event_id = event_id
-            created += 1
+        try:
+            if row and row.google_event_id and row.calendar_id and row.calendar_id != link.calendar_id:
+                try:
+                    client.delete_event(row.calendar_id, row.google_event_id)
+                except GoogleCalendarError:
+                    logger.warning(
+                        'Could not remove meeting %s from previous calendar',
+                        row.google_event_id,
+                    )
+                row.google_event_id = None
+            if row and row.google_event_id and row.calendar_id == link.calendar_id:
+                try:
+                    client.patch_event(link.calendar_id, row.google_event_id, body)
+                except GoogleCalendarError as exc:
+                    if exc.status_code != 404:
+                        raise
+                    row.google_event_id = client.insert_event(link.calendar_id, body)
+                updated += 1
+            else:
+                event_id = client.insert_event(link.calendar_id, body)
+                if not row:
+                    row = ExternalCalendarEvent(
+                        user_id=user.id,
+                        media_type=plan.media_type,
+                        trakt_id=plan.trakt_id,
+                        kind=plan.kind,
+                        season_number=plan.season_number,
+                        episode_number=plan.episode_number,
+                    )
+                    db.session.add(row)
+                row.google_event_id = event_id
+                created += 1
+        except GoogleCalendarError as exc:
+            logger.warning(
+                'Skipped meeting %s %s for user %s: %s',
+                plan.media_type, plan.trakt_id, user.id, exc,
+            )
+            if row is not None:
+                state = db.inspect(row)
+                if state.persistent:
+                    db.session.refresh(row)
+            continue
         row.event_date = plan.event_date
         row.calendar_id = link.calendar_id
         row.content_hash = event_hash
@@ -586,11 +597,12 @@ def sync_external_calendar(user: User, client=None) -> dict:
         if row.google_event_id and (row.calendar_id or link.calendar_id):
             try:
                 client.delete_event(row.calendar_id or link.calendar_id, row.google_event_id)
-            except GoogleCalendarError:
+            except GoogleCalendarError as exc:
                 logger.warning(
-                    'Could not delete Google meeting %s for user %s',
-                    row.google_event_id, user.id,
+                    'Could not delete Google meeting %s for user %s: %s',
+                    row.google_event_id, user.id, exc,
                 )
+                continue
         db.session.delete(row)
         deleted += 1
         db.session.commit()

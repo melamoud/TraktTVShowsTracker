@@ -46,7 +46,7 @@
     The meeting includes the overview, genres, runtime, and cast.
     Create a calendar in Google that is only for TV Tracker, and pick that one, so these meetings stay off your personal calendar.
   </p>
-  <form method="post" action="{{ url_for('auth.google_calendar_reminder') }}" class="actions" style="flex-wrap:wrap;align-items:center;">
+  <form method="post" action="{{ url_for('auth.google_calendar_reminder') }}" class="reminder-form">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label>
       Reminder for every meeting
@@ -58,15 +58,14 @@
     </label>
     <label>
       How long before
-      <input type="number" name="reminder_amount" min="0" max="40320" required value="{{ gcal.reminder_amount }}">
-    </label>
-    <label>
-      Unit
-      <select name="reminder_unit">
-        <option value="minutes" {% if gcal.reminder_unit == 'minutes' %}selected{% endif %}>minutes</option>
-        <option value="hours" {% if gcal.reminder_unit == 'hours' %}selected{% endif %}>hours</option>
-        <option value="days" {% if gcal.reminder_unit == 'days' %}selected{% endif %}>days</option>
-      </select>
+      <span class="reminder-when">
+        <input type="number" name="reminder_amount" min="0" max="40320" required value="{{ gcal.reminder_amount }}" aria-label="Amount">
+        <select name="reminder_unit" aria-label="Unit">
+          <option value="minutes" {% if gcal.reminder_unit == 'minutes' %}selected{% endif %}>minutes</option>
+          <option value="hours" {% if gcal.reminder_unit == 'hours' %}selected{% endif %}>hours</option>
+          <option value="days" {% if gcal.reminder_unit == 'days' %}selected{% endif %}>days</option>
+        </select>
+      </span>
     </label>
     <button class="btn btn-primary" type="submit">Save reminder</button>
   </form>

@@ -5,6 +5,8 @@
 - Preferences sets one reminder for every Google Calendar meeting: **Popup**, **Email**, or **None**
 - Default is a popup 1 day before. The lead time can be minutes, hours, or days (up to 28 days)
 - Saving the reminder updates meetings already on the calendar
+- The reminder fields stack on the Preferences page: the notification choice, then how long before, then Save
+- If Google drops the connection on one meeting, that meeting is skipped and the rest of the sync continues
 - Updated [Google Calendar](help/user/calendar.md)
 
 ## 2026-10-14 — Dedicated calendar for meetings (1.0.21)

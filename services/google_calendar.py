@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import logging
 import secrets
+import time
 from datetime import datetime, timedelta
 from urllib.parse import quote, urlencode
 
@@ -231,19 +232,24 @@ class GoogleCalendarClient:
     def _request(self, method: str, url: str, **kwargs):
         self._ensure_token()
         headers = dict(kwargs.pop('headers', {}) or {})
-        headers['Authorization'] = f'Bearer {self.access_token}'
-        try:
-            resp = requests.request(method, url, headers=headers, timeout=20, **kwargs)
-        except requests.RequestException as exc:
-            raise GoogleCalendarError('Could not reach Google Calendar.') from exc
-        if resp.status_code == 401:
-            self._refresh()
+        refreshed = False
+        last_exc: Exception | None = None
+        for attempt in range(3):
             headers['Authorization'] = f'Bearer {self.access_token}'
             try:
                 resp = requests.request(method, url, headers=headers, timeout=20, **kwargs)
             except requests.RequestException as exc:
-                raise GoogleCalendarError('Could not reach Google Calendar.') from exc
-        return resp
+                last_exc = exc
+                if attempt == 2:
+                    raise GoogleCalendarError('Could not reach Google Calendar.') from exc
+                time.sleep(0.4 * (attempt + 1))
+                continue
+            if resp.status_code == 401 and not refreshed:
+                refreshed = True
+                self._refresh()
+                continue
+            return resp
+        raise GoogleCalendarError('Could not reach Google Calendar.') from last_exc
 
     def list_calendars(self) -> list[dict]:
         """Writable calendars: ``id``, ``name``, ``primary``."""

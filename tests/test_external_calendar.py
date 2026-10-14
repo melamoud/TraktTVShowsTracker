@@ -20,6 +20,7 @@ from models import (
     db,
 )
 from services.external_calendar import sync_external_calendar
+from services.google_calendar import GoogleCalendarError
 from services.local_time import local_today
 from tests.conftest import login_client
 
@@ -425,6 +426,41 @@ def test_android_connect_returns_account_chooser(app, client, user):
     assert status['reminder_method'] == 'popup'
     assert status['reminder_amount'] == 1
     assert status['reminder_unit'] == 'days'
+
+
+def test_sync_continues_when_one_google_call_fails(app, user):
+    today = local_today()
+
+    class FailPatch(FakeGoogle):
+        def patch_event(self, calendar_id, event_id, body):
+            raise GoogleCalendarError('Could not reach Google Calendar.')
+
+    with app.app_context():
+        _link(user)
+        _movie(42, 'Dune', today + timedelta(days=40), with_cast=False)
+        _movie(43, 'Arrival', today + timedelta(days=12), with_cast=False)
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=42, on_watchlist=True,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=43, on_watchlist=True,
+        ))
+        db.session.add(ExternalCalendarEvent(
+            user_id=user, media_type='movie', trakt_id=42, kind='theater',
+            season_number=0, episode_number=0,
+            event_date=today + timedelta(days=40),
+            google_event_id='old-dune', calendar_id='cal-1',
+            content_hash='stale',
+        ))
+        db.session.commit()
+        fake = FailPatch()
+        result = sync_external_calendar(_user(user), client=fake)
+        assert result['created'] == 1
+        assert result['updated'] == 0
+        assert fake.inserted[0][2]['summary'].startswith('In theaters: Arrival')
+        kept = ExternalCalendarEvent.query.filter_by(user_id=user, trakt_id=42).one()
+        assert kept.google_event_id == 'old-dune'
+        assert kept.content_hash == 'stale'
 
 
 def test_default_reminder_is_popup_one_day_before(app, user):
