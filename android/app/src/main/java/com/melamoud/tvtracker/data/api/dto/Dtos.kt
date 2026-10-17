@@ -472,6 +472,7 @@ data class AlertItemDto(
     val hint: String? = null,
     @SerializedName("display_title") val displayTitle: String? = null,
     @SerializedName("alerts_pinned") val alertsPinned: Boolean = false,
+    @SerializedName("title_watched") val titleWatched: Boolean = false,
     val match: MatchDto? = null,
 )
 

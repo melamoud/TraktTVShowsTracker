@@ -336,6 +336,59 @@ def test_season_alert_badge_and_code_from_title(app, client, user):
     assert 'Season out' in html
 
 
+def test_new_episode_alert_stays_when_show_still_counted_complete(app, client, user):
+    """A later episode stays in the inbox while the cached count is still 100%."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=195475, title='The Ark', year=2023,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=195475,
+            episodes_aired=35, episodes_completed=35, progress_percent=100,
+            progress_payload_json='{"watched_keys": [[3, 11]]}',
+            watched=True,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='episode_aired',
+            title='New episode: The Ark',
+            message='S03E12 — We Can\'t Save Everyone · aired 2026-10-14',
+            media_type='show', trakt_id=195475, payload_key='ep:3:12',
+            is_read=False, is_new=True,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'The Ark' in html
+    assert 'S3E12' in html
+    with app.app_context():
+        note = Notification.query.filter_by(user_id=user, trakt_id=195475).one()
+        assert note.is_read is False
+
+
+def test_list_add_for_finished_show_shows_watched(app, client, user):
+    """Adding a show you already finished still marks that inbox card Watched."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='show', trakt_id=77692, title='Billions', year=2016,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='show', trakt_id=77692,
+            episodes_aired=84, episodes_completed=84, progress_percent=100,
+            watched=True,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='list_add',
+            title='Billions',
+            message='Added to TV Show Favs Favorites',
+            media_type='show', trakt_id=77692, is_read=False, is_new=True,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications?inbox=1').get_data(as_text=True)
+    assert 'Billions' in html
+    assert 'Watched' in html
+
+
 def test_watched_episode_alert_cleared_on_page(app, client, user):
     """Opening Alerts marks a watched episode read so it does not stay unread."""
     with app.app_context():

@@ -330,6 +330,7 @@ def serialize_alert_card(card: dict) -> dict:
         'episode_code': card.get('episode_code') or '',
         'display_title': card.get('display_title') or title,
         'alerts_pinned': bool(card.get('alerts_pinned')),
+        'title_watched': bool(card.get('title_watched')),
         'match': {
             'matched': bool(match.get('matched')),
             'genres': list(match.get('genres') or []),

@@ -481,6 +481,14 @@ private fun AlertItemCard(
                             fontWeight = FontWeight.Normal,
                         )
                     }
+                    if (item.titleWatched) {
+                        Text(
+                            "Watched",
+                            color = if (item.isNew) titleInk else AccentGold,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.labelLarge,
+                        )
+                    }
                     if (!item.isRead && !item.isNew) {
                         Text(
                             "Active",

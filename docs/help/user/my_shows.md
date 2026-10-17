@@ -4,7 +4,7 @@ Same as [My movies](my_movies) for series — only titles on your selected **Lis
 
 **Trakt Watchlist warning:** marking **any** episode watched **removes the whole show from Wishlist** (you cannot turn that off). My Shows then loses it unless it is also on a **personal list** (e.g. TV Show Favs). **Dismiss** on an alert does not change lists. See [Wishlist vs lists](wishlist).
 
-Extra status filter: **Unwatched episodes** — selected-list titles that are **not finished**. Fully watched shows (100%) drop out even if they stay on a list.
+Extra status filter: **Unwatched episodes** — selected-list titles that are **not finished**. Fully watched shows (100%) drop out even if they stay on a list. When a new episode airs, that show comes back onto this filter and the **Watched** label comes off until you catch up again.
 
 Sorted by in-progress first, then most recently watched (`last_watched_at` from Trakt). Titles you haven’t started are last.
 

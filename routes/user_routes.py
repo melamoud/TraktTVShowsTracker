@@ -1791,6 +1791,19 @@ def _streaming_vendor_and_date(n, media) -> tuple[str, str]:
     return vendor.strip(), added
 
 
+def _alert_title_watched(st) -> bool:
+    """True when this alert's title is already caught up."""
+    if st is None:
+        return False
+    if st.media_type == 'movie':
+        return bool(st.watched)
+    aired = st.episodes_aired
+    completed = st.episodes_completed
+    if aired is None or completed is None:
+        return False
+    return int(aired) > 0 and int(completed) >= int(aired)
+
+
 def _alert_presentation(n, media, episode_code: str = '') -> dict:
     """Per-type title bits: episode name next to S#E#, payload in the type tag, dates as hint."""
     kind = n.alert_type or ''
@@ -2197,6 +2210,7 @@ def _collect_alert_cards(*, force_inbox=None) -> dict:
             'headline': copy['headline'],
             'alerts_pinned': bool(st and getattr(st, 'alerts_pinned', False)),
             'is_new': bool(getattr(n, 'is_new', False) and not n.is_read),
+            'title_watched': _alert_title_watched(st),
         })
     cards.sort(key=lambda c: _alert_sort_key(c, sort))
     cards = _merge_streaming_alert_cards(cards)

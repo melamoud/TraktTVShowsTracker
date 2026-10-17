@@ -512,23 +512,27 @@ def mark_cached_watched_alerts_read(
         finished = is_finished(user.id, 'show', trakt_id)
         watched_keys = watched_keys_from_payload(load_progress_payload(user.id, trakt_id))
         for note in group:
-            if finished:
-                dismiss_note(note)
-                marked += 1
-                continue
             payload = _notification_payload_key(note)
-            if not payload:
-                continue
-            if note.alert_type == ALERT_EPISODE_AIRED and payload.startswith('ep:'):
+            # A caught-up count must not clear a newer episode. Dismiss an
+            # episode alert only when that episode is in the watch list.
+            # Rows with no episode id still clear when the show is caught up.
+            if note.alert_type == ALERT_EPISODE_AIRED and payload and payload.startswith('ep:'):
                 try:
                     _prefix, s_raw, e_raw = payload.split(':', 2)
                     key = (int(s_raw), int(e_raw))
                 except (TypeError, ValueError):
                     continue
-                if key in watched_keys:
+                if key in watched_keys or (finished and not watched_keys):
                     dismiss_note(note)
                     marked += 1
-            elif note.alert_type == ALERT_SEASON_AIRED and payload.startswith('season:'):
+                continue
+            if finished:
+                dismiss_note(note)
+                marked += 1
+                continue
+            if not payload:
+                continue
+            if note.alert_type == ALERT_SEASON_AIRED and payload.startswith('season:'):
                 try:
                     s_num = int(payload.split(':', 1)[1])
                 except (TypeError, ValueError):

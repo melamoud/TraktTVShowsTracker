@@ -271,7 +271,10 @@ private fun DetailHero(item: MediaItemDto, detail: MediaDetailResponse, baseUrl:
         match?.keywords.orEmpty().forEach { TagChip(it, gold = true) }
         if (item.onWatchlist) TagChip("Watchlist")
         item.listNames.forEach { TagChip(it) }
-        if (item.watched) TagChip("Watched", ok = true)
+        val showStillOpen = item.mediaType == "show"
+            && item.progressPercent != null
+            && item.progressPercent < 100.0
+        if (item.watched && !showStillOpen) TagChip("Watched", ok = true)
         item.rating?.let { TagChip("$it/10") }
         if (item.favorited) TagChip("Favorite", gold = true)
     }

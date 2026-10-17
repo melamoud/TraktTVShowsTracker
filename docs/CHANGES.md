@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-10-17 — Caught-up shows pick up a new episode (1.0.23)
+
+- A show at 100% comes back onto **Unwatched episodes** when a later episode has aired, and the **Watched** label comes off until you catch up
+- That episode’s alert stays in Inbox until that episode is watched, instead of being cleared because the show used to be caught up
+- Adding a show you already finished shows **Watched** on the list-add alert
+- Updated [Alerts](help/user/release_alerts.md) and [My shows](help/user/my_shows.md)
+
 ## 2026-10-14 — Meeting reminders (1.0.22)
 
 - Preferences sets one reminder for every Google Calendar meeting: **Popup**, **Email**, or **None**

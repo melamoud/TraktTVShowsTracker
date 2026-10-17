@@ -101,7 +101,10 @@ fun MediaCard(
                 )
                 val meta = buildList {
                     if (item.listNames.isNotEmpty()) add(item.listNames.joinToString(", "))
-                    if (item.watched) add("Watched")
+                    val showStillOpen = item.mediaType == "show"
+                        && item.progressPercent != null
+                        && item.progressPercent < 100.0
+                    if (item.watched && !showStillOpen) add("Watched")
                     item.rating?.let { add("$it/10") }
                     if (item.favorited) add("Favorite")
                     if (item.pinned) add("Pinned")

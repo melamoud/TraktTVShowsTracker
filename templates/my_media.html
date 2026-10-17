@@ -272,7 +272,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% if st.pinned %}<span class="tag pinned">Pinned</span>{% endif %}
           {% if st.on_watchlist %}<span class="tag watchlist">Wishlist</span>{% endif %}
           {% for name in row.list_names %}<span class="tag list">{{ name }}</span>{% endfor %}
-          {% if st.watched %}<span class="tag watched">Watched</span>{% endif %}
+          {% if st.watched and not (media_type == 'show' and st.progress_percent is not none and st.progress_percent < 100) %}<span class="tag watched">Watched</span>{% endif %}
           {% set rating = st.rating %}{% set favorited = st.favorited %}
           {% include '_rate_favorite_tags.html' %}
           {% if st.progress_percent and st.progress_percent < 100 %}<span class="tag partial">{{ '%.0f'|format(st.progress_percent) }}%</span>{% endif %}

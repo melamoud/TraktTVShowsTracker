@@ -35,6 +35,7 @@
           <span class="alert-ep-name">{{ card.episode_name }}</span>
         {% endif %}
         <span class="alert-type">{{ card.type_label }}</span>
+        {% if card.title_watched %}<span class="tag watched">Watched</span>{% endif %}
         {% if not n.is_read and not card.is_new %}<span class="tag found">Active</span>{% endif %}
       </span>
     </h2>

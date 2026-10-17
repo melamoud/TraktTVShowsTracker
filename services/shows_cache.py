@@ -172,8 +172,53 @@ def _calendar_last_aired(
             if e.episode_title:
                 parts.append(str(e.episode_title))
             label = ' · '.join(parts)
-        latest[tid] = (e.event_date, label)
+        latest[tid] = (
+            e.event_date, label, e.season_number, e.episode_number, e.episode_title,
+        )
     return latest, airing_today
+
+
+def _caught_up(row: UserMediaState) -> bool:
+    if row.progress_percent is None or float(row.progress_percent) < 100:
+        return False
+    if row.episodes_aired is None or row.episodes_completed is None:
+        return False
+    return int(row.episodes_completed) >= int(row.episodes_aired) > 0
+
+
+def _reopen_for_newer_episode(
+    row: UserMediaState,
+    air_day: date,
+    today: date,
+    season,
+    episode,
+    title,
+) -> bool:
+    """Drop a 100% show when a later episode has already aired.
+
+    Progress refresh skips shows at 100%, so a new episode left the show on
+    the watched list. A snapshot from the air day or earlier has not counted
+    that episode yet.
+    """
+    from services.local_time import local_date, to_local
+
+    if not _caught_up(row) or row.progress_detail_at is None:
+        return False
+    detail_day = local_date(row.progress_detail_at)
+    if detail_day is None or detail_day > air_day:
+        return False
+    if detail_day == air_day and today <= air_day:
+        if to_local(row.progress_detail_at).hour >= 21:
+            return False
+    completed = int(row.episodes_completed or 0)
+    row.episodes_aired = completed + 1
+    row.progress_percent = round(100.0 * completed / row.episodes_aired, 1)
+    if season is not None and episode is not None:
+        row.next_episode_season = int(season)
+        row.next_episode_number = int(episode)
+        row.next_episode_title = (str(title)[:400] if title else None)
+    row.progress_payload_json = None
+    return True
 
 
 def refresh_shows_cache_for_user(user: User, *, skip_per_show: bool = False) -> dict:
@@ -209,17 +254,18 @@ def refresh_shows_cache_for_user(user: User, *, skip_per_show: bool = False) -> 
 
     # 1. Free: last-aired from past calendar days (not today — no clock time).
     cal_latest, airing_today = _calendar_last_aired(user.id, show_ids, today)
-    for tid, (air_day, label) in cal_latest.items():
+    for tid, (air_day, label, season, episode, ep_title) in cal_latest.items():
         row = _state(tid)
         aired_dt = datetime.combine(air_day, datetime.min.time())
         last = row.last_episode_aired_at
         last_day = local_date(last)
-        if last is not None and last_day == air_day and not is_calendar_midnight(last):
-            continue
-        if last is None or last_day is None or air_day > last_day:
-            row.last_episode_aired_at = aired_dt
-            if label:
-                row.last_episode_label = label
+        if not (last is not None and last_day == air_day and not is_calendar_midnight(last)):
+            if last is None or last_day is None or air_day > last_day:
+                row.last_episode_aired_at = aired_dt
+                if label:
+                    row.last_episode_label = label
+                stats['calendar'] += 1
+        if _reopen_for_newer_episode(row, air_day, today, season, episode, ep_title):
             stats['calendar'] += 1
 
     # 2. Per-show seed: nothing stored yet and (never checked or stale check).

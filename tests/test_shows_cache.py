@@ -37,6 +37,67 @@ def _list_show(user_id, tid, **kw):
     ))
 
 
+def test_newer_episode_reopens_caught_up_show(app, user):
+    """A 100% show drops below 100% when a later episode has already aired."""
+    from services.local_time import local_today
+
+    with app.app_context():
+        air = local_today() - timedelta(days=1)
+        _show(
+            user, 9,
+            episodes_aired=35, episodes_completed=35, progress_percent=100,
+            progress_detail_at=datetime.utcnow() - timedelta(days=10),
+            progress_payload_json='{"watched_keys": [[3, 11]]}',
+            watched=True,
+        )
+        _cal_event(user, 9, air, 3, 12, "We Can't Save Everyone")
+        db.session.commit()
+        with patch(
+            'services.shows_cache.trakt_client.get_show_seasons',
+            side_effect=AssertionError('must not hit Trakt'),
+        ), patch(
+            'services.shows_cache.refresh_show_progress_for_ids', return_value=0,
+        ):
+            refresh_shows_cache_for_user(_reload_user(user))
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=9,
+        ).one()
+        assert st.episodes_aired == 36
+        assert st.episodes_completed == 35
+        assert st.progress_percent < 100
+        assert st.next_episode_season == 3
+        assert st.next_episode_number == 12
+        assert st.progress_payload_json is None
+
+
+def test_progress_after_air_day_stays_caught_up(app, user):
+    """A snapshot taken after the episode aired does not un-finish the show."""
+    from services.local_time import local_today
+
+    with app.app_context():
+        air = local_today() - timedelta(days=3)
+        _show(
+            user, 9,
+            episodes_aired=36, episodes_completed=36, progress_percent=100,
+            progress_detail_at=datetime.utcnow(),
+            watched=True,
+        )
+        _cal_event(user, 9, air, 3, 12, 'Already counted')
+        db.session.commit()
+        with patch(
+            'services.shows_cache.trakt_client.get_show_seasons',
+            side_effect=AssertionError('must not hit Trakt'),
+        ), patch(
+            'services.shows_cache.refresh_show_progress_for_ids', return_value=0,
+        ):
+            refresh_shows_cache_for_user(_reload_user(user))
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=9,
+        ).one()
+        assert st.progress_percent == 100
+        assert st.episodes_aired == 36
+
+
 def test_refresh_derives_last_aired_from_calendar_rows(app, user):
     """Watchlisted show with calendar rows: date comes from cache, no API call."""
     with app.app_context():
