@@ -233,5 +233,10 @@ def test_parse_calendar_day_converts_hbo_utc_to_eastern(app):
     with app.app_context():
         assert parse_calendar_day('2026-08-24T01:00:00.000Z') == date(2026, 8, 23)
         assert parse_calendar_day('2026-08-20') == date(2026, 8, 20)
+        # Movie date-only midnight stays on that UTC day.
         assert parse_calendar_day('2026-08-20T00:00:00.000Z') == date(2026, 8, 20)
+        # Episode 00:00Z is 8pm Eastern the previous evening (daylight time).
+        assert parse_calendar_day(
+            '2026-10-20T00:00:00.000Z', midnight_is_instant=True,
+        ) == date(2026, 10, 19)
 

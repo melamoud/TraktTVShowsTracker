@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 from datetime import date, datetime, timedelta
 from typing import Iterable
 
@@ -1092,6 +1093,35 @@ def _upsert_state(
     row.updated_at = datetime.utcnow()
 
 
+_LATEST_EP_LABEL_RE = re.compile(
+    r'S(\d{1,2})\s*(?:·\s*)?E(\d{1,2})(?:\s*·\s*(.+))?$',
+    re.IGNORECASE,
+)
+
+
+def _watch_predates_latest_air(row: UserMediaState) -> bool:
+    """True when the show's last watch is before the latest aired episode."""
+    if not row.last_watched_at or not row.last_episode_aired_at:
+        return False
+    from services.local_time import local_date
+    watched_day = local_date(row.last_watched_at)
+    aired_day = local_date(row.last_episode_aired_at)
+    if watched_day is None or aired_day is None:
+        return False
+    return watched_day < aired_day
+
+
+def _parse_latest_episode_label(label: str | None) -> tuple[int, int, str | None] | None:
+    text = (label or '').strip()
+    if not text:
+        return None
+    match = _LATEST_EP_LABEL_RE.search(text)
+    if not match:
+        return None
+    title = (match.group(3) or '').strip() or None
+    return int(match.group(1)), int(match.group(2)), title
+
+
 def apply_show_episode_progress(
     user_id: int,
     trakt_id: int,
@@ -1100,6 +1130,7 @@ def apply_show_episode_progress(
     completed: int | None,
     next_episode: dict | None = None,
     clear_payload: bool = True,
+    episode_list: bool = False,
 ) -> UserMediaState:
     """
     Cache show episode summary on UserMediaState for My Shows cards.
@@ -1140,7 +1171,7 @@ def apply_show_episode_progress(
 
     if aired is not None:
         count = int(aired)
-        if last_still_upcoming:
+        if last_still_upcoming and not episode_list:
             # Trakt's UTC aired count can include tonight's episode before 9pm ET.
             stored = row.episodes_aired
             if stored is not None and int(stored) < count:
@@ -1152,8 +1183,26 @@ def apply_show_episode_progress(
         row.episodes_completed = int(completed)
     stored_aired = row.episodes_aired
     if stored_aired is not None and completed is not None and int(stored_aired) > 0:
-        row.progress_percent = round(100.0 * int(completed) / int(stored_aired), 1)
-        if int(completed) > 0:
+        done = int(completed)
+        # Trakt's completed total often still says caught up after a new episode.
+        # The show-level last watch is the check: if it is before that air date,
+        # the new episode is unwatched.
+        if (
+            done >= int(stored_aired)
+            and not episode_list
+            and _watch_predates_latest_air(row)
+        ):
+            done = int(stored_aired) - 1
+            row.episodes_completed = done
+            parsed = _parse_latest_episode_label(row.last_episode_label)
+            if parsed:
+                next_episode = {
+                    'season': parsed[0],
+                    'number': parsed[1],
+                    'title': parsed[2],
+                }
+        row.progress_percent = round(100.0 * done / int(stored_aired), 1)
+        if done > 0:
             row.watched = True
 
     if last_still_upcoming:
@@ -1295,16 +1344,12 @@ def refresh_show_progress_for_ids(
 
 
 def _parse_first_aired(value: str | None) -> datetime | None:
-    """Parse Trakt first_aired / released timestamp to naive UTC datetime."""
+    """Parse an episode first_aired. Explicit 00:00Z is 8pm Eastern in summer."""
+    from services.local_time import parse_trakt_datetime
+
     if not value:
         return None
-    try:
-        text = str(value).strip().replace('Z', '+00:00')
-        if len(text) == 10 and text[4] == '-' and text[7] == '-':
-            return datetime.fromisoformat(text)
-        return datetime.fromisoformat(text).replace(tzinfo=None)
-    except ValueError:
-        return None
+    return parse_trakt_datetime(value, midnight_is_instant=True)
 
 
 def _latest_aired_from_seasons(seasons: list) -> tuple[datetime | None, str | None, int]:

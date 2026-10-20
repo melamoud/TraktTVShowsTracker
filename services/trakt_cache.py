@@ -367,8 +367,76 @@ def save_progress_payload(
         completed=completed,
         next_episode=next_episode,
         clear_payload=False,
+        episode_list=True,
     )
     return row
+
+
+def reconcile_cached_episode_counts(user_id: int, trakt_ids: list[int] | None = None) -> set[int]:
+    """Recount cached shows from each episode's local air time.
+
+    My Shows treats a show as caught up from ``progress_percent``. That number
+    used to follow Trakt's UTC aired total, so an episode that already aired
+    locally (8pm Eastern stored as the next UTC midnight) left the show on
+    the watched list. Returns the show ids that have an episode list, so a
+    later Trakt total cannot put them back at 100%.
+    """
+    q = UserMediaState.query.filter_by(user_id=user_id, media_type='show')
+    q = q.filter(UserMediaState.progress_payload_json.isnot(None))
+    if trakt_ids is not None:
+        ids = [int(t) for t in trakt_ids if t]
+        if not ids:
+            return set()
+        q = q.filter(UserMediaState.trakt_id.in_(ids))
+    protected: set[int] = set()
+    changed = False
+    for row in q.all():
+        result = _reconcile_one_show(row)
+        if result is None:
+            continue
+        protected.add(int(row.trakt_id))
+        changed = changed or result
+    if changed:
+        db.session.commit()
+    return protected
+
+
+def _reconcile_one_show(row) -> bool | None:
+    """True when the summary or calendar day changed, None when there is no list."""
+    from services.sync_jobs import apply_show_episode_progress
+
+    try:
+        data = json.loads(row.progress_payload_json or '')
+    except (TypeError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, dict):
+        return None
+    seasons = data.get('seasons_meta') or []
+    if not seasons:
+        return None
+    watched = _keys_to_tuples(data.get('watched_keys'))
+    aired_keys = _keys_to_tuples(data.get('aired_keys'))
+    aired, completed, next_episode = summarize_progress(seasons, watched, aired_keys)
+    next_s = (next_episode or {}).get('season')
+    next_e = (next_episode or {}).get('number')
+    same = (
+        row.episodes_aired == aired
+        and row.episodes_completed == completed
+        and row.next_episode_season == next_s
+        and row.next_episode_number == next_e
+    )
+    if same:
+        return False
+    apply_show_episode_progress(
+        row.user_id,
+        int(row.trakt_id),
+        aired=aired,
+        completed=completed,
+        next_episode=next_episode,
+        clear_payload=False,
+        episode_list=True,
+    )
+    return True
 
 
 def invalidate_show_progress(user_id: int, trakt_id: int) -> None:
@@ -407,11 +475,16 @@ def summarize_progress(
                 continue
             ep_no = int(ep_no)
             key = (number, ep_no)
-            is_aired = key in aired_keys if aired_keys else False
-            if is_aired:
-                air = parse_trakt_datetime(ep.get('first_aired') or ep.get('released'))
-                if air is not None and not has_aired_at(air):
-                    is_aired = False
+            air = parse_trakt_datetime(
+                ep.get('first_aired') or ep.get('released'),
+                midnight_is_instant=True,
+            )
+            if air is not None:
+                # Local air time decides. Trakt's aired set follows the UTC
+                # date, so an 8pm Eastern episode is missing until the next day.
+                is_aired = has_aired_at(air)
+            else:
+                is_aired = key in aired_keys if aired_keys else False
             if not is_aired:
                 continue
             if not is_specials:

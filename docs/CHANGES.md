@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-10-19 — 8pm Eastern episode air times
+
+- An episode timestamp of `00:00 UTC` is 8pm Eastern during daylight time, so it counts as aired that evening. A bare release date, and the calendar day for a midnight stamp, stay on the labeled day
+- Opening My Shows recounts every saved episode. A show at 100% comes back to **Unwatched episodes** and the shows widget when one of those episodes is still unwatched
+- The movies widget lists released titles you have not watched
+- Updated [Alerts](help/user/release_alerts.md), [My shows](help/user/my_shows.md), and [Android app](help/user/android.md)
+
 ## 2026-10-17 — Caught-up shows pick up a new episode (1.0.23)
 
 - A show at 100% comes back onto **Unwatched episodes** when a later episode has aired, and the **Watched** label comes off until you catch up

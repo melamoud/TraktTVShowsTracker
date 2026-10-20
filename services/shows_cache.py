@@ -202,14 +202,21 @@ def _reopen_for_newer_episode(
     """
     from services.local_time import local_date, to_local
 
-    if not _caught_up(row) or row.progress_detail_at is None:
+    if not _caught_up(row):
         return False
-    detail_day = local_date(row.progress_detail_at)
-    if detail_day is None or detail_day > air_day:
-        return False
-    if detail_day == air_day and today <= air_day:
-        if to_local(row.progress_detail_at).hour >= 21:
+    watched_day = local_date(row.last_watched_at) if row.last_watched_at else None
+    # Last watch before this airing means the new episode is still open, even
+    # when a later progress pull stamped 100%.
+    unwatched_airing = watched_day is not None and watched_day < air_day
+    if not unwatched_airing:
+        if row.progress_detail_at is None:
             return False
+        detail_day = local_date(row.progress_detail_at)
+        if detail_day is None or detail_day > air_day:
+            return False
+        if detail_day == air_day and today <= air_day:
+            if to_local(row.progress_detail_at).hour >= 21:
+                return False
     completed = int(row.episodes_completed or 0)
     row.episodes_aired = completed + 1
     row.progress_percent = round(100.0 * completed / row.episodes_aired, 1)
@@ -296,12 +303,24 @@ def refresh_shows_cache_for_user(user: User, *, skip_per_show: bool = False) -> 
             break
     db.session.commit()
 
-    # 3. Progress for anything not known finished (NULL = unknown, fetch once).
+    # 3. Recount from cached episode air times, including shows at 100%.
+    #    Trakt's aired total follows the UTC date, so this is what puts a show
+    #    back on Unwatched after an 8pm Eastern episode.
+    from services.trakt_cache import reconcile_cached_episode_counts
+    protected = reconcile_cached_episode_counts(user.id, show_ids)
+    db.session.expire_all()
+
+    # 4. Progress for anything not known finished (NULL = unknown, fetch once).
+    #    Skip shows we just counted from their episode list so Trakt's UTC
+    #    aired total cannot put them back at 100%.
     if not stats['aborted']:
         open_ids = [
             tid for tid in show_ids
-            if (states.get(tid) is None)
-            or (states[tid].progress_percent is None or states[tid].progress_percent < 100)
+            if tid not in protected
+            and (
+                (states.get(tid) is None)
+                or (states[tid].progress_percent is None or states[tid].progress_percent < 100)
+            )
         ]
         if open_ids:
             try:

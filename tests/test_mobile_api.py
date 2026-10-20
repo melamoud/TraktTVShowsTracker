@@ -341,6 +341,14 @@ def test_widget_shows_movies_alerts_and_does_not_persist_display(app, client, us
             user_id=user, media_type='movie', trakt_id=9, on_watchlist=True,
             watched=False,
         ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=10, title='Seen Film', year=2024,
+            released_at=datetime.utcnow().date() - timedelta(days=3),
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=10, on_watchlist=True,
+            watched=True,
+        ))
         db.session.add(Notification(
             user_id=user, alert_type='episode_aired', title='The Bear S3E1',
             message='S03E01 aired', media_type='show', trakt_id=42,
@@ -371,6 +379,7 @@ def test_widget_shows_movies_alerts_and_does_not_persist_display(app, client, us
     assert movie_body['mode'] == 'movies'
     assert movie_body['items'][0]['title'] == 'Old Film'
     assert movie_body['items'][0]['can_watch'] is True
+    assert all(item['title'] != 'Seen Film' for item in movie_body['items'])
 
     alerts = client.get('/api/v1/widget?mode=alerts')
     assert alerts.status_code == 200

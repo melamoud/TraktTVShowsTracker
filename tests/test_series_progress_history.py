@@ -60,7 +60,8 @@ def test_series_progress_prefers_history_over_progress_flags(app, client, user):
     assert '2</strong> / 2 aired' in html
     assert 'Next up:' not in html  # all aired eps watched; E3/E4 future
     assert 'E3' in html and 'E4' in html
-    assert 'Airs 2030-01-01 · Not aired yet' in html
+    # 2030-01-01T00:00Z is 8pm Eastern on 2029-12-31.
+    assert 'Airs 2029-12-31 · Not aired yet' in html
     assert 'episode-line' in html
     assert 'btn-watched' in html and '>Watched<' in html
     assert 'btn-watch' in html and '>Watch<' in html

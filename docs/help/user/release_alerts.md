@@ -63,7 +63,7 @@ Episode titles put the number **and episode name** together — **The Ark S3E9 C
 
 **Added to a list** is written as soon as you save Set lists or add to Wishlist. Other types are written in the background on the schedule under **Admin → Scheduler** (default: every 4 hours at :00 **America/New_York** — 12am / 4am / 8am / 12pm / 4pm / 8pm). You see them next login or page refresh. Admins can **Run alert check now** from Admin, Scheduler, or the Alerts page.
 
-- Episode detection uses Trakt's **My calendar** bulk feed — one call per run covers every watchlisted or in-progress show, so a show you **just added** alerts on the very next run. Air dates are the local calendar day (a `01:00 UTC` episode alerts on the previous evening). List-only shows (never watched, not watchlisted) get a per-show fallback check.
+- Episode detection uses Trakt's **My calendar** bulk feed — one call per run covers every watchlisted or in-progress show, so a show you **just added** alerts on the very next run. Air dates follow the calendar day (`01:00 UTC` is 9pm Eastern the evening before; a midnight `00:00 UTC` stamp stays on that labeled day). List-only shows (never watched, not watchlisted) get a per-show fallback check.
 - If Trakt is rate-limiting (HTTP 429), the run backs off instead of scanning shows one by one — nothing is lost; the next run catches up within the 3-day window.
 - First scan after install (or for a newly added show) only alerts episodes/seasons aired within the last **3 days** — older history is baselined silently, so you never get a flood of ancient episodes.
 - **Favorite actor** alerts only look at titles ingested in about the last week, and only notify for those listed in the last **3 days**. Older catalog is recorded as already seen.

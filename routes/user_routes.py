@@ -14,16 +14,12 @@ from sqlalchemy import String, and_, case, cast, extract, or_
 
 
 def _parse_air_datetime(value: str | None) -> datetime | None:
-    """Parse Trakt first_aired / released timestamps to naive UTC datetime."""
+    """Parse an episode air time. Explicit 00:00Z is 8pm Eastern in summer."""
+    from services.local_time import parse_trakt_datetime
+
     if not value:
         return None
-    try:
-        text = str(value).strip().replace('Z', '+00:00')
-        if len(text) == 10 and text[4] == '-' and text[7] == '-':
-            return datetime.fromisoformat(text)
-        return datetime.fromisoformat(text).replace(tzinfo=None)
-    except ValueError:
-        return None
+    return parse_trakt_datetime(value, midnight_is_instant=True)
 
 
 def _episode_air_info(ep: dict, *, progress_says_aired: bool | None) -> dict:
@@ -32,18 +28,16 @@ def _episode_air_info(ep: dict, *, progress_says_aired: bool | None) -> dict:
 
     Returns aired (bool), air_date (datetime|None), air_label (str).
 
-    Air time is converted to the admin scheduler timezone. Trakt progress
-    cannot force an episode to look aired while it is still in the future
-    locally (UTC-date vs Eastern evening mismatch).
+    Air time is converted to the admin scheduler timezone. That local time
+    decides aired vs upcoming, including 00:00 UTC (8pm Eastern in summer).
     """
     from services.local_time import format_local_date, has_aired_at
 
     air_dt = _parse_air_datetime(ep.get('first_aired')) or _parse_air_datetime(ep.get('released'))
     if air_dt is not None:
         label = format_local_date(air_dt) or air_dt.strftime('%Y-%m-%d')
+        # The timestamp wins over Trakt's aired flag in both directions.
         is_aired = has_aired_at(air_dt)
-        if progress_says_aired is False:
-            is_aired = False
         if is_aired:
             air_label = f'Aired {label}'
         else:
@@ -617,6 +611,9 @@ def _my_media(media_type: str):
     filter_lists = _my_filter_lists(current_user)
     selected_lists = _resolve_selected_lists(current_user, filter_lists, view)
     list_trakt_ids = _trakt_ids_for_lists(current_user.id, media_type, selected_lists)
+    if media_type == 'show' and list_trakt_ids:
+        from services.trakt_cache import reconcile_cached_episode_counts
+        reconcile_cached_episode_counts(current_user.id, list(list_trakt_ids))
     search_q = (request.args.get('q') or '').strip()
     if len(search_q) < 2:
         search_q = ''

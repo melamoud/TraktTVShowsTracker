@@ -30,15 +30,16 @@ _CAL_TZ_PAD_DAYS = 1
 _HAS_DASH_STRFTIME = None
 
 
-def parse_calendar_day(value) -> date | None:
+def parse_calendar_day(value, *, midnight_is_instant: bool = False) -> date | None:
     """Local calendar day for a Trakt date or ISO timestamp.
 
-    Date-only and midnight-UTC values stay on that day (Netflix drops).
-    Timed UTC (HBO 01:00Z) converts to the scheduler timezone.
+    A bare date stays on that day. ``00:00Z`` stays on that UTC day too
+    (a calendar label). A later clock time, such as ``01:00Z``, converts
+    to the previous evening in the scheduler timezone.
     """
     from services.local_time import local_date, parse_trakt_datetime
 
-    return local_date(parse_trakt_datetime(value))
+    return local_date(parse_trakt_datetime(value, midnight_is_instant=midnight_is_instant))
 
 
 def _fmt(day: date, fmt: str) -> str:

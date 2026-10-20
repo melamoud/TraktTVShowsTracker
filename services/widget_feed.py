@@ -70,6 +70,7 @@ def _media_items(user, media_type: str) -> list[dict]:
         states = order_shows_newest_aired(raw, media_by_id, today)[:WIDGET_LIMIT]
     else:
         q = q.filter(
+            UserMediaState.watched.is_(False),
             CachedMedia.released_at.isnot(None),
             CachedMedia.released_at <= today,
         )

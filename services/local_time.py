@@ -1,11 +1,13 @@
 """App-local timezone for display and 'has this aired?' checks.
 
-Naive datetimes in the DB are UTC. Date-only values (and midnight-UTC
-datetimes, which Trakt uses as calendar days) stay on that calendar date so a
-Netflix drop labeled 2026-08-20 does not shift to the 19th in Eastern.
+Naive datetimes in the DB are UTC. A bare date (YYYY-MM-DD) stays on that
+calendar day, so a Netflix drop labeled 2026-08-20 does not shift to the 19th.
 
-Timed UTC stamps (HBO 01:00Z) convert to Admin → Scheduler timezone
-(default America/New_York).
+An explicit UTC timestamp converts to Admin → Scheduler timezone (default
+America/New_York). 01:00Z is 9pm Eastern. 00:00Z is 8pm Eastern during
+daylight time, so a cable airing at that instant is the previous evening,
+not the next UTC date. Callers that mean a date-only label pass
+midnight_is_instant=False (the default).
 """
 
 from __future__ import annotations
@@ -75,14 +77,23 @@ def is_calendar_midnight(dt: datetime) -> bool:
     )
 
 
-def parse_trakt_datetime(value) -> datetime | None:
-    """Parse a Trakt date or ISO timestamp to naive UTC (midnight = date-only)."""
+def parse_trakt_datetime(value, *, midnight_is_instant: bool = False) -> datetime | None:
+    """Parse a Trakt date or ISO timestamp.
+
+    A bare date becomes naive midnight (a calendar label). A timed stamp
+    becomes naive UTC. When ``midnight_is_instant`` is set, an explicit
+    ``00:00:00Z`` stays timezone-aware so ``local_date`` converts it (8pm
+    Eastern in daylight time) instead of treating it as the next UTC day.
+    """
     if value is None:
         return None
     if isinstance(value, datetime):
         if value.tzinfo is None:
             return value
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
+        utc = value.astimezone(timezone.utc)
+        if midnight_is_instant and _utc_midnight(utc):
+            return utc
+        return utc.replace(tzinfo=None)
     if isinstance(value, date):
         return datetime(value.year, value.month, value.day)
     text = str(value).strip()
@@ -94,13 +105,25 @@ def parse_trakt_datetime(value) -> datetime | None:
         iso = text.replace('Z', '+00:00')
         dt = datetime.fromisoformat(iso)
         if dt.tzinfo is not None:
-            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+            utc = dt.astimezone(timezone.utc)
+            if midnight_is_instant and _utc_midnight(utc):
+                return utc
+            dt = utc.replace(tzinfo=None)
         return dt
     except ValueError:
         try:
             return datetime.fromisoformat(text[:10])
         except ValueError:
             return None
+
+
+def _utc_midnight(dt: datetime) -> bool:
+    return (
+        dt.hour == 0
+        and dt.minute == 0
+        and dt.second == 0
+        and dt.microsecond == 0
+    )
 
 
 def local_date(value) -> date | None:

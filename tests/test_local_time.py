@@ -36,13 +36,22 @@ def test_has_aired_uses_local_clock(app):
 
 
 def test_parse_trakt_datetime_midnight_vs_timed(app):
-    from services.local_time import parse_trakt_datetime
+    from services.local_time import has_aired_at, local_date, parse_trakt_datetime
 
     with app.app_context():
         midnight = parse_trakt_datetime('2026-08-20T00:00:00.000Z')
         assert midnight == datetime(2026, 8, 20, 0, 0, 0)
         timed = parse_trakt_datetime('2026-08-24T01:00:00.000Z')
         assert timed == datetime(2026, 8, 24, 1, 0, 0)
+        # 2026-10-20 00:00Z is 8:00pm EDT on Oct 19.
+        instant = parse_trakt_datetime(
+            '2026-10-20T00:00:00.000Z', midnight_is_instant=True,
+        )
+        assert local_date(instant) == date(2026, 10, 19)
+        after = datetime(2026, 10, 19, 22, 0, 0, tzinfo=ZoneInfo('America/New_York'))
+        before = datetime(2026, 10, 19, 19, 0, 0, tzinfo=ZoneInfo('America/New_York'))
+        assert has_aired_at(instant, now=after) is True
+        assert has_aired_at(instant, now=before) is False
 
 
 
@@ -56,3 +65,9 @@ def test_progress_air_label_uses_local_date_not_utc(app):
         )
         assert '2026-08-23' in info['air_label']
         assert '2026-08-24' not in info['air_label']
+        eight_pm = _episode_air_info(
+            {'first_aired': '2026-10-20T00:00:00.000Z'},
+            progress_says_aired=True,
+        )
+        assert '2026-10-19' in eight_pm['air_label']
+        assert '2026-10-20' not in eight_pm['air_label']

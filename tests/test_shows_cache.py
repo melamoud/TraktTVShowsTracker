@@ -1,5 +1,6 @@
 """My Shows cache job: calendar-derived last-aired, seeds, 429 abort, views."""
 
+import json
 from datetime import date, datetime, timedelta
 from unittest.mock import patch
 
@@ -385,6 +386,64 @@ def test_my_shows_card_shows_next_episode_date(app, client, user):
     assert future.strftime('%Y-%m-%d') in html
 
 
+def test_progress_does_not_keep_100_when_last_watch_is_older(app, user):
+    """Trakt's completed total must not hide an episode aired after the last watch."""
+    from services.sync_jobs import apply_show_episode_progress
+
+    with app.app_context():
+        _show(
+            user, 133964,
+            episodes_aired=158, episodes_completed=158, progress_percent=100,
+            last_watched_at=datetime(2026, 5, 20, 3, 12, 0),
+            last_episode_aired_at=datetime(2026, 10, 13, 0, 0, 0),
+            last_episode_label='S09 · E02 · Omissions',
+            watched=True,
+        )
+        db.session.commit()
+        apply_show_episode_progress(
+            user, 133964, aired=159, completed=159,
+            next_episode={'season': 9, 'number': 3, 'title': 'White Rock'},
+        )
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=133964,
+        ).one()
+        assert st.episodes_completed == 158
+        assert st.episodes_aired == 159
+        assert st.progress_percent < 100
+        assert st.next_episode_season == 9
+        assert st.next_episode_number == 2
+        assert st.next_episode_title == 'Omissions'
+
+
+def test_later_progress_snapshot_still_reopens_when_unwatched(app, user):
+    """A 100% pull after the air date still reopens if the last watch is older."""
+    from services.local_time import local_today
+
+    with app.app_context():
+        air = local_today() - timedelta(days=6)
+        _show(
+            user, 133964,
+            episodes_aired=159, episodes_completed=159, progress_percent=100,
+            progress_detail_at=datetime.utcnow(),
+            last_watched_at=datetime(2026, 5, 20, 3, 12, 0),
+            watched=True,
+        )
+        _cal_event(user, 133964, air, 9, 2, 'Omissions')
+        db.session.commit()
+        with patch(
+            'services.shows_cache.trakt_client.get_show_seasons',
+            side_effect=AssertionError('must not hit Trakt'),
+        ), patch(
+            'services.shows_cache.refresh_show_progress_for_ids', return_value=0,
+        ):
+            refresh_shows_cache_for_user(_reload_user(user))
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=133964,
+        ).one()
+        assert st.progress_percent < 100
+        assert st.next_episode_number == 2
+
+
 def test_apply_progress_clamps_aired_until_local_air_time(app, user):
     """Trakt aired=2 before 9pm ET must not become 2/2 on the card."""
     from services.sync_jobs import apply_show_episode_progress
@@ -414,3 +473,44 @@ def test_apply_progress_clamps_aired_until_local_air_time(app, user):
 def _reload_user(user_id):
     from models import User
     return db.session.get(User, user_id)
+
+
+def test_reconcile_counts_locally_aired_episode_trakt_still_calls_tomorrow(app, user):
+    """8pm Eastern is 00:00 UTC the next day. That episode still counts as aired."""
+    from services.trakt_cache import reconcile_cached_episode_counts
+
+    payload = {
+        'watched_keys': [[1, 1]],
+        'aired_keys': [[1, 1]],
+        'seasons_meta': [{
+            'number': 1,
+            'episodes': [
+                {'number': 1, 'title': 'One', 'first_aired': '2020-01-02T00:00:00.000Z'},
+                {'number': 2, 'title': 'Two', 'first_aired': '2020-01-09T00:00:00.000Z'},
+                {'number': 3, 'title': 'Later', 'first_aired': '2030-01-01T00:00:00.000Z'},
+            ],
+        }],
+    }
+    with app.app_context():
+        _show(
+            user, 133964,
+            episodes_aired=1, episodes_completed=1, progress_percent=100,
+            progress_detail_at=datetime.utcnow(),
+            progress_payload_json=json.dumps(payload),
+            watched=True,
+        )
+        _cal_event(user, 133964, date(2020, 1, 9), season=1, episode=2, title='Two')
+        db.session.commit()
+        reconcile_cached_episode_counts(user, [133964])
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=133964,
+        ).one()
+        assert st.episodes_aired == 2
+        assert st.episodes_completed == 1
+        assert st.progress_percent < 100
+        assert st.next_episode_number == 2
+        assert st.next_episode_title == 'Two'
+        ev = UserCalendarEvent.query.filter_by(
+            user_id=user, trakt_id=133964, episode_number=2,
+        ).one()
+        assert ev.event_date == date(2020, 1, 9)
