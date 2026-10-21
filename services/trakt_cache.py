@@ -394,11 +394,51 @@ def reconcile_cached_episode_counts(user_id: int, trakt_ids: list[int] | None = 
         result = _reconcile_one_show(row)
         if result is None:
             continue
-        protected.add(int(row.trakt_id))
+        if result:
+            protected.add(int(row.trakt_id))
         changed = changed or result
     if changed:
         db.session.commit()
     return protected
+
+
+def _locally_aired_missing(seasons, watched: set, aired_keys: set) -> list[dict]:
+    """Episodes that have aired locally but are absent from Trakt's aired set.
+
+    Only called when ``aired_keys`` is non-empty, so a missing key is the
+    8pm-Eastern gap, not an excuse to recount the whole series.
+    """
+    from services.local_time import has_aired_at, parse_trakt_datetime
+
+    found = []
+    for season in seasons or []:
+        number = season.get('number')
+        if number is None:
+            continue
+        number = int(number)
+        if number == 0:
+            continue
+        for ep in season.get('episodes') or []:
+            ep_no = ep.get('number')
+            if ep_no is None:
+                continue
+            ep_no = int(ep_no)
+            key = (number, ep_no)
+            if key in watched or key in aired_keys:
+                continue
+            air = parse_trakt_datetime(
+                ep.get('first_aired') or ep.get('released'),
+                midnight_is_instant=True,
+            )
+            if air is None or not has_aired_at(air):
+                continue
+            found.append({
+                'season': number,
+                'number': ep_no,
+                'title': ep.get('title'),
+                'ids': ep.get('ids') or {},
+            })
+    return found
 
 
 def _reconcile_one_show(row) -> bool | None:
@@ -416,23 +456,22 @@ def _reconcile_one_show(row) -> bool | None:
         return None
     watched = _keys_to_tuples(data.get('watched_keys'))
     aired_keys = _keys_to_tuples(data.get('aired_keys'))
-    aired, completed, next_episode = summarize_progress(seasons, watched, aired_keys)
-    next_s = (next_episode or {}).get('season')
-    next_e = (next_episode or {}).get('number')
-    same = (
-        row.episodes_aired == aired
-        and row.episodes_completed == completed
-        and row.next_episode_season == next_s
-        and row.next_episode_number == next_e
-    )
-    if same:
+    # An empty watch list is not "nothing was watched". Replacing the stored
+    # totals from it marked finished shows as unwatched.
+    if not aired_keys:
         return False
+    extras = _locally_aired_missing(seasons, watched, aired_keys)
+    done = int(row.episodes_completed or 0)
+    aired = int(row.episodes_aired or 0)
+    if not extras or aired <= 0 or done < aired:
+        return False
+    nxt = extras[0]
     apply_show_episode_progress(
         row.user_id,
         int(row.trakt_id),
-        aired=aired,
-        completed=completed,
-        next_episode=next_episode,
+        aired=aired + len(extras),
+        completed=done,
+        next_episode=nxt,
         clear_payload=False,
         episode_list=True,
     )
@@ -475,16 +514,15 @@ def summarize_progress(
                 continue
             ep_no = int(ep_no)
             key = (number, ep_no)
-            air = parse_trakt_datetime(
-                ep.get('first_aired') or ep.get('released'),
-                midnight_is_instant=True,
-            )
-            if air is not None:
-                # Local air time decides. Trakt's aired set follows the UTC
-                # date, so an 8pm Eastern episode is missing until the next day.
-                is_aired = has_aired_at(air)
-            else:
-                is_aired = key in aired_keys if aired_keys else False
+            is_aired = key in aired_keys if aired_keys else False
+            if is_aired:
+                air = parse_trakt_datetime(
+                    ep.get('first_aired') or ep.get('released'),
+                    midnight_is_instant=True,
+                )
+                # Trakt's UTC date can include tonight before 8pm Eastern.
+                if air is not None and not has_aired_at(air):
+                    is_aired = False
             if not is_aired:
                 continue
             if not is_specials:

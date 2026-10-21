@@ -514,3 +514,36 @@ def test_reconcile_counts_locally_aired_episode_trakt_still_calls_tomorrow(app, 
             user_id=user, trakt_id=133964, episode_number=2,
         ).one()
         assert ev.event_date == date(2020, 1, 9)
+
+
+def test_reconcile_does_not_unwatch_a_finished_show_with_no_watch_list(app, user):
+    """An empty saved watch list must not turn a caught-up show into unwatched."""
+    from services.trakt_cache import reconcile_cached_episode_counts
+
+    payload = {
+        'watched_keys': [],
+        'aired_keys': [],
+        'seasons_meta': [{
+            'number': 1,
+            'episodes': [
+                {'number': n, 'title': f'E{n}', 'first_aired': '2020-01-02T00:00:00.000Z'}
+                for n in range(1, 11)
+            ],
+        }],
+    }
+    with app.app_context():
+        _show(
+            user, 50,
+            episodes_aired=10, episodes_completed=10, progress_percent=100,
+            progress_detail_at=datetime.utcnow(),
+            progress_payload_json=json.dumps(payload),
+            watched=True,
+        )
+        db.session.commit()
+        reconcile_cached_episode_counts(user, [50])
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=50,
+        ).one()
+        assert st.episodes_aired == 10
+        assert st.episodes_completed == 10
+        assert st.progress_percent == 100

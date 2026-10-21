@@ -8,7 +8,7 @@ Extra status filter: **Unwatched episodes** — selected-list titles that are **
 
 Sorted by in-progress first, then most recently watched (`last_watched_at` from Trakt). Titles you haven’t started are last.
 
-Each show card shows **x / y episodes watched** and **Next: SxEy — title · air date** when known. Counts use the scheduler timezone. `01:00 UTC` is 9pm Eastern, and `00:00 UTC` is 8pm Eastern during daylight time, so that episode is not in **y** until that evening. Opening My Shows recounts those episodes from the saved list. The background media job (about every 6 hours, and **Refresh from Trakt**) fills in shows that do not have that list yet.
+Each show card shows **x / y episodes watched** and **Next: SxEy — title · air date** when known. Counts use the scheduler timezone. `01:00 UTC` is 9pm Eastern, and `00:00 UTC` is 8pm Eastern during daylight time, so that episode is not in **y** until that evening. A finished show stays finished. It comes back only when an episode has aired locally and Trakt has not counted it yet. **Refresh from Trakt** reloads the watched totals.
 
 Filter choices (status, Lists…, titles per page) are remembered for your account. Leaving My shows and coming back via the menu restores the same settings.
 

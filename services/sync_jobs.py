@@ -1454,7 +1454,9 @@ def _update_latest_aired_for_show(user_id: int, trakt_id: int) -> bool:
         row.last_episode_aired_at = latest
         row.last_episode_label = label
     ep_rows = sum(len(s.get('episodes') or []) for s in (seasons or []))
-    if ep_rows:
+    # Only fill a missing aired total. Replacing a saved total with every
+    # episode in the seasons list dropped finished shows below 100%.
+    if ep_rows and row.episodes_aired is None:
         row.episodes_aired = aired_count
         if row.episodes_completed is not None:
             if aired_count > 0:
