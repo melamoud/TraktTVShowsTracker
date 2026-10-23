@@ -46,6 +46,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
+import com.melamoud.tvtracker.ui.components.FeedbackDialog
 import com.melamoud.tvtracker.ui.components.FilterMenuButton
 import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
@@ -174,6 +175,7 @@ fun LatestMediaScreen(
                             onFoundOn = { viewModel.openFoundOn(item) },
                             onWatched = { viewModel.confirmWatch(item) },
                             onRate = { viewModel.openRate(item) },
+                            onFeedback = { viewModel.openFeedback(item) },
                             onFavorite = { viewModel.favorite(item) },
                             onReviewMarker = { viewModel.reviewMarkerSet(item) },
                             onHideRecommendation = { viewModel.hideRecommendation(item) },
@@ -234,6 +236,15 @@ fun LatestMediaScreen(
     }
     state.rateTarget?.let { item ->
         RateDialog(current = item.rating, onSave = viewModel::applyRate, onDismiss = viewModel::dismissRate)
+    }
+    state.feedbackTarget?.let { item ->
+        FeedbackDialog(
+            title = item.title,
+            load = { viewModel.loadFeedback(item) },
+            save = { viewModel.saveFeedback(item, it) },
+            onSaved = viewModel::feedbackSaved,
+            onDismiss = viewModel::dismissFeedback,
+        )
     }
     state.listsDialog?.let { dialog ->
         ListsDialog(

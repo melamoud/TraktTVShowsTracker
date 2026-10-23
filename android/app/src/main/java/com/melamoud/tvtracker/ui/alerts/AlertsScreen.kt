@@ -189,7 +189,11 @@ fun AlertsScreen(
                                             viewModel.pin(mt, id, !item.alertsPinned)
                                         }
                                     },
-                                    onWatch = item.mediaType?.let { mt -> item.traktId?.let { { viewModel.confirmWatch(item) } } },
+                                    onWatch = if (item.offersMarkWatched()) {
+                                        { viewModel.confirmWatch(item) }
+                                    } else {
+                                        null
+                                    },
                                     onLists = item.mediaType?.let { mt -> item.traktId?.let { { viewModel.openLists(item) } } },
                                     onFoundOn = item.mediaType?.let { mt -> item.traktId?.let { { viewModel.openFoundOn(item) } } },
                                     onRate = item.mediaType?.let { mt -> item.traktId?.let { { viewModel.openRate(item) } } },
@@ -215,7 +219,11 @@ fun AlertsScreen(
                                             viewModel.pin(mt, id, !single.alertsPinned)
                                         }
                                     },
-                                    onWatch = single.mediaType?.let { mt -> single.traktId?.let { { viewModel.confirmWatch(single) } } },
+                                    onWatch = if (single.offersMarkWatched()) {
+                                        { viewModel.confirmWatch(single) }
+                                    } else {
+                                        null
+                                    },
                                     onLists = single.mediaType?.let { mt -> single.traktId?.let { { viewModel.openLists(single) } } },
                                     onFoundOn = single.mediaType?.let { mt -> single.traktId?.let { { viewModel.openFoundOn(single) } } },
                                     onRate = single.mediaType?.let { mt -> single.traktId?.let { { viewModel.openRate(single) } } },
@@ -228,10 +236,15 @@ fun AlertsScreen(
         }
     }
     state.watchConfirm?.let { item ->
+        val name = item.mediaTitle ?: item.title
         ConfirmDialog(
             title = "Mark watched?",
-            message = item.mediaTitle ?: item.title,
-            confirmLabel = "Watch",
+            message = if (item.mediaType == "show") {
+                "This marks all aired episodes of $name watched on Trakt."
+            } else {
+                "$name will be marked watched on Trakt."
+            },
+            confirmLabel = "Mark watched",
             onConfirm = viewModel::applyWatch,
             onDismiss = viewModel::dismissWatch,
         )
@@ -550,7 +563,7 @@ private fun AlertItemCard(
                             onClick = it,
                             contentPadding = PaddingValues(horizontal = 10.dp),
                             modifier = Modifier.height(AlertActionHeight),
-                        ) { Text("Watch", maxLines = 1, softWrap = false) }
+                        ) { Text("Mark watched", maxLines = 1, softWrap = false) }
                     }
                     onRate?.let {
                         OutlinedButton(
@@ -683,5 +696,17 @@ private fun AlertPoster(
                     .padding(horizontal = 5.dp, vertical = 2.dp),
             )
         }
+    }
+}
+
+private val EpisodeAlertTypes = setOf("episode_aired", "season_aired", "season_streaming")
+
+/** Movie alerts, and show alerts that are about the title rather than one episode or season. */
+private fun AlertItemDto.offersMarkWatched(): Boolean {
+    if (titleWatched || traktId == null) return false
+    return when (mediaType) {
+        "movie" -> true
+        "show" -> alertType !in EpisodeAlertTypes
+        else -> false
     }
 }

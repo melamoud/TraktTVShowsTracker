@@ -28,6 +28,7 @@ from services import trakt_client
 from services.sync_jobs import (
     _update_latest_aired_for_show,
     collection_trakt_ids,
+    payload_watched_keys,
     refresh_show_progress_for_ids,
 )
 
@@ -204,6 +205,15 @@ def _reopen_for_newer_episode(
 
     if not _caught_up(row):
         return False
+    # The saved episode list already checked this one off. The show-level
+    # last-watch clock can still be the previous evening; that is not a reason
+    # to put the episode back or throw the list away.
+    if season is not None and episode is not None:
+        try:
+            if (int(season), int(episode)) in payload_watched_keys(row):
+                return False
+        except (TypeError, ValueError):
+            pass
     watched_day = local_date(row.last_watched_at) if row.last_watched_at else None
     # Last watch before this airing means the new episode is still open, even
     # when a later progress pull stamped 100%.

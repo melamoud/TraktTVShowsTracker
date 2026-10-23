@@ -368,6 +368,7 @@ def save_progress_payload(
         next_episode=next_episode,
         clear_payload=False,
         episode_list=True,
+        watched_keys=watched_keys,
     )
     return row
 

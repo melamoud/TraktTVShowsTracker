@@ -1,5 +1,18 @@
 # Changes log
 
+## 2026-10-23 — Watched episode stays watched
+
+- A show at 100% still comes back to **Unwatched episodes** and the home-screen widget when a later episode has aired and is not in the watch list
+- An episode that is already checked off stays finished, even when the show’s last-watch time is the evening before that air date. The website and the app read the same row
+- Updated [My shows](help/user/my_shows.md)
+
+## 2026-10-21 — Alert mark watched + movie/show feedback (1.0.24)
+
+- Alerts for a movie, or for a show as a title (list add, favorite actor, now streaming), have **Mark watched**. Episode, season, and season-on-a-service alerts stay on **Progress**
+- A show that is already caught up, or a movie already watched, does not show that button
+- Android movie and show cards, search, recommendations, and the title page have **Feedback**: rating plus an optional Trakt review
+- Updated [Alerts](help/user/release_alerts.md), [Android app](help/user/android.md), and [My movies](help/user/my_movies.md)
+
 ## 2026-10-19 — 8pm Eastern episode air times
 
 - An episode timestamp of `00:00 UTC` is 8pm Eastern during daylight time, so it counts as aired that evening. A bare release date, and the calendar day for a midnight stamp, stay on the labeled day

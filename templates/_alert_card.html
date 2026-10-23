@@ -81,6 +81,15 @@
                 data-trakt-id="{{ card.media_pair[1] }}"
                 data-title="{{ (m.title if m else n.title)|e }}">Progress</button>
       {% endif %}
+      {% set episode_alert = n.alert_type in ('episode_aired', 'season_aired', 'season_streaming') %}
+      {% if card.media_pair and not episode_alert and not card.title_watched %}
+        <button class="btn btn-small" type="button"
+                data-action="watched-add"
+                data-media-type="{{ card.media_pair[0] }}"
+                data-trakt-id="{{ card.media_pair[1] }}"
+                data-title="{{ (m.title if m else n.title)|e }}"
+                title="{% if card.media_pair[0] == 'show' %}Mark all aired episodes of this show watched on Trakt{% else %}Mark this movie watched on Trakt{% endif %}">Mark watched</button>
+      {% endif %}
       {% if m %}
         <a class="btn btn-small"
            href="{{ media_detail_url(m.media_type, m.trakt_id) }}">Details</a>

@@ -68,6 +68,7 @@ def test_notifications_page_renders_episode_card(app, client, user):
     assert 'Streaming:' in html
     assert 'Found on:' in html and 'toFlx' in html
     assert 'data-action="progress-open"' in html     # drawer, not page nav
+    assert 'data-action="watched-add"' not in html  # episode alerts use Progress, not whole-show watch
     assert 'data-trakt-id="7701"' in html
     assert '/catalog/show/7701' in html              # details link
     assert 'New episode' in html                     # type tag label
@@ -107,6 +108,7 @@ def test_streaming_movie_alert_shows_vendor_not_blurb(app, client, user):
     assert 'Now streaming on YouTube Free' in html
     assert 'is available on' not in html
     assert 'data-action="progress-open"' not in html
+    assert 'data-action="watched-add"' in html
 
 
 def test_legacy_episode_alert_hides_available_on_suffix(app, client, user):
@@ -387,6 +389,7 @@ def test_list_add_for_finished_show_shows_watched(app, client, user):
     html = client.get('/notifications?inbox=1').get_data(as_text=True)
     assert 'Billions' in html
     assert 'Watched' in html
+    assert 'data-action="watched-add"' not in html
 
 
 def test_watched_episode_alert_cleared_on_page(app, client, user):
@@ -467,6 +470,7 @@ def test_streaming_show_alert_has_progress_and_streaming_badge(app, client, user
     assert 'alert-kind-streaming' in html
     assert 'Now streaming' in html
     assert 'data-action="progress-open"' in html
+    assert 'data-action="watched-add"' in html
     assert 'data-trakt-id="195577"' in html
     assert 'S1E' not in html and 'S01E' not in html
 
@@ -491,6 +495,7 @@ def test_notifications_page_renders_list_add_card(app, client, user):
     assert 'Added to Wishlist' in html
     assert 'Added to list' not in html
     assert 'data-trakt-id="202341"' in html
+    assert 'data-action="watched-add"' in html
 
 
 def test_streaming_alerts_for_same_title_merge(app, client, user):
@@ -543,6 +548,7 @@ def test_season_streaming_alert_renders_sxe_and_vendors(app, client, user):
     assert 'Season streaming on Netflix' in html
     assert 'On stream:' not in html
     assert 'alert-kind-streaming' in html
+    assert 'data-action="watched-add"' not in html
     from services.local_time import format_local_date
     with app.app_context():
         note = Notification.query.filter_by(user_id=user, alert_type='season_streaming').one()
@@ -575,6 +581,7 @@ def test_notifications_page_renders_favorite_actor_card(app, client, user):
     assert 'Favorite actor: Lior Raz' in html
     assert 'alert-kind-actor' in html
     assert 'Preference match' in html
+    assert 'data-action="watched-add"' in html
     assert 'drama' in html
     assert 'heist' in html
 

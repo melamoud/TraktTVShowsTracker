@@ -11,6 +11,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
@@ -19,9 +20,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,8 +32,10 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
 import com.melamoud.tvtracker.data.api.dto.ListMembershipDto
 import com.melamoud.tvtracker.data.api.dto.ServiceLinkDto
+import kotlinx.coroutines.launch
 
 @Composable
 fun ConfirmDialog(
@@ -128,6 +133,157 @@ fun RateDialog(
         },
         confirmButton = { TextButton(onClick = { onSave(value) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
+    )
+}
+
+data class FeedbackDraft(
+    val rating: Int?,
+    val ratingChanged: Boolean,
+    val comment: String?,
+    val spoiler: Boolean,
+    val commentId: Int?,
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun FeedbackDialog(
+    title: String,
+    load: suspend () -> FeedbackResponse,
+    save: suspend (FeedbackDraft) -> Unit,
+    onSaved: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    var loading by remember { mutableStateOf(true) }
+    var saving by remember { mutableStateOf(false) }
+    var formError by remember { mutableStateOf<String?>(null) }
+    var rating by remember { mutableStateOf<Int?>(null) }
+    var initialRating by remember { mutableStateOf<Int?>(null) }
+    var comment by remember { mutableStateOf("") }
+    var initialComment by remember { mutableStateOf("") }
+    var spoiler by remember { mutableStateOf(false) }
+    var initialSpoiler by remember { mutableStateOf(false) }
+    var commentId by remember { mutableStateOf<Int?>(null) }
+    var expanded by remember { mutableStateOf(false) }
+
+    LaunchedEffect(title) {
+        loading = true
+        formError = null
+        try {
+            val fb = load()
+            rating = fb.rating
+            initialRating = fb.rating
+            comment = fb.comment.orEmpty()
+            initialComment = fb.comment.orEmpty()
+            spoiler = fb.spoiler
+            initialSpoiler = fb.spoiler
+            commentId = fb.commentId
+        } catch (err: Exception) {
+            formError = err.message ?: "Could not load your Trakt rating/review."
+        } finally {
+            loading = false
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Feedback") },
+        text = {
+            if (loading) {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(if (title.isBlank()) "Loading your Trakt rating and review…" else "Loading $title…")
+                    CircularProgressIndicator()
+                }
+            } else {
+                Column(
+                    Modifier.verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    if (title.isNotBlank()) Text(title)
+                    Text("Rating and optional review for this title. A review needs at least 5 words.")
+                    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+                        OutlinedTextField(
+                            value = rating?.toString() ?: "No rating",
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Rating 1–10") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                            modifier = Modifier.menuAnchor().fillMaxWidth(),
+                        )
+                        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                            DropdownMenuItem(text = { Text("No rating") }, onClick = {
+                                rating = null
+                                expanded = false
+                            })
+                            (1..10).forEach { score ->
+                                DropdownMenuItem(text = { Text(score.toString()) }, onClick = {
+                                    rating = score
+                                    expanded = false
+                                })
+                            }
+                        }
+                    }
+                    OutlinedTextField(
+                        value = comment,
+                        onValueChange = { comment = it },
+                        label = { Text("Review (optional)") },
+                        modifier = Modifier.fillMaxWidth().height(120.dp),
+                        maxLines = 5,
+                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = spoiler, onCheckedChange = { spoiler = it })
+                        Text("Spoiler")
+                    }
+                    formError?.let { Text(it) }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = !loading && !saving,
+                onClick = {
+                    val text = comment.trim()
+                    val words = text.split(Regex("\\s+")).filter { it.isNotBlank() }
+                    if (text.isNotEmpty() && words.size < 5) {
+                        formError = "Reviews need at least 5 words (or leave the review empty)."
+                        return@TextButton
+                    }
+                    if (text.isEmpty() && initialComment.isNotBlank()) {
+                        formError = "Leave the existing review, or replace it with at least 5 words."
+                        return@TextButton
+                    }
+                    val ratingChanged = rating != initialRating
+                    val commentChanged = text != initialComment.trim() || spoiler != initialSpoiler
+                    val writeComment = text.isNotEmpty() && commentChanged
+                    if (!ratingChanged && !writeComment) {
+                        formError = "Change the rating or write a review."
+                        return@TextButton
+                    }
+                    formError = null
+                    saving = true
+                    scope.launch {
+                        try {
+                            save(
+                                FeedbackDraft(
+                                    rating = rating,
+                                    ratingChanged = ratingChanged,
+                                    comment = if (writeComment) text else null,
+                                    spoiler = spoiler,
+                                    commentId = commentId,
+                                ),
+                            )
+                            onSaved()
+                        } catch (err: Exception) {
+                            formError = err.message ?: "Could not save to Trakt."
+                            saving = false
+                        }
+                    }
+                },
+            ) { Text(if (saving) "Saving…" else "Save") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss, enabled = !saving) { Text("Cancel") }
+        },
     )
 }
 

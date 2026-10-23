@@ -29,7 +29,7 @@ Filter choices and page size are remembered for your account when you leave and 
 - **Set lists…** — set Wishlist + Trakt personal list membership (checkboxes = actual membership; **Apply my defaults** / **Remove from all lists**)
 - **Rate…** — set or clear a 1–10 Trakt rating (same as trakt.tv)
 
-Open the title page for **Write review…** (posts a Trakt comment; optional spoiler). Episode reviews are only in the Progress panel for shows.
+Open the title page for **Write review…** (posts a Trakt comment; optional spoiler). Episode reviews are only in the Progress panel for shows. The Android app also has **Feedback** on the movie card and the title page: a 1–10 rating and an optional review, saved together.
 - **Favorite / Unfavorite** — add or remove from Trakt favorites
 - **Mark watched / Unwatch** — syncs to Trakt (**Unwatch** asks for confirmation first)
 - **Streaming** / **Plays on your services** — TMDB availability (same as Latest); highlighted when it matches services in Preferences  

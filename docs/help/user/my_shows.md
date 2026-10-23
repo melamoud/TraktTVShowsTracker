@@ -8,7 +8,7 @@ Extra status filter: **Unwatched episodes** — selected-list titles that are **
 
 Sorted by in-progress first, then most recently watched (`last_watched_at` from Trakt). Titles you haven’t started are last.
 
-Each show card shows **x / y episodes watched** and **Next: SxEy — title · air date** when known. Counts use the scheduler timezone. `01:00 UTC` is 9pm Eastern, and `00:00 UTC` is 8pm Eastern during daylight time, so that episode is not in **y** until that evening. A finished show stays finished. It comes back only when an episode has aired locally and Trakt has not counted it yet. **Refresh from Trakt** reloads the watched totals.
+Each show card shows **x / y episodes watched** and **Next: SxEy — title · air date** when known. Counts use the scheduler timezone. `01:00 UTC` is 9pm Eastern, and `00:00 UTC` is 8pm Eastern during daylight time, so that episode is not in **y** until that evening. A finished show stays finished. It comes back only when an episode has aired locally and that episode is not already in the watch list. The show’s last-watch time alone does not put a checked-off episode back. **Refresh from Trakt** reloads the watched totals.
 
 Filter choices (status, Lists…, titles per page) are remembered for your account. Leaving My shows and coming back via the menu restores the same settings.
 
@@ -28,4 +28,4 @@ Opening the page uses a local cache shared with Progress, Latest tags, and Alert
 
 Cards show **Streaming** / **Plays on your services** from TMDB (same layout as Latest), plus your local **Found on** choices.
 
-Use **Progress** to open the episode panel beside the list (Watch / **Rate / Review** dialog; writes back to Trakt). See [Series progress](series_progress). Open a show’s title page for **Write review…** on the series itself.
+Use **Progress** to open the episode panel beside the list (Watch / **Rate / Review** dialog; writes back to Trakt). See [Series progress](series_progress). Open a show’s title page for **Write review…** on the series itself. The Android app has **Feedback** on the show card and the title page for a rating plus an optional review of the series.

@@ -49,12 +49,12 @@ import com.melamoud.tvtracker.data.api.dto.CastMemberDto
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
+import com.melamoud.tvtracker.ui.components.FeedbackDialog
 import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ScrollableActionRow
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
-import com.melamoud.tvtracker.ui.components.ReviewDialog
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
 import com.melamoud.tvtracker.ui.components.ServiceLinksLine
 import com.melamoud.tvtracker.ui.theme.AccentGold
@@ -125,7 +125,7 @@ fun DetailScreen(
                             onLists = viewModel::openLists,
                             onRate = viewModel::openRate,
                             onFavorite = viewModel::favorite,
-                            onReview = viewModel::openReview,
+                            onFeedback = viewModel::openFeedback,
                             onWatch = viewModel::confirmWatch,
                             onFoundOn = viewModel::openFoundOn,
                             onHideRecommendation = viewModel::hideRecommendation,
@@ -211,14 +211,13 @@ fun DetailScreen(
             onDismiss = viewModel::dismissFoundOn,
         )
     }
-    state.review?.let { review ->
-        ReviewDialog(
-            loading = review.loading,
-            error = review.error,
-            comment = review.comment,
-            spoiler = review.spoiler,
-            onSave = viewModel::applyReview,
-            onDismiss = viewModel::dismissReview,
+    if (state.feedbackOpen && item != null) {
+        FeedbackDialog(
+            title = item.title,
+            load = { viewModel.loadFeedback() },
+            save = viewModel::saveFeedback,
+            onSaved = viewModel::feedbackSaved,
+            onDismiss = viewModel::dismissFeedback,
         )
     }
 }
@@ -316,7 +315,7 @@ private fun DetailActions(
     onLists: () -> Unit,
     onRate: () -> Unit,
     onFavorite: () -> Unit,
-    onReview: () -> Unit,
+    onFeedback: () -> Unit,
     onWatch: () -> Unit,
     onFoundOn: () -> Unit,
     onHideRecommendation: () -> Unit,
@@ -327,7 +326,7 @@ private fun DetailActions(
         ActionBtn("Set lists…", onClick = onLists)
         ActionBtn(if (item.rating != null) "Rate ${item.rating}/10" else "Rate…", onClick = onRate)
         ActionBtn(if (item.favorited) "Unfavorite" else "Favorite", onClick = onFavorite)
-        ActionBtn("Write review…", onClick = onReview)
+        ActionBtn("Feedback", onClick = onFeedback)
         ActionBtn(if (item.watched) "Unwatch" else "Mark watched", onClick = onWatch)
         ActionBtn("Found on…", onClick = onFoundOn)
         ActionBtn("Hide recommendation", onClick = onHideRecommendation)

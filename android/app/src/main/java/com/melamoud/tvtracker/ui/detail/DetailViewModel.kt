@@ -9,19 +9,12 @@ import com.melamoud.tvtracker.data.api.dto.FeedbackResponse
 import com.melamoud.tvtracker.data.api.dto.MediaDetailResponse
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
+import com.melamoud.tvtracker.ui.components.FeedbackDraft
 import com.melamoud.tvtracker.ui.media.ListsDialogState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-
-data class ReviewDialogState(
-    val loading: Boolean = false,
-    val error: String? = null,
-    val comment: String = "",
-    val spoiler: Boolean = false,
-    val commentId: Int? = null,
-)
 
 data class DetailUiState(
     val loading: Boolean = false,
@@ -32,7 +25,7 @@ data class DetailUiState(
     val rateOpen: Boolean = false,
     val watchConfirm: Boolean = false,
     val foundOnOpen: Boolean = false,
-    val review: ReviewDialogState? = null,
+    val feedbackOpen: Boolean = false,
 )
 
 class DetailViewModel(
@@ -148,37 +141,17 @@ class DetailViewModel(
         }
     }
 
-    fun openReview() {
-        _state.value = _state.value.copy(review = ReviewDialogState(loading = true))
-        viewModelScope.launch {
-            val result = repo.feedback(mediaType, traktId)
-            _state.value = result.fold(
-                onSuccess = { fb: FeedbackResponse ->
-                    _state.value.copy(
-                        review = ReviewDialogState(
-                            loading = false,
-                            comment = fb.comment.orEmpty(),
-                            spoiler = fb.spoiler,
-                            commentId = fb.commentId,
-                        ),
-                    )
-                },
-                onFailure = {
-                    _state.value.copy(
-                        review = ReviewDialogState(loading = false, error = it.message),
-                    )
-                },
-            )
-        }
+    fun openFeedback() { _state.value = _state.value.copy(feedbackOpen = true) }
+    fun dismissFeedback() { _state.value = _state.value.copy(feedbackOpen = false) }
+    fun feedbackSaved() {
+        _state.value = _state.value.copy(feedbackOpen = false)
+        reload()
     }
-    fun dismissReview() { _state.value = _state.value.copy(review = null) }
-    fun applyReview(text: String, spoiler: Boolean) {
-        val commentId = _state.value.review?.commentId
-        _state.value = _state.value.copy(review = null)
-        viewModelScope.launch {
-            repo.comment(mediaType, traktId, text, spoiler, commentId)
-            reload()
-        }
+    suspend fun loadFeedback(): FeedbackResponse = repo.feedback(mediaType, traktId).getOrThrow()
+    suspend fun saveFeedback(draft: FeedbackDraft) {
+        if (draft.ratingChanged) repo.rating(mediaType, traktId, draft.rating).getOrThrow()
+        val text = draft.comment?.trim().orEmpty()
+        if (text.isNotEmpty()) repo.comment(mediaType, traktId, text, draft.spoiler, draft.commentId).getOrThrow()
     }
 
     fun toggleFavoriteActor(actor: CastMemberDto) {

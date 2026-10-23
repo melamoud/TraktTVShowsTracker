@@ -415,6 +415,167 @@ def test_progress_does_not_keep_100_when_last_watch_is_older(app, user):
         assert st.next_episode_title == 'Omissions'
 
 
+def test_watched_latest_episode_stays_caught_up(app, user):
+    """A checked-off latest episode stays finished when the show clock is older."""
+    from services.sync_jobs import apply_show_episode_progress
+
+    payload = '{"watched_keys": [[9, 3]]}'
+    with app.app_context():
+        _show(
+            user, 133964,
+            episodes_aired=160, episodes_completed=159, progress_percent=99.4,
+            last_watched_at=datetime(2026, 10, 20, 2, 55, 0),
+            last_episode_aired_at=datetime(2026, 10, 20, 0, 0, 0),
+            last_episode_label='S09E03 · White Rock',
+            next_episode_season=9, next_episode_number=3,
+            next_episode_title='White Rock',
+            progress_payload_json=payload,
+            watched=True,
+        )
+        db.session.commit()
+        apply_show_episode_progress(
+            user, 133964, aired=160, completed=160,
+            next_episode={'season': 9, 'number': 3, 'title': 'White Rock'},
+            watched_keys={(9, 3)},
+            latest_watched_at=datetime(2026, 10, 20, 2, 55, 0),
+        )
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=133964,
+        ).one()
+        assert st.episodes_completed == 160
+        assert st.episodes_aired == 160
+        assert st.progress_percent == 100
+        assert st.next_episode_season is None
+        assert st.next_episode_number is None
+        assert st.progress_payload_json == payload
+        assert st.last_watched_at == datetime(2026, 10, 20, 16, 0, 0)
+
+
+def test_reopen_skips_episode_already_in_watch_list(app, user):
+    """Calendar must not put back an episode the saved watch list already has."""
+    from services.local_time import local_today
+
+    with app.app_context():
+        air = local_today() - timedelta(days=1)
+        payload = '{"watched_keys": [[3, 12]]}'
+        _show(
+            user, 9,
+            episodes_aired=36, episodes_completed=36, progress_percent=100,
+            progress_detail_at=datetime.utcnow() - timedelta(days=10),
+            last_watched_at=datetime(2026, 5, 20, 3, 12, 0),
+            progress_payload_json=payload,
+            watched=True,
+        )
+        _cal_event(user, 9, air, 3, 12, "We Can't Save Everyone")
+        db.session.commit()
+        with patch(
+            'services.shows_cache.trakt_client.get_show_seasons',
+            side_effect=AssertionError('must not hit Trakt'),
+        ), patch(
+            'services.shows_cache.refresh_show_progress_for_ids', return_value=0,
+        ):
+            refresh_shows_cache_for_user(_reload_user(user))
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=9,
+        ).one()
+        assert st.episodes_aired == 36
+        assert st.episodes_completed == 36
+        assert st.progress_percent == 100
+        assert st.next_episode_number is None
+        assert st.progress_payload_json == payload
+
+
+def test_progress_fetch_uses_history_when_totals_are_stale(app, user):
+    """Caught-up totals with an old show clock stay caught up once history has the episode."""
+    from models import User
+    from services.sync_jobs import refresh_show_progress_for_ids
+
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        _show(
+            user, 133964,
+            episodes_aired=160, episodes_completed=159, progress_percent=99.4,
+            last_watched_at=datetime(2026, 10, 20, 2, 55, 0),
+            last_episode_aired_at=datetime(2026, 10, 20, 0, 0, 0),
+            last_episode_label='S09E03 · White Rock',
+            next_episode_season=9, next_episode_number=3,
+            next_episode_title='White Rock',
+            watched=True,
+        )
+        db.session.commit()
+        progress = {
+            'aired': 160,
+            'completed': 160,
+            'next_episode': {'season': 9, 'number': 3, 'title': 'White Rock'},
+            'seasons': [],
+        }
+        history = [{
+            'watched_at': '2026-10-21T02:00:00.000Z',
+            'episode': {'season': 9, 'number': 3},
+        }]
+        with patch(
+            'services.sync_jobs.trakt_client.get_show_progress', return_value=progress,
+        ), patch(
+            'services.sync_jobs.trakt_client.get_show_watch_history', return_value=history,
+        ) as hist:
+            n = refresh_show_progress_for_ids(user_obj, [133964])
+        assert n == 1
+        hist.assert_called_once()
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=133964,
+        ).one()
+        assert st.episodes_completed == 160
+        assert st.episodes_aired == 160
+        assert st.progress_percent == 100
+        assert st.next_episode_season is None
+        assert st.last_watched_at == datetime(2026, 10, 21, 2, 0, 0)
+
+
+def test_progress_fetch_skips_history_when_episode_flag_is_set(app, user):
+    """Progress episode flags are enough; history is only for the stale-total case."""
+    from models import User
+    from services.sync_jobs import refresh_show_progress_for_ids
+
+    with app.app_context():
+        user_obj = db.session.get(User, user)
+        _show(
+            user, 133964,
+            episodes_aired=160, episodes_completed=159, progress_percent=99.4,
+            last_watched_at=datetime(2026, 10, 20, 2, 55, 0),
+            last_episode_aired_at=datetime(2026, 10, 20, 0, 0, 0),
+            last_episode_label='S09E03 · White Rock',
+            watched=True,
+        )
+        db.session.commit()
+        progress = {
+            'aired': 160,
+            'completed': 160,
+            'next_episode': None,
+            'seasons': [{
+                'number': 9,
+                'episodes': [{
+                    'number': 3,
+                    'completed': True,
+                    'last_watched_at': '2026-10-21T02:00:00.000Z',
+                }],
+            }],
+        }
+        with patch(
+            'services.sync_jobs.trakt_client.get_show_progress', return_value=progress,
+        ), patch(
+            'services.sync_jobs.trakt_client.get_show_watch_history',
+        ) as hist:
+            n = refresh_show_progress_for_ids(user_obj, [133964])
+        assert n == 1
+        hist.assert_not_called()
+        st = UserMediaState.query.filter_by(
+            user_id=user, media_type='show', trakt_id=133964,
+        ).one()
+        assert st.episodes_completed == 160
+        assert st.progress_percent == 100
+        assert st.last_watched_at == datetime(2026, 10, 21, 2, 0, 0)
+
+
 def test_later_progress_snapshot_still_reopens_when_unwatched(app, user):
     """A 100% pull after the air date still reopens if the last watch is older."""
     from services.local_time import local_today

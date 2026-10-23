@@ -63,6 +63,7 @@ import com.melamoud.tvtracker.data.api.absoluteUrl
 import com.melamoud.tvtracker.data.api.dto.FilterListDto
 import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
+import com.melamoud.tvtracker.ui.components.FeedbackDialog
 import com.melamoud.tvtracker.ui.components.FilterMenuButton
 import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
@@ -215,6 +216,7 @@ fun MyMediaScreen(
                             onFoundOn = { viewModel.openFoundOn(item) },
                             onWatched = { viewModel.confirmWatch(item) },
                             onRate = { viewModel.openRate(item) },
+                            onFeedback = { viewModel.openFeedback(item) },
                             onFavorite = { viewModel.favorite(item) },
                             onProgress = if (isShows) ({ onProgress(item.traktId) }) else null,
                             onOpen = {
@@ -267,6 +269,15 @@ fun MyMediaScreen(
     }
     state.rateTarget?.let { item ->
         RateDialog(current = item.rating, onSave = viewModel::applyRate, onDismiss = viewModel::dismissRate)
+    }
+    state.feedbackTarget?.let { item ->
+        FeedbackDialog(
+            title = item.title,
+            load = { viewModel.loadFeedback(item) },
+            save = { viewModel.saveFeedback(item, it) },
+            onSaved = viewModel::feedbackSaved,
+            onDismiss = viewModel::dismissFeedback,
+        )
     }
     state.listsDialog?.let { dialog ->
         ListsDialog(

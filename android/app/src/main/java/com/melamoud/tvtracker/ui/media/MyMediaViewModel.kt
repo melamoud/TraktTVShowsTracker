@@ -10,6 +10,7 @@ import com.melamoud.tvtracker.data.api.dto.ListMembershipDto
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.data.api.dto.ServiceLinkDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
+import com.melamoud.tvtracker.ui.components.FeedbackDraft
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -37,6 +38,7 @@ data class MyMediaUiState(
     val foundOnDialog: FoundOnDialogState? = null,
     val foundOnChoices: List<String> = emptyList(),
     val rateTarget: MediaItemDto? = null,
+    val feedbackTarget: MediaItemDto? = null,
     val watchConfirm: MediaItemDto? = null,
     val listCreateDialog: Boolean = false,
     val listDeleteConfirm: FilterListDto? = null,
@@ -192,6 +194,21 @@ class MyMediaViewModel(
             repo.rating(mediaType, item.traktId, score)
             reload()
         }
+    }
+
+    fun openFeedback(item: MediaItemDto) { _state.value = _state.value.copy(feedbackTarget = item) }
+    fun dismissFeedback() { _state.value = _state.value.copy(feedbackTarget = null) }
+    fun feedbackSaved() {
+        _state.value = _state.value.copy(feedbackTarget = null)
+        reload()
+    }
+    suspend fun loadFeedback(item: MediaItemDto) =
+        repo.feedback(item.mediaType ?: mediaType, item.traktId).getOrThrow()
+    suspend fun saveFeedback(item: MediaItemDto, draft: FeedbackDraft) {
+        val mt = item.mediaType ?: mediaType
+        if (draft.ratingChanged) repo.rating(mt, item.traktId, draft.rating).getOrThrow()
+        val text = draft.comment?.trim().orEmpty()
+        if (text.isNotEmpty()) repo.comment(mt, item.traktId, text, draft.spoiler, draft.commentId).getOrThrow()
     }
 
     fun favorite(item: MediaItemDto) {

@@ -1122,6 +1122,93 @@ def _parse_latest_episode_label(label: str | None) -> tuple[int, int, str | None
     return int(match.group(1)), int(match.group(2)), title
 
 
+def payload_watched_keys(row: UserMediaState | None) -> set[tuple[int, int]]:
+    """(season, episode) pairs already stored on the show, if the list is still there."""
+    if row is None or not row.progress_payload_json:
+        return set()
+    try:
+        data = json.loads(row.progress_payload_json)
+    except (TypeError, json.JSONDecodeError):
+        return set()
+    if not isinstance(data, dict):
+        return set()
+    keys: set[tuple[int, int]] = set()
+    for pair in data.get('watched_keys') or []:
+        if not isinstance(pair, (list, tuple)) or len(pair) < 2:
+            continue
+        try:
+            keys.add((int(pair[0]), int(pair[1])))
+        except (TypeError, ValueError):
+            continue
+    return keys
+
+
+def _bump_last_watched_past_air_day(row: UserMediaState, when: datetime | None = None) -> None:
+    """Move the show clock forward so a watched latest episode is not reopened.
+
+    The show-level Trakt timestamp can stay on the previous evening while the
+    episode itself is already checked off. Comparisons use the local date, so
+    a floor of 16:00 UTC on the calendar air day is still that day in Eastern
+    time. A later episode watch time replaces that floor. The stored clock
+    never moves backward.
+    """
+    air = row.last_episode_aired_at
+    floor = None
+    if air is not None:
+        floor = datetime(air.year, air.month, air.day, 16, 0, 0)
+    chosen = when
+    if chosen is not None and chosen.tzinfo is not None:
+        chosen = chosen.replace(tzinfo=None)
+    if floor is not None and (chosen is None or chosen < floor):
+        chosen = floor
+    if chosen is None:
+        return
+    if row.last_watched_at is None or chosen > row.last_watched_at:
+        row.last_watched_at = chosen
+
+
+def _episode_pair(episode: dict | None) -> tuple[int, int] | None:
+    if not episode:
+        return None
+    try:
+        return int(episode.get('season')), int(episode.get('number'))
+    except (TypeError, ValueError):
+        return None
+
+
+def _episode_watch_time(
+    progress: dict | None,
+    history: list | None,
+    season: int,
+    episode: int,
+) -> datetime | None:
+    """Latest watch time Trakt recorded for one episode, if any."""
+    latest: datetime | None = None
+    for season_row in (progress or {}).get('seasons') or []:
+        try:
+            if int(season_row.get('number')) != int(season):
+                continue
+        except (TypeError, ValueError):
+            continue
+        for ep in season_row.get('episodes') or []:
+            try:
+                if int(ep.get('number')) != int(episode):
+                    continue
+            except (TypeError, ValueError):
+                continue
+            stamp = _parse_trakt_dt(ep.get('last_watched_at'))
+            if stamp is not None and (latest is None or stamp > latest):
+                latest = stamp
+    for item in history or []:
+        pair = _episode_pair(item.get('episode') or {})
+        if pair != (int(season), int(episode)):
+            continue
+        stamp = _parse_trakt_dt(item.get('watched_at'))
+        if stamp is not None and (latest is None or stamp > latest):
+            latest = stamp
+    return latest
+
+
 def apply_show_episode_progress(
     user_id: int,
     trakt_id: int,
@@ -1131,6 +1218,8 @@ def apply_show_episode_progress(
     next_episode: dict | None = None,
     clear_payload: bool = True,
     episode_list: bool = False,
+    watched_keys: set[tuple[int, int]] | None = None,
+    latest_watched_at: datetime | None = None,
 ) -> UserMediaState:
     """
     Cache show episode summary on UserMediaState for My Shows cards.
@@ -1182,19 +1271,29 @@ def apply_show_episode_progress(
     if completed is not None:
         row.episodes_completed = int(completed)
     stored_aired = row.episodes_aired
+    kept_watched_episode = False
     if stored_aired is not None and completed is not None and int(stored_aired) > 0:
         done = int(completed)
         # Trakt's completed total often still says caught up after a new episode.
         # The show-level last watch is the check: if it is before that air date,
-        # the new episode is unwatched.
-        if (
+        # the new episode is unwatched — unless that episode is already in the
+        # watch list. The show clock can sit on the previous evening after the
+        # episode itself was checked off.
+        parsed = _parse_latest_episode_label(row.last_episode_label)
+        latest_key = (parsed[0], parsed[1]) if parsed else None
+        latest_is_watched = latest_key is not None and latest_key in (watched_keys or set())
+        if latest_is_watched:
+            kept_watched_episode = True
+            _bump_last_watched_past_air_day(row, latest_watched_at)
+            if _episode_pair(next_episode) == latest_key:
+                next_episode = None
+        elif (
             done >= int(stored_aired)
             and not episode_list
             and _watch_predates_latest_air(row)
         ):
             done = int(stored_aired) - 1
             row.episodes_completed = done
-            parsed = _parse_latest_episode_label(row.last_episode_label)
             if parsed:
                 next_episode = {
                     'season': parsed[0],
@@ -1245,7 +1344,10 @@ def apply_show_episode_progress(
     # so mark the payload stale. Callers that just saved a fresh payload pass
     # clear_payload=False to keep it. next_episode_ids_json is kept separately
     # so the home-screen widget can still mark the next episode.
-    if clear_payload and old_summary != new_summary:
+    # Keep the episode list when this pass only confirmed the latest episode
+    # is already watched. Clearing it left the next run with the show clock
+    # alone, which put that episode back.
+    if clear_payload and old_summary != new_summary and not kept_watched_episode:
         row.progress_payload_json = None
     row.updated_at = datetime.utcnow()
     return row
@@ -1326,12 +1428,45 @@ def refresh_show_progress_for_ids(
             completed = progress.get('completed')
             if aired is None and completed is None:
                 continue
+            row = rows.get(tid)
+            from services.trakt_client import episode_watched_keys_from_trakt
+            keys = episode_watched_keys_from_trakt(
+                history=None, watched_entry=None, progress=progress,
+            )
+            parsed = _parse_latest_episode_label(
+                row.last_episode_label if row else None,
+            )
+            history = None
+            totals_caught_up = int(completed or 0) >= int(aired or 0) > 0
+            if (
+                row is not None
+                and parsed is not None
+                and (parsed[0], parsed[1]) not in keys
+                and totals_caught_up
+                and _watch_predates_latest_air(row)
+            ):
+                try:
+                    owner = db.session.get(User, user_id)
+                    if owner is not None:
+                        history = trakt_client.get_show_watch_history(owner, tid)
+                        keys |= episode_watched_keys_from_trakt(
+                            history=history, watched_entry=None, progress=None,
+                        )
+                except Exception as exc:
+                    logger.warning(
+                        'Show history fetch failed for %s: %s', tid, exc,
+                    )
+            watch_at = None
+            if parsed is not None and (parsed[0], parsed[1]) in keys:
+                watch_at = _episode_watch_time(progress, history, parsed[0], parsed[1])
             apply_show_episode_progress(
                 user_id,
                 tid,
                 aired=int(aired or 0),
                 completed=int(completed or 0),
                 next_episode=progress.get('next_episode'),
+                watched_keys=keys,
+                latest_watched_at=watch_at,
             )
             updated += 1
     if updated:

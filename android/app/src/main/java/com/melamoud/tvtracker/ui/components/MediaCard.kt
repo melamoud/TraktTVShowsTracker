@@ -61,6 +61,7 @@ fun MediaCard(
     onFoundOn: () -> Unit,
     onWatched: () -> Unit,
     onRate: () -> Unit,
+    onFeedback: () -> Unit,
     onFavorite: () -> Unit,
     onProgress: (() -> Unit)? = null,
     onReviewMarker: (() -> Unit)? = null,
@@ -196,6 +197,11 @@ fun MediaCard(
                             modifier = Modifier.height(32.dp),
                         ) { Text(if (item.watched) "Unwatch" else "Watch") }
                     }
+                    OutlinedButton(
+                        onClick = onFeedback,
+                        contentPadding = PaddingValues(horizontal = 10.dp),
+                        modifier = Modifier.height(32.dp),
+                    ) { Text("Feedback") }
                     if (hideRecommendationInline && onHideRecommendation != null) {
                         OutlinedButton(
                             onClick = onHideRecommendation,
