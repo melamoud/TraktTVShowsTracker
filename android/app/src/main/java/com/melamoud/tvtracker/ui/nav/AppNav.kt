@@ -112,6 +112,13 @@ fun AppNav(
     val pendingOpen by container.pendingOpen.collectAsStateWithLifecycle()
     val onUnread = container::setAlertCounts
 
+    fun goSearch() {
+        navController.navigate("search") {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
     fun openDetail(mediaType: String, traktId: Int) {
         navController.navigate("detail/$mediaType/$traktId")
     }
@@ -120,11 +127,11 @@ fun AppNav(
     }
     fun openActorSearch(personId: Int, name: String) {
         container.requestActorSearch(personId, name)
-        navController.navigate("search") {
-            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-            launchSingleTop = true
-            restoreState = true
-        }
+        goSearch()
+    }
+    fun openActorNameSearch(name: String) {
+        container.requestActorNameSearch(name)
+        goSearch()
     }
 
     LaunchedEffect(pendingOpen, loggedIn) {
@@ -335,6 +342,7 @@ fun AppNav(
                     vm, container.baseUrl, isShows = true,
                     onProgress = ::openProgress,
                     onOpenDetail = ::openDetail,
+                    onSearchActor = ::openActorNameSearch,
                 )
             }
             composable("movies") {
@@ -345,6 +353,7 @@ fun AppNav(
                     vm, container.baseUrl, isShows = false,
                     onProgress = {},
                     onOpenDetail = ::openDetail,
+                    onSearchActor = ::openActorNameSearch,
                 )
             }
             composable("search") {
@@ -379,6 +388,7 @@ fun AppNav(
                 LatestMediaScreen(
                     vm, container.baseUrl, isShows = false,
                     onOpenDetail = ::openDetail,
+                    onSearchActor = ::openActorNameSearch,
                 )
             }
             composable("latest_shows") {
@@ -388,6 +398,7 @@ fun AppNav(
                 LatestMediaScreen(
                     vm, container.baseUrl, isShows = true,
                     onOpenDetail = ::openDetail,
+                    onSearchActor = ::openActorNameSearch,
                 )
             }
             composable("recommended_movies") {
@@ -397,6 +408,7 @@ fun AppNav(
                 RecommendedMediaScreen(
                     vm, container.baseUrl, isShows = false,
                     onOpenDetail = ::openDetail,
+                    onSearchActor = ::openActorNameSearch,
                 )
             }
             composable("recommended_shows") {
@@ -406,6 +418,7 @@ fun AppNav(
                 RecommendedMediaScreen(
                     vm, container.baseUrl, isShows = true,
                     onOpenDetail = ::openDetail,
+                    onSearchActor = ::openActorNameSearch,
                 )
             }
             composable("preferences") {
@@ -417,6 +430,7 @@ fun AppNav(
                     baseUrl = container.baseUrl,
                     onHelp = { navController.navigate("help") },
                     onOpenUrl = onOpenLoginUrl,
+                    onActorTitles = ::openActorSearch,
                 )
             }
             composable("help") {

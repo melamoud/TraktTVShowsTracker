@@ -84,6 +84,18 @@ class SearchViewModel(
         search()
     }
 
+    fun beginActorNameSearch(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.length < 2) return
+        _state.value = _state.value.copy(
+            actorId = null,
+            actorName = "",
+            actorSearchQuery = trimmed,
+            query = "",
+        )
+        searchActors()
+    }
+
     fun clearActor() {
         _state.value = _state.value.copy(actorId = null, actorName = "", items = emptyList(), total = 0)
     }

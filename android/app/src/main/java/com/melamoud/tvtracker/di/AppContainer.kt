@@ -23,7 +23,7 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
-data class ActorSearchRequest(val traktId: Int, val name: String)
+data class ActorSearchRequest(val traktId: Int?, val name: String)
 
 data class PendingOpen(
     val dest: String,
@@ -97,6 +97,10 @@ class AppContainer(context: Context) {
 
     fun requestActorSearch(traktId: Int, name: String) {
         _pendingActorSearch.value = ActorSearchRequest(traktId, name)
+    }
+
+    fun requestActorNameSearch(name: String) {
+        _pendingActorSearch.value = ActorSearchRequest(null, name.trim())
     }
 
     fun consumePendingActorSearch() {

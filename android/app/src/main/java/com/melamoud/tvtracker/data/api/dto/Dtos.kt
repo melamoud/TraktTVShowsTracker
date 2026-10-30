@@ -87,6 +87,12 @@ data class ServiceLinkDto(
     val url: String? = null,
 )
 
+data class CardMatchDto(
+    val matched: Boolean = false,
+    val genres: List<String> = emptyList(),
+    val keywords: List<String> = emptyList(),
+)
+
 data class MediaItemDto(
     @SerializedName("media_type") val mediaType: String? = null,
     @SerializedName("trakt_id") val traktId: Int = 0,
@@ -126,6 +132,7 @@ data class MediaItemDto(
     val runtime: Int? = null,
     @SerializedName("is_marker") val isMarker: Boolean = false,
     @SerializedName("older_than_marker") val olderThanMarker: Boolean = false,
+    val match: CardMatchDto? = null,
 )
 
 data class FilterListDto(

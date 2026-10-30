@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.melamoud.tvtracker.ui.theme.Primary
+import com.melamoud.tvtracker.ui.theme.TextMuted
 
 @Composable
 fun FilterMenuButton(
@@ -115,5 +117,29 @@ fun MoreFiltersButton(
                 content { showSheet = false }
             }
         }
+    }
+}
+
+@Composable
+fun ActorJumpField(onSearch: (String) -> Unit) {
+    var name by remember { mutableStateOf("") }
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Search actor", style = MaterialTheme.typography.titleSmall)
+        Text(
+            "Opens Search for this person. It does not filter the list you are on.",
+            color = TextMuted,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        OutlinedTextField(
+            value = name,
+            onValueChange = { name = it },
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Actor name") },
+            singleLine = true,
+        )
+        TextButton(
+            onClick = { onSearch(name.trim()) },
+            enabled = name.trim().length >= 2,
+        ) { Text("Search actor") }
     }
 }

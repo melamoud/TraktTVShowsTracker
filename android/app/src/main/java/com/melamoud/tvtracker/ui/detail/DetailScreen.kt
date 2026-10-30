@@ -122,6 +122,7 @@ fun DetailScreen(
                             traktUrl = detail.traktUrl,
                             imdbUrl = detail.imdbUrl,
                             homepage = detail.homepage,
+                            onPin = viewModel::pin,
                             onLists = viewModel::openLists,
                             onRate = viewModel::openRate,
                             onFavorite = viewModel::favorite,
@@ -276,6 +277,7 @@ private fun DetailHero(item: MediaItemDto, detail: MediaDetailResponse, baseUrl:
         if (item.watched && !showStillOpen) TagChip("Watched", ok = true)
         item.rating?.let { TagChip("$it/10") }
         if (item.favorited) TagChip("Favorite", gold = true)
+        if (item.pinned) TagChip("Pinned", gold = true)
     }
     if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
         ServiceLinksLine(
@@ -312,6 +314,7 @@ private fun DetailActions(
     traktUrl: String?,
     imdbUrl: String?,
     homepage: String?,
+    onPin: () -> Unit,
     onLists: () -> Unit,
     onRate: () -> Unit,
     onFavorite: () -> Unit,
@@ -323,6 +326,7 @@ private fun DetailActions(
     onOpenUrl: (String) -> Unit,
 ) {
     ScrollableActionRow(itemSpacing = 8.dp) {
+        ActionBtn(if (item.pinned) "Unpin" else "Pin", primary = item.pinned, onClick = onPin)
         ActionBtn("Set lists…", onClick = onLists)
         ActionBtn(if (item.rating != null) "Rate ${item.rating}/10" else "Rate…", onClick = onRate)
         ActionBtn(if (item.favorited) "Unfavorite" else "Favorite", onClick = onFavorite)

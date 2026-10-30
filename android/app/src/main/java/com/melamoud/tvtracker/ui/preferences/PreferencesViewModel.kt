@@ -40,6 +40,7 @@ data class PreferencesUiState(
     val prefsReminderSnoozeUntil: String? = null,
     val markers: MarkersDto = MarkersDto(),
     val actorBusy: Boolean = false,
+    val listBusy: Boolean = false,
     val googleCalendar: GoogleCalendarStatusDto? = null,
     val googleCalendarBusy: Boolean = false,
 )
@@ -378,6 +379,32 @@ class PreferencesViewModel(
         viewModelScope.launch {
             repo.reviewMarkerCaughtUp(mediaType)
             load()
+        }
+    }
+
+    fun createList(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return
+        viewModelScope.launch {
+            _state.value = _state.value.copy(listBusy = true, saveError = null)
+            repo.createList(trimmed).onSuccess {
+                _state.value = _state.value.copy(listBusy = false)
+                load()
+            }.onFailure {
+                _state.value = _state.value.copy(listBusy = false, saveError = it.message)
+            }
+        }
+    }
+
+    fun deleteList(id: String) {
+        viewModelScope.launch {
+            _state.value = _state.value.copy(listBusy = true, saveError = null)
+            repo.deleteList(id).onSuccess {
+                _state.value = _state.value.copy(listBusy = false)
+                load()
+            }.onFailure {
+                _state.value = _state.value.copy(listBusy = false, saveError = it.message)
+            }
         }
     }
 

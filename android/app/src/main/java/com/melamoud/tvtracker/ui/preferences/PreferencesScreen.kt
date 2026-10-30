@@ -63,6 +63,7 @@ fun PreferencesScreen(
     baseUrl: String,
     onHelp: () -> Unit,
     onOpenUrl: (String) -> Unit,
+    onActorTitles: (Int, String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
@@ -84,6 +85,8 @@ fun PreferencesScreen(
     ) {
         ReloadOnResume(viewModel::load)
         var confirmDisconnect by remember { mutableStateOf(false) }
+        var newListName by remember { mutableStateOf("") }
+        var listToDelete by remember { mutableStateOf<Pair<String, String>?>(null) }
         if (confirmDisconnect) {
             ConfirmDialog(
                 title = "Disconnect Google Calendar?",
@@ -95,6 +98,19 @@ fun PreferencesScreen(
                     viewModel.disconnectGoogle()
                 },
                 onDismiss = { confirmDisconnect = false },
+            )
+        }
+        listToDelete?.let { (id, name) ->
+            ConfirmDialog(
+                title = "Delete list?",
+                message = "Delete \"$name\" from Trakt? Watch history is kept. This cannot be undone.",
+                confirmLabel = "Delete",
+                destructive = true,
+                onConfirm = {
+                    listToDelete = null
+                    viewModel.deleteList(id)
+                },
+                onDismiss = { listToDelete = null },
             )
         }
         val gcal = state.googleCalendar
@@ -320,7 +336,16 @@ fun PreferencesScreen(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(list.name, modifier = Modifier.weight(1f))
+                    Column(Modifier.weight(1f)) {
+                        Text(list.name)
+                        if (list.kind != "watchlist") {
+                            TextButton(
+                                onClick = { listToDelete = list.id to list.name },
+                                enabled = !state.listBusy,
+                                contentPadding = androidx.compose.foundation.layout.PaddingValues(0.dp),
+                            ) { Text("Delete", color = Danger) }
+                        }
+                    }
                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Show", style = MaterialTheme.typography.labelSmall, color = TextMuted)
                         Checkbox(checked = !list.hidden, onCheckedChange = { viewModel.toggleListHidden(list.id) })
@@ -331,10 +356,30 @@ fun PreferencesScreen(
                     }
                 }
             }
+            OutlinedTextField(
+                value = newListName,
+                onValueChange = { newListName = it },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("New list name") },
+                singleLine = true,
+                enabled = !state.listBusy,
+            )
+            TextButton(
+                onClick = {
+                    viewModel.createList(newListName)
+                    newListName = ""
+                },
+                enabled = newListName.isNotBlank() && !state.listBusy,
+            ) { Text("Create on Trakt") }
+            Text(
+                "Creates a private list on trakt.tv. Delete removes the list there. Watch history is kept.",
+                color = TextMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
 
         ExpandableSection("Favorite actors") {
-            Text("Actors marked as favorite on title detail pages. Tap to remove.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
+            Text("Actors marked as favorite on title pages. Titles opens Search for that person.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
             if (state.favoriteActors.isEmpty()) {
                 Text("No favorite actors yet. Add them from a title's cast list.", color = TextMuted)
             } else {
@@ -350,6 +395,7 @@ fun PreferencesScreen(
                             modifier = Modifier.size(40.dp),
                         )
                         Text(actor.name, modifier = Modifier.weight(1f))
+                        TextButton(onClick = { onActorTitles(actor.traktId, actor.name) }) { Text("Titles") }
                         IconButton(
                             onClick = { viewModel.removeFavoriteActor(actor.traktId) },
                             enabled = !state.actorBusy,

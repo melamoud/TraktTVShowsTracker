@@ -37,9 +37,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.R
+import com.melamoud.tvtracker.ui.components.ConfirmDialog
+import com.melamoud.tvtracker.ui.components.FeedbackDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ScrollableActionRow
-import com.melamoud.tvtracker.ui.components.ReviewDialog
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
 import com.melamoud.tvtracker.ui.theme.Ok
 import com.melamoud.tvtracker.ui.theme.Primary
@@ -55,6 +56,7 @@ fun ProgressScreen(
     val open = remember { mutableStateMapOf<Int, Boolean>() }
     val data = state.data
     var menuExpanded by remember { mutableStateOf(false) }
+    var confirmSeries by remember { mutableStateOf(false) }
     ReloadOnResume(viewModel::reload)
 
     Column(Modifier.fillMaxSize()) {
@@ -101,6 +103,12 @@ fun ProgressScreen(
                             color = Ok,
                             fontWeight = FontWeight.SemiBold,
                         )
+                        if (data.progressAired > 0 && data.progressCompleted < data.progressAired) {
+                            TextButton(
+                                onClick = { confirmSeries = true },
+                                enabled = !state.busy,
+                            ) { Text("Mark series watched") }
+                        }
                         data.nextEpisode?.let { next ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(
@@ -154,9 +162,9 @@ fun ProgressScreen(
                                             enabled = !state.busy && ep.aired,
                                         ) { Text(if (ep.watched) "Watched" else "Watch") }
                                         TextButton(
-                                            onClick = { viewModel.openReview(ep) },
+                                            onClick = { viewModel.openReview(ep, season.number) },
                                             enabled = !state.busy,
-                                        ) { Text("Rate") }
+                                        ) { Text("Rate / Review") }
                                     }
                                 }
                             }
@@ -166,12 +174,26 @@ fun ProgressScreen(
             }
         }
     }
-    state.reviewTarget?.let { ep ->
-        ReviewDialog(
-            currentRating = null,
-            currentComment = null,
-            onSave = { rating, comment, spoiler -> viewModel.applyReview(rating, comment, spoiler) },
+    state.reviewTarget?.let { target ->
+        FeedbackDialog(
+            title = "S${target.season}E${target.episode.number} ${target.episode.title.orEmpty()}".trim(),
+            load = { viewModel.loadEpisodeFeedback(target) },
+            save = { viewModel.saveEpisodeFeedback(target, it) },
+            onSaved = viewModel::episodeFeedbackSaved,
             onDismiss = viewModel::dismissReview,
+            showMarkWatched = !target.episode.watched && target.episode.aired,
+        )
+    }
+    if (confirmSeries) {
+        ConfirmDialog(
+            title = "Mark series watched?",
+            message = "This marks every aired episode of ${data?.title ?: "this show"} watched on Trakt.",
+            confirmLabel = "Mark series watched",
+            onConfirm = {
+                confirmSeries = false
+                viewModel.markSeriesWatched()
+            },
+            onDismiss = { confirmSeries = false },
         )
     }
 }

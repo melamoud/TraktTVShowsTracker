@@ -1,5 +1,14 @@
 # Changes log
 
+## 2026-10-30 — Android matches the missing website actions (1.0.26)
+
+- The title page has **Pin** / **Unpin**. List cards and Alerts still keep pin in the ⋮ menu
+- My, Latest, and Recommended **More** filters can **Search actor**. Preferences favorite actors have **Titles**
+- My and Search cards link to IMDb, Trailer, and Trakt from the ⋮ menu. Cards show genres, and a gold **Preference match** line when the server sends it
+- Progress can **Mark series watched**. **Rate / Review** loads the existing Trakt rating and review and can mark that episode watched
+- Preferences can **Create on Trakt** and **Delete** a personal list
+- Updated [Android app](help/user/android.md)
+
 ## 2026-10-23 — Watched episode stays watched
 
 - A show at 100% still comes back to **Unwatched episodes** and the home-screen widget when a later episode has aired and is not in the watch list

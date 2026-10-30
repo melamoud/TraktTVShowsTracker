@@ -84,6 +84,14 @@ class DetailViewModel(
         }
     }
 
+    fun pin() {
+        val current = item ?: return
+        viewModelScope.launch {
+            repo.pin(mediaType, traktId, !current.pinned)
+            reload()
+        }
+    }
+
     fun hideRecommendation() {
         viewModelScope.launch {
             repo.hideRecommendation(mediaType, traktId)

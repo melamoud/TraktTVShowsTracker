@@ -78,6 +78,7 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
         }
 
     avail = row.get('avail') or {}
+    match = row.get('match') or {}
     poster_url = None
     if mt and trakt_id:
         poster_url = f'/cache/posters/{mt}/{int(trakt_id)}'
@@ -142,6 +143,11 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
         'runtime': media.runtime if media else None,
         'is_marker': bool(row.get('is_marker')),
         'older_than_marker': bool(row.get('older_than_marker')),
+        'match': {
+            'matched': bool(match.get('matched')),
+            'genres': list(match.get('genres') or []),
+            'keywords': list(match.get('keywords') or []),
+        },
     }
 
 

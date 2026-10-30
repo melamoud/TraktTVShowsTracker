@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -61,6 +62,7 @@ import coil.compose.AsyncImage
 import com.melamoud.tvtracker.R
 import com.melamoud.tvtracker.data.api.absoluteUrl
 import com.melamoud.tvtracker.data.api.dto.FilterListDto
+import com.melamoud.tvtracker.ui.components.ActorJumpField
 import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
 import com.melamoud.tvtracker.ui.components.FeedbackDialog
@@ -84,6 +86,7 @@ fun MyMediaScreen(
     isShows: Boolean,
     onProgress: (Int) -> Unit,
     onOpenDetail: (String, Int) -> Unit,
+    onSearchActor: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showPageJump by remember { mutableStateOf(false) }
@@ -175,6 +178,7 @@ fun MyMediaScreen(
                     PerPageSection(state.perPage) { viewModel.setPerPage(it) }
                     YearSection(state.year) { viewModel.setYear(it) }
                     GenreSection(state.genres, state.genreChoices) { viewModel.toggleGenre(it) }
+                    ActorJumpField(onSearch = onSearchActor)
                     TextButton(onClick = viewModel::refreshFromTrakt) {
                         Icon(Icons.Default.Refresh, contentDescription = null)
                         Text("Refresh Trakt", modifier = Modifier.padding(start = 8.dp))
@@ -206,6 +210,8 @@ fun MyMediaScreen(
                 state.items.isEmpty() -> Text(stringResource(R.string.empty_list), color = TextMuted, modifier = Modifier.padding(24.dp))
                 else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
+                        val uriHandler = LocalUriHandler.current
+                        val mt = item.mediaType ?: if (isShows) "show" else "movie"
                         MediaCard(
                             item = item,
                             baseUrl = baseUrl,
@@ -219,6 +225,13 @@ fun MyMediaScreen(
                             onFeedback = { viewModel.openFeedback(item) },
                             onFavorite = { viewModel.favorite(item) },
                             onProgress = if (isShows) ({ onProgress(item.traktId) }) else null,
+                            onImdb = item.imdbId?.takeIf { it.isNotBlank() }?.let { id ->
+                                { try { uriHandler.openUri("https://www.imdb.com/title/$id/") } catch (_: Exception) {} }
+                            },
+                            onTrailer = item.trailerUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                                { try { uriHandler.openUri(url) } catch (_: Exception) {} }
+                            },
+                            onTrakt = { try { uriHandler.openUri("https://trakt.tv/${mt}s/${item.slug ?: item.traktId}") } catch (_: Exception) {} },
                             onOpen = {
                                 onOpenDetail(item.mediaType ?: if (isShows) "show" else "movie", item.traktId)
                             },

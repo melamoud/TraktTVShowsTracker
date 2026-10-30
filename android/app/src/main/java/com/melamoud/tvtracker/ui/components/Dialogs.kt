@@ -142,6 +142,7 @@ data class FeedbackDraft(
     val comment: String?,
     val spoiler: Boolean,
     val commentId: Int?,
+    val markWatched: Boolean = false,
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -152,6 +153,7 @@ fun FeedbackDialog(
     save: suspend (FeedbackDraft) -> Unit,
     onSaved: () -> Unit,
     onDismiss: () -> Unit,
+    showMarkWatched: Boolean = false,
 ) {
     val scope = rememberCoroutineScope()
     var loading by remember { mutableStateOf(true) }
@@ -164,6 +166,7 @@ fun FeedbackDialog(
     var spoiler by remember { mutableStateOf(false) }
     var initialSpoiler by remember { mutableStateOf(false) }
     var commentId by remember { mutableStateOf<Int?>(null) }
+    var markWatched by remember { mutableStateOf(false) }
     var expanded by remember { mutableStateOf(false) }
 
     LaunchedEffect(title) {
@@ -234,6 +237,12 @@ fun FeedbackDialog(
                         Checkbox(checked = spoiler, onCheckedChange = { spoiler = it })
                         Text("Spoiler")
                     }
+                    if (showMarkWatched) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(checked = markWatched, onCheckedChange = { markWatched = it })
+                            Text("Mark watched")
+                        }
+                    }
                     formError?.let { Text(it) }
                 }
             }
@@ -255,8 +264,12 @@ fun FeedbackDialog(
                     val ratingChanged = rating != initialRating
                     val commentChanged = text != initialComment.trim() || spoiler != initialSpoiler
                     val writeComment = text.isNotEmpty() && commentChanged
-                    if (!ratingChanged && !writeComment) {
-                        formError = "Change the rating or write a review."
+                    if (!ratingChanged && !writeComment && !(showMarkWatched && markWatched)) {
+                        formError = if (showMarkWatched) {
+                            "Change the rating, write a review, or mark watched."
+                        } else {
+                            "Change the rating or write a review."
+                        }
                         return@TextButton
                     }
                     formError = null
@@ -270,6 +283,7 @@ fun FeedbackDialog(
                                     comment = if (writeComment) text else null,
                                     spoiler = spoiler,
                                     commentId = commentId,
+                                    markWatched = markWatched,
                                 ),
                             )
                             onSaved()

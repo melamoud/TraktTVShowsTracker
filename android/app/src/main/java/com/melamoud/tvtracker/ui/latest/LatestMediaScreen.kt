@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.melamoud.tvtracker.R
+import com.melamoud.tvtracker.ui.components.ActorJumpField
 import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
 import com.melamoud.tvtracker.ui.components.FeedbackDialog
@@ -65,6 +66,7 @@ fun LatestMediaScreen(
     baseUrl: String,
     isShows: Boolean,
     onOpenDetail: (String, Int) -> Unit,
+    onSearchActor: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     var showPageJump by remember { mutableStateOf(false) }
@@ -129,6 +131,7 @@ fun LatestMediaScreen(
                 PerPageSection(state.perPage) { viewModel.setPerPage(it) }
                 YearSection(state.year) { viewModel.setYear(it) }
                 GenreSection(state.genres, state.genreChoices) { viewModel.toggleGenre(it) }
+                ActorJumpField(onSearch = onSearchActor)
             }
         }
         state.marker?.let { marker ->

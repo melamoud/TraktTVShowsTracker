@@ -3,6 +3,7 @@ package com.melamoud.tvtracker.ui.components
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -137,6 +138,26 @@ fun MediaCard(
                         Text(newestLine, color = AccentGold, style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
+                val match = item.match
+                if (match?.matched == true) {
+                    val bits = listOf("Preference match") + match.genres + match.keywords
+                    Text(
+                        bits.joinToString(" · "),
+                        color = AccentGold,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (item.genres.isNotEmpty()) {
+                    Text(
+                        item.genres.take(6).joinToString(" · "),
+                        color = TextMuted,
+                        style = MaterialTheme.typography.bodySmall,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 if (item.foundOn.isNotEmpty() || item.foundOnLinks.isNotEmpty()) {
                     ServiceLinksLine(
                         prefix = "Found on:",
@@ -168,7 +189,18 @@ fun MediaCard(
                         color = TextMuted,
                     )
                 }
-                ScrollableActionRow(Modifier.padding(top = 4.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().padding(top = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                ScrollableActionRow(Modifier.weight(1f)) {
+                    if (onProgress != null) {
+                        OutlinedButton(
+                            onClick = onProgress,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(32.dp),
+                        ) { Text("Progress", color = AccentGold) }
+                    }
                     if (setListsInline) {
                         OutlinedButton(
                             onClick = onLists,
@@ -182,13 +214,6 @@ fun MediaCard(
                             contentPadding = PaddingValues(horizontal = 10.dp),
                             modifier = Modifier.height(32.dp),
                         ) { Text("Found on") }
-                    }
-                    if (onProgress != null) {
-                        OutlinedButton(
-                            onClick = onProgress,
-                            contentPadding = PaddingValues(horizontal = 10.dp),
-                            modifier = Modifier.height(32.dp),
-                        ) { Text("Progress", color = AccentGold) }
                     }
                     if (!watchInOverflow) {
                         OutlinedButton(
@@ -209,6 +234,8 @@ fun MediaCard(
                             modifier = Modifier.height(32.dp),
                         ) { Text("Hide", color = Danger) }
                     }
+                }
+                Box {
                     IconButton(onClick = { menuOpen = true }, modifier = Modifier.height(32.dp)) {
                         Icon(Icons.Default.MoreVert, contentDescription = "More")
                     }
@@ -279,6 +306,7 @@ fun MediaCard(
                 }
             }
         }
+    }
     }
 }
 

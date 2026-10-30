@@ -35,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
@@ -69,7 +70,9 @@ fun SearchScreen(
     var showPageJump by remember { mutableStateOf(false) }
     LaunchedEffect(pendingActor) {
         if (pendingActor != null) {
-            viewModel.searchActor(pendingActor.traktId, pendingActor.name)
+            val id = pendingActor.traktId
+            if (id != null && id > 0) viewModel.searchActor(id, pendingActor.name)
+            else viewModel.beginActorNameSearch(pendingActor.name)
             onConsumeActor()
         }
     }
@@ -210,6 +213,8 @@ fun SearchScreen(
                 )
                 else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
+                        val uriHandler = LocalUriHandler.current
+                        val mt = item.mediaType ?: "movie"
                         MediaCard(
                             item = item,
                             baseUrl = baseUrl,
@@ -222,6 +227,13 @@ fun SearchScreen(
                             onFeedback = { viewModel.openFeedback(item) },
                             onFavorite = { viewModel.favorite(item) },
                             onProgress = if (item.mediaType == "show") ({ onProgress(item.traktId) }) else null,
+                            onImdb = item.imdbId?.takeIf { it.isNotBlank() }?.let { id ->
+                                { try { uriHandler.openUri("https://www.imdb.com/title/$id/") } catch (_: Exception) {} }
+                            },
+                            onTrailer = item.trailerUrl?.takeIf { it.isNotBlank() }?.let { url ->
+                                { try { uriHandler.openUri(url) } catch (_: Exception) {} }
+                            },
+                            onTrakt = { try { uriHandler.openUri("https://trakt.tv/${mt}s/${item.slug ?: item.traktId}") } catch (_: Exception) {} },
                             onOpen = {
                                 item.mediaType?.let { onOpenDetail(it, item.traktId) }
                             },
