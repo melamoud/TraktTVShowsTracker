@@ -1270,9 +1270,14 @@ document.addEventListener('click', async function (ev) {
       // null = Cancel. [] = clear all lists (remove from Wishlist + personal lists).
       if (selected === null) return;
       showPageLoading('Saving lists…');
-      await apiPost('/api/lists/membership/' + mediaType + '/' + traktId, {
+      const saved = await apiPost('/api/lists/membership/' + mediaType + '/' + traktId, {
         selected: Array.isArray(selected) ? selected : [],
       });
+      if (saved && saved.google_reauth_url) {
+        pageReloadPending = true;
+        window.location.href = saved.google_reauth_url;
+        return;
+      }
       requestReload();
     } else if (action === 'pin-add' || action === 'pin-remove') {
       await apiPost('/api/pin/' + mediaType + '/' + traktId, {

@@ -356,20 +356,41 @@ def _load_media(media_type: str, trakt_ids: set[int]) -> list[CachedMedia]:
     ).all()
 
 
-def plan_meetings(user: User, today: date | None = None) -> list[PlannedMeeting]:
+def plan_meetings(
+    user: User,
+    today: date | None = None,
+    *,
+    only: tuple[str, int] | None = None,
+) -> list[PlannedMeeting]:
     """Meetings that should exist for this user's eligible titles."""
     today = today or local_today()
     movie_ids = _eligible_ids(user, 'movie')
     show_ids = _eligible_ids(user, 'show')
+    if only is not None:
+        media_type, trakt_id = only[0], int(only[1])
+        if media_type == 'movie':
+            movie_ids = {trakt_id} if trakt_id in movie_ids else set()
+            show_ids = set()
+        elif media_type == 'show':
+            show_ids = {trakt_id} if trakt_id in show_ids else set()
+            movie_ids = set()
+        else:
+            movie_ids = set()
+            show_ids = set()
     planned: list[PlannedMeeting] = []
 
-    existing_stream = {
-        int(row.trakt_id): row.event_date
-        for row in ExternalCalendarEvent.query.filter_by(
-            user_id=user.id, media_type='movie', kind='streaming',
-        ).all()
-        if row.event_date
-    }
+    existing_stream = {}
+    if movie_ids:
+        existing_stream = {
+            int(row.trakt_id): row.event_date
+            for row in ExternalCalendarEvent.query.filter(
+                ExternalCalendarEvent.user_id == user.id,
+                ExternalCalendarEvent.media_type == 'movie',
+                ExternalCalendarEvent.kind == 'streaming',
+                ExternalCalendarEvent.trakt_id.in_(movie_ids),
+            ).all()
+            if row.event_date
+        }
     seen_vendors = _seen_streaming_vendors(user)
 
     for media in _load_media('movie', movie_ids):
@@ -503,30 +524,66 @@ def _row_key(row: ExternalCalendarEvent) -> tuple:
     )
 
 
-def sync_external_calendar(user: User, client=None) -> dict:
+def _mark_google_reauth(link: UserGoogleCalendar) -> None:
+    """Remember that Google refused the saved login so the site can send the user back."""
+    if link.reauth_required:
+        return
+    link.reauth_required = True
+    link.updated_at = datetime.utcnow()
+    db.session.commit()
+
+
+def _has_upcoming(rows: dict) -> bool:
+    today = local_today()
+    return any(row.event_date and row.event_date >= today for row in rows.values())
+
+
+def sync_external_calendar(user: User, client=None, *, only: tuple[str, int] | None = None) -> dict:
     """
     Create, update, or remove Google meetings so they match known dates.
 
-    ``client`` is injectable for tests. Upcoming meetings that no longer apply
+    ``client`` is injectable for tests. ``only`` limits the check to one title.
+    That path calls Google only when the title has a future meeting to write,
+    or an upcoming meeting to remove. Upcoming meetings that no longer apply
     (title left Wishlist / default lists, or the date was dropped) are deleted.
     Meetings whose date is already in the past are left on the calendar.
     """
     link = UserGoogleCalendar.query.filter_by(user_id=user.id).first()
     if not link or not link.calendar_id or not link.refresh_token_enc:
-        return {'skipped': True, 'created': 0, 'updated': 0, 'deleted': 0}
-    if client is None:
-        client = load_client(link)
+        return {'skipped': True, 'created': 0, 'updated': 0, 'deleted': 0, 'reauth': False}
 
     today = local_today()
+    planned = {item.key: item for item in plan_meetings(user, today, only=only)}
+    if only is None:
+        existing_rows = ExternalCalendarEvent.query.filter_by(user_id=user.id).all()
+    else:
+        existing_rows = ExternalCalendarEvent.query.filter_by(
+            user_id=user.id, media_type=only[0], trakt_id=int(only[1]),
+        ).all()
+    existing = {_row_key(row): row for row in existing_rows}
+    if only is not None and not planned and not _has_upcoming(existing):
+        return {'skipped': True, 'created': 0, 'updated': 0, 'deleted': 0, 'reauth': False}
+
+    if link.reauth_required:
+        return {'skipped': True, 'created': 0, 'updated': 0, 'deleted': 0, 'reauth': True}
+    if client is None:
+        try:
+            client = load_client(link)
+        except GoogleCalendarError as exc:
+            if exc.token_failure:
+                _mark_google_reauth(link)
+                return {
+                    'skipped': True, 'created': 0, 'updated': 0, 'deleted': 0, 'reauth': True,
+                }
+            raise
+
     reminder_method, reminder_minutes = meeting_reminder(user)
-    planned = {item.key: item for item in plan_meetings(user, today)}
-    for media in _load_media('movie', _eligible_ids(user, 'movie')):
+    movie_ids = _eligible_ids(user, 'movie')
+    if only is not None:
+        movie_ids = {int(only[1])} if only[0] == 'movie' and int(only[1]) in movie_ids else set()
+    for media in _load_media('movie', movie_ids):
         if _providers_known(media):
             _remember_streaming_vendors(user, media, _my_vendors(user, media))
-    existing = {
-        _row_key(row): row
-        for row in ExternalCalendarEvent.query.filter_by(user_id=user.id).all()
-    }
     created = updated = deleted = 0
 
     for key, plan in planned.items():
@@ -582,6 +639,19 @@ def sync_external_calendar(user: User, client=None) -> dict:
                 state = db.inspect(row)
                 if state.persistent:
                     db.session.refresh(row)
+            if exc.token_failure:
+                _mark_google_reauth(link)
+                logger.warning(
+                    'Stopped Google Calendar sync for user %s until they approve the Google login again.',
+                    user.id,
+                )
+                return {
+                    'skipped': False,
+                    'created': created,
+                    'updated': updated,
+                    'deleted': deleted,
+                    'reauth': True,
+                }
             continue
         row.event_date = plan.event_date
         row.calendar_id = link.calendar_id
@@ -602,26 +672,43 @@ def sync_external_calendar(user: User, client=None) -> dict:
                     'Could not delete Google meeting %s for user %s: %s',
                     row.google_event_id, user.id, exc,
                 )
+                if exc.token_failure:
+                    _mark_google_reauth(link)
+                    return {
+                        'skipped': False,
+                        'created': created,
+                        'updated': updated,
+                        'deleted': deleted,
+                        'reauth': True,
+                    }
                 continue
         db.session.delete(row)
         deleted += 1
         db.session.commit()
 
     db.session.commit()
-    logger.info(
-        'Google Calendar sync user=%s created=%s updated=%s deleted=%s',
-        user.id, created, updated, deleted,
-    )
-    return {'skipped': False, 'created': created, 'updated': updated, 'deleted': deleted}
+    if only is None:
+        logger.info(
+            'Google Calendar sync user=%s created=%s updated=%s deleted=%s',
+            user.id, created, updated, deleted,
+        )
+    else:
+        logger.info(
+            'Google Calendar sync user=%s title=%s/%s created=%s updated=%s deleted=%s',
+            user.id, only[0], int(only[1]), created, updated, deleted,
+        )
+    return {
+        'skipped': False, 'created': created, 'updated': updated, 'deleted': deleted, 'reauth': False,
+    }
 
 
-def sync_external_calendar_quietly(user: User) -> None:
+def sync_external_calendar_quietly(user: User) -> dict | None:
     """Sync when a calendar is selected. Failures are logged, not raised."""
     try:
         link = UserGoogleCalendar.query.filter_by(user_id=getattr(user, 'id', None)).first()
         if not link or not link.calendar_id or not link.refresh_token_enc:
-            return
-        sync_external_calendar(user)
+            return None
+        return sync_external_calendar(user)
     except Exception:
         logger.exception(
             'Google Calendar sync failed for user %s', getattr(user, 'id', None),
@@ -630,6 +717,26 @@ def sync_external_calendar_quietly(user: User) -> None:
             db.session.rollback()
         except Exception:
             pass
+        return None
+
+
+def sync_external_calendar_title_quietly(user: User, media_type: str, trakt_id: int) -> dict | None:
+    """Update Google for one title. No Google call when it has no future date."""
+    try:
+        link = UserGoogleCalendar.query.filter_by(user_id=getattr(user, 'id', None)).first()
+        if not link or not link.calendar_id or not link.refresh_token_enc:
+            return None
+        return sync_external_calendar(user, only=(media_type, int(trakt_id)))
+    except Exception:
+        logger.exception(
+            'Google Calendar sync failed for user %s title %s/%s',
+            getattr(user, 'id', None), media_type, trakt_id,
+        )
+        try:
+            db.session.rollback()
+        except Exception:
+            pass
+        return None
 
 
 def disconnect_google_calendar(user: User) -> None:
@@ -737,11 +844,15 @@ def calendar_settings(user: User) -> dict:
     connected = bool(link and link.refresh_token_enc)
     calendars: list[dict] = []
     error = None
-    if connected:
+    if link and link.reauth_required:
+        error = 'Google needs you to approve calendar access again.'
+    elif connected:
         try:
             calendars = load_client(link).list_calendars()
         except GoogleCalendarError as exc:
             error = str(exc)
+            if exc.token_failure:
+                _mark_google_reauth(link)
         except Exception:
             logger.exception('Could not list Google calendars for user %s', user.id)
             error = 'Could not load calendars from Google.'
@@ -755,6 +866,7 @@ def calendar_settings(user: User) -> dict:
         'calendar_name': link.calendar_name if link else None,
         'calendars': calendars,
         'error': error,
+        'reauth_required': bool(link and link.reauth_required),
         'reminder_method': method,
         'reminder_minutes': minutes,
         'reminder_amount': amount,

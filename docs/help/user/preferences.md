@@ -60,7 +60,7 @@ Does not apply to titles with no cached genres yet (nothing to hide on).
 
 ## Google Calendar
 
-Connect a Google account and pick one calendar. Create a calendar in Google that is only for TV Tracker, and pick that one, so these meetings stay off your personal calendar. TV Tracker then adds an all-day meeting when it learns a date for a title on **Wishlist** or a list you marked **Auto-select**. A title that is only on some other personal list is skipped.
+Connect a Google account and pick one calendar. Create a calendar in Google that is only for TV Tracker, and pick that one, so these meetings stay off your personal calendar. Saving a title’s lists updates the calendar for that title only, and only when it has a future date. A finished title does not call Google. The title has to be on **Wishlist** or a list you marked **Auto-select**. A title that is only on some other personal list is skipped.
 
 - **Movie in theaters / upcoming release** — meeting on the release date (including dates still inside the 30-day theater window)
 - **Movie on a streaming service you use** — meeting when it newly appears on Netflix, Prime, or any other service you checked. If the release is still in the future, the meeting is on that day. Movies already streaming the first time they are seen do not get a catch-up meeting
@@ -71,6 +71,8 @@ The meeting text includes the overview, year, runtime, genres, network, cast (wi
 **Reminder for every meeting** is **Popup**, **Email**, or **None**. The default is a popup 1 day before. Change how long before (minutes, hours, or days, up to 28) and save. Meetings are all-day, so the time is before midnight at the start of that day.
 
 Disconnect removes upcoming meetings this app created. Past meetings stay.
+
+If Google refuses the saved login, or the login can only see your email address, the website sends you to Google again and keeps the calendar you already picked. On that screen, allow calendar access. Meetings are added after you approve. A Google app left in Testing mode expires that login after 7 days, so this happens again until the OAuth consent screen is published to Production.
 
 The server needs a Google OAuth client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`). Until that is set, Preferences says Google Calendar is not configured.
 

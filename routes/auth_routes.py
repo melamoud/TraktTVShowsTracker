@@ -226,7 +226,11 @@ def google_calendar_callback():
     ))
     db.session.commit()
     session['app_session_token'] = session_token
-    email = user.google_calendar.account_email if user.google_calendar else 'your Google account'
+    link = user.google_calendar
+    email = link.account_email if link else 'your Google account'
+    if link and link.calendar_id:
+        flash(f'Reconnected {email}.', 'success')
+        return redirect(url_for('catalog.home'))
     flash(f'Connected {email}. Choose a calendar below.', 'success')
     return redirect(url_for('user.preferences'))
 

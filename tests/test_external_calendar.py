@@ -112,6 +112,44 @@ def _provider(media, name):
     ))
 
 
+def test_one_title_with_no_future_date_does_not_call_google(app, user):
+    with app.app_context():
+        _link(user)
+        _movie(293862, 'Skyscraper', datetime(2018, 7, 13).date(), with_cast=False)
+        future = _movie(42, 'Dune', local_today() + timedelta(days=40), with_cast=False)
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=293862, on_watchlist=True,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=future.trakt_id, on_watchlist=True,
+        ))
+        db.session.commit()
+        fake = FakeGoogle()
+        result = sync_external_calendar(_user(user), client=fake, only=('movie', 293862))
+        assert result['skipped'] is True
+        assert result['created'] == 0
+        assert fake.inserted == []
+
+
+def test_one_title_sync_leaves_other_titles_alone(app, user):
+    today = local_today()
+    with app.app_context():
+        _link(user)
+        _movie(42, 'Dune', today + timedelta(days=40), with_cast=False)
+        _movie(43, 'Arrival', today + timedelta(days=12), with_cast=False)
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=42, on_watchlist=True,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=43, on_watchlist=True,
+        ))
+        db.session.commit()
+        fake = FakeGoogle()
+        result = sync_external_calendar(_user(user), client=fake, only=('movie', 42))
+        assert result['created'] == 1
+        assert [body['summary'] for _c, _e, body in fake.inserted] == ['In theaters: Dune (2026)']
+
+
 def test_theater_meeting_includes_cast_for_wishlist(app, user):
     today = local_today()
     with app.app_context():
@@ -410,6 +448,45 @@ def test_google_callback_signs_the_user_back_in(app, client, user):
     assert 'Disconnect Google account' in html
 
 
+def test_email_only_google_grant_is_rejected(app, client, user):
+    from datetime import datetime, timedelta
+    from unittest.mock import patch
+
+    from models import GoogleOAuthState
+
+    with app.app_context():
+        _link(user)
+        db.session.add(GoogleOAuthState(
+            state='state-email',
+            user_id=user,
+            client_kind='web',
+            expires_at=datetime.utcnow() + timedelta(minutes=10),
+        ))
+        db.session.commit()
+    app.config['GOOGLE_CLIENT_ID'] = 'cid'
+    app.config['GOOGLE_CLIENT_SECRET'] = 'secret'
+    app.config['GOOGLE_CALENDAR_REDIRECT_URI'] = 'https://localhost:8300/auth/google/callback'
+    with patch(
+        'services.google_calendar.exchange_code',
+        return_value={
+            'access_token': 'email-only',
+            'refresh_token': 'email-refresh',
+            'expires_in': 3600,
+            'scope': 'openid https://www.googleapis.com/auth/userinfo.email',
+        },
+    ):
+        resp = client.get(
+            '/auth/google/callback?state=state-email&code=xyz',
+            follow_redirects=True,
+        )
+    html = resp.get_data(as_text=True)
+    assert 'did not allow calendar access' in html
+    with app.app_context():
+        link = UserGoogleCalendar.query.filter_by(user_id=user).one()
+        assert link.reauth_required is True
+        assert link.refresh_token_enc == 'enc'
+
+
 def test_android_connect_returns_account_chooser(app, client, user):
     login_client(client, app, user)
     app.config['GOOGLE_CLIENT_ID'] = 'cid'
@@ -461,6 +538,47 @@ def test_sync_continues_when_one_google_call_fails(app, user):
         kept = ExternalCalendarEvent.query.filter_by(user_id=user, trakt_id=42).one()
         assert kept.google_event_id == 'old-dune'
         assert kept.content_hash == 'stale'
+
+
+def test_sync_stops_when_google_rejects_the_login(app, user):
+    today = local_today()
+
+    class RejectToken(FakeGoogle):
+        def __init__(self):
+            super().__init__()
+            self.attempts = 0
+
+        def insert_event(self, calendar_id, body):
+            self.attempts += 1
+            raise GoogleCalendarError(
+                'Google token request failed. invalid_grant: Token has been expired or revoked.',
+                status_code=400,
+                token_failure=True,
+            )
+
+    with app.app_context():
+        _link(user)
+        _movie(42, 'Dune', today + timedelta(days=40), with_cast=False)
+        _movie(43, 'Arrival', today + timedelta(days=12), with_cast=False)
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=42, on_watchlist=True,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=43, on_watchlist=True,
+        ))
+        db.session.commit()
+        fake = RejectToken()
+        result = sync_external_calendar(_user(user), client=fake)
+        assert result['created'] == 0
+        assert result['reauth'] is True
+        assert fake.attempts == 1
+        assert fake.inserted == []
+        assert ExternalCalendarEvent.query.filter_by(user_id=user).count() == 0
+        link = UserGoogleCalendar.query.filter_by(user_id=user).one()
+        assert link.reauth_required is True
+        again = sync_external_calendar(_user(user), client=fake)
+        assert again['reauth'] is True
+        assert fake.attempts == 1
 
 
 def test_default_reminder_is_popup_one_day_before(app, user):

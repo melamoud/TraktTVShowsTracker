@@ -1,5 +1,13 @@
 # Changes log
 
+## 2026-11-09 — Google Calendar reconnects when the login is refused
+
+- A refused Google login (often a Testing-mode refresh token that expired after 7 days) no longer skips every meeting
+- A login that can only see the Gmail address is not treated as calendar access. The website sends you to Google to allow the calendar
+- Saving a title’s lists checks that title only, and calls Google only when it has a future date
+- Updated [Google Calendar](help/user/calendar.md) and [Preferences](help/user/preferences.md)
+- Updated [Preferences](help/user/preferences.md) and [Setup](SETUP.md)
+
 ## 2026-10-30 — Android matches the missing website actions (1.0.26)
 
 - The title page has **Pin** / **Unpin**. List cards and Alerts still keep pin in the ⋮ menu

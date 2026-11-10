@@ -33,14 +33,19 @@ SCOPES = ' '.join([
     'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
     'https://www.googleapis.com/auth/calendar.events',
 ])
+_CALENDAR_SCOPES = (
+    'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+    'https://www.googleapis.com/auth/calendar.events',
+)
 
 
 class GoogleCalendarError(Exception):
     """Google OAuth or Calendar API failure the UI can show."""
 
-    def __init__(self, message: str, status_code: int | None = None):
+    def __init__(self, message: str, status_code: int | None = None, token_failure: bool = False):
         super().__init__(message)
         self.status_code = status_code
+        self.token_failure = token_failure
 
 
 def google_configured() -> bool:
@@ -68,7 +73,21 @@ def _token_request(data: dict) -> dict:
     except requests.RequestException as exc:
         raise GoogleCalendarError('Could not reach Google.') from exc
     if resp.status_code != 200:
-        raise GoogleCalendarError('Google token request failed.', status_code=resp.status_code)
+        detail = ''
+        try:
+            body = resp.json()
+        except ValueError:
+            body = None
+        if isinstance(body, dict):
+            err = str(body.get('error') or '').strip()
+            desc = str(body.get('error_description') or '').strip()
+            detail = ': '.join(part for part in (err, desc) if part)
+        message = 'Google token request failed.'
+        if detail:
+            message = f'{message} {detail}'
+        raise GoogleCalendarError(
+            message, status_code=resp.status_code, token_failure=True,
+        )
     payload = resp.json()
     if not isinstance(payload, dict):
         raise GoogleCalendarError('Google returned an unexpected token response.')
@@ -109,9 +128,47 @@ def fetch_email(access_token: str) -> str:
     return str(email).strip() or 'Google account'
 
 
-def authorize_url(state: str) -> str:
-    """Google account-chooser URL. ``prompt`` lets the user pick the account."""
-    query = urlencode({
+def missing_calendar_scope(payload: dict) -> bool:
+    """True when Google listed scopes and left out calendar access."""
+    scope = payload.get('scope') if isinstance(payload, dict) else None
+    if not scope:
+        return False
+    text = scope if isinstance(scope, str) else ' '.join(str(part) for part in scope)
+    return any(marker not in text for marker in _CALENDAR_SCOPES)
+
+
+def _error_parts(resp) -> tuple[str, str]:
+    try:
+        body = resp.json()
+    except ValueError:
+        return '', ''
+    if not isinstance(body, dict):
+        return '', ''
+    err = body.get('error')
+    if isinstance(err, dict):
+        message = str(err.get('message') or '').strip()
+        errors = err.get('errors') or []
+        reason = ''
+        if errors and isinstance(errors[0], dict):
+            reason = str(errors[0].get('reason') or '').strip()
+        return reason, message
+    if isinstance(err, str):
+        return err.strip(), str(body.get('error_description') or '').strip()
+    return '', ''
+
+
+def calendar_api_error(resp, fallback: str) -> GoogleCalendarError:
+    """Calendar API failure, including Google's reason. Scope denial must re-approve."""
+    reason, message = _error_parts(resp)
+    detail = ': '.join(part for part in (reason, message) if part)
+    text = f'{fallback} {detail}' if detail else fallback
+    scope_denied = resp.status_code == 403 and reason == 'insufficientPermissions'
+    return GoogleCalendarError(text, status_code=resp.status_code, token_failure=scope_denied)
+
+
+def authorize_url(state: str, login_hint: str = '') -> str:
+    """Google authorize URL. A hint skips the account picker and still asks consent."""
+    params = {
         'client_id': _client_id(),
         'redirect_uri': _redirect_uri(),
         'response_type': 'code',
@@ -119,12 +176,15 @@ def authorize_url(state: str) -> str:
         'access_type': 'offline',
         'prompt': 'select_account consent',
         'state': state,
-        'include_granted_scopes': 'true',
-    })
-    return f'{AUTH_URL}?{query}'
+    }
+    hint = (login_hint or '').strip()
+    if hint:
+        params['login_hint'] = hint
+        params['prompt'] = 'consent'
+    return f'{AUTH_URL}?{urlencode(params)}'
 
 
-def begin_oauth(user_id: int, client_kind: str) -> str:
+def begin_oauth(user_id: int, client_kind: str, login_hint: str = '') -> str:
     """Store a one-time state and return the Google authorize URL."""
     if not google_configured():
         raise GoogleCalendarError(
@@ -145,7 +205,15 @@ def begin_oauth(user_id: int, client_kind: str) -> str:
         expires_at=now + timedelta(minutes=15),
     ))
     db.session.commit()
-    return authorize_url(state)
+    return authorize_url(state, login_hint=login_hint)
+
+
+def reauth_authorize_url(user_id: int, client_kind: str) -> str | None:
+    """Google URL when the saved login was refused. None when the login is still good."""
+    link = UserGoogleCalendar.query.filter_by(user_id=user_id).first()
+    if not link or not link.reauth_required:
+        return None
+    return begin_oauth(user_id, client_kind, login_hint=link.account_email or '')
 
 
 def complete_oauth(state: str, code: str) -> tuple:
@@ -172,6 +240,16 @@ def complete_oauth(state: str, code: str) -> tuple:
     access = tokens.get('access_token')
     if not access:
         raise GoogleCalendarError('Google did not return an access token.')
+    if missing_calendar_scope(tokens):
+        link = UserGoogleCalendar.query.filter_by(user_id=user.id).first()
+        if link:
+            link.reauth_required = True
+            link.updated_at = datetime.utcnow()
+            db.session.commit()
+        raise GoogleCalendarError(
+            'Google signed you in but did not allow calendar access. '
+            'Approve calendar permissions on the Google screen.'
+        )
     email = fetch_email(access)
     link = UserGoogleCalendar.query.filter_by(user_id=user.id).first()
     if not link:
@@ -180,14 +258,16 @@ def complete_oauth(state: str, code: str) -> tuple:
     link.account_email = email
     link.access_token_enc = encrypt_token(access)
     refresh = tokens.get('refresh_token')
+    needs_new_refresh = bool(link.reauth_required) or not link.refresh_token_enc
     if refresh:
         link.refresh_token_enc = encrypt_token(refresh)
-    elif not link.refresh_token_enc:
+    elif needs_new_refresh:
         db.session.rollback()
         raise GoogleCalendarError(
             'Google did not return a refresh token. Remove TV Tracker’s access '
             'at myaccount.google.com/permissions and connect again.'
         )
+    link.reauth_required = False
     link.token_expires_at = _expires_at(tokens)
     link.updated_at = datetime.utcnow()
     db.session.commit()
@@ -212,7 +292,15 @@ class GoogleCalendarClient:
         })
         access = payload.get('access_token')
         if not access:
-            raise GoogleCalendarError('Google refused to refresh the calendar login.')
+            raise GoogleCalendarError(
+                'Google refused to refresh the calendar login.',
+                token_failure=True,
+            )
+        if missing_calendar_scope(payload):
+            raise GoogleCalendarError(
+                'Google did not grant calendar access.',
+                token_failure=True,
+            )
         self.access_token = access
         if payload.get('refresh_token'):
             self.refresh_token = payload['refresh_token']
@@ -248,6 +336,8 @@ class GoogleCalendarClient:
                 refreshed = True
                 self._refresh()
                 continue
+            if resp.status_code == 403:
+                raise calendar_api_error(resp, 'Google refused the calendar request.')
             return resp
         raise GoogleCalendarError('Could not reach Google Calendar.') from last_exc
 
@@ -263,9 +353,8 @@ class GoogleCalendarClient:
                 'GET', f'{CALENDAR_API}/users/me/calendarList', params=params,
             )
             if resp.status_code != 200:
-                raise GoogleCalendarError(
-                    'Could not list calendars on this Google account.',
-                    status_code=resp.status_code,
+                raise calendar_api_error(
+                    resp, 'Could not list calendars on this Google account.',
                 )
             payload = resp.json() or {}
             for item in payload.get('items') or []:
@@ -287,10 +376,7 @@ class GoogleCalendarClient:
         url = f'{CALENDAR_API}/calendars/{quote(calendar_id, safe="")}/events'
         resp = self._request('POST', url, json=body)
         if resp.status_code not in (200, 201):
-            raise GoogleCalendarError(
-                'Could not create the calendar meeting.',
-                status_code=resp.status_code,
-            )
+            raise calendar_api_error(resp, 'Could not create the calendar meeting.')
         event_id = (resp.json() or {}).get('id')
         if not event_id:
             raise GoogleCalendarError('Google did not return a meeting id.')
@@ -305,10 +391,7 @@ class GoogleCalendarClient:
         if resp.status_code == 404:
             raise GoogleCalendarError('Calendar meeting was deleted.', status_code=404)
         if resp.status_code not in (200, 201):
-            raise GoogleCalendarError(
-                'Could not update the calendar meeting.',
-                status_code=resp.status_code,
-            )
+            raise calendar_api_error(resp, 'Could not update the calendar meeting.')
 
     def delete_event(self, calendar_id: str, event_id: str) -> None:
         url = (
@@ -318,17 +401,14 @@ class GoogleCalendarClient:
         resp = self._request('DELETE', url)
         if resp.status_code in (204, 200, 404, 410):
             return
-        raise GoogleCalendarError(
-            'Could not remove the calendar meeting.',
-            status_code=resp.status_code,
-        )
+        raise calendar_api_error(resp, 'Could not remove the calendar meeting.')
 
 
 def load_client(link: UserGoogleCalendar) -> GoogleCalendarClient:
     """Build a client and persist refreshed tokens back onto ``link``."""
     refresh = decrypt_token(link.refresh_token_enc)
     if not refresh:
-        raise GoogleCalendarError('Connect the Google account again.')
+        raise GoogleCalendarError('Connect the Google account again.', token_failure=True)
 
     def _save(access, new_refresh, expires):
         link.access_token_enc = encrypt_token(access)

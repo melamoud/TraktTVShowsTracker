@@ -18,7 +18,9 @@ A meeting is created when TV Tracker knows a date **and** the title is on **Wish
 
 Episode dates are the ones the app has already loaded from Trakt (about the next month, plus any later dates opened on My calendar). A show that is not on any of your streaming services does not get episode meetings.
 
-Adding the title to Wishlist or an Auto-select list creates the meeting immediately when the date is already known. If the date shows up later, the regular alert check writes the meeting then.
+Saving that title’s lists creates the meeting when the date is already known and still in the future. A finished title does not call Google, and other titles are left alone. If a date shows up later, save that title’s lists again to write the meeting.
+
+If Google refuses the saved login, the website sends you to approve calendar access again and keeps the calendar you already picked. Picking the calendar, or changing the reminder, updates every meeting.
 
 ## Reminder
 

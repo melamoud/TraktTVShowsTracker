@@ -1668,19 +1668,32 @@ def api_lists_membership(media_type, trakt_id):
             )
         except Exception:
             pass
-        try:
-            from services.external_calendar import sync_external_calendar_quietly
-            sync_external_calendar_quietly(current_user)
-        except Exception:
-            current_app.logger.exception('Calendar sync after list change failed')
-        return jsonify({
+        payload = {
             'success': True,
             'on_watchlist': on_watchlist,
             'selected': (
                 ([WATCHLIST_LIST_ID] if on_watchlist else [])
                 + sorted(wanted_lists)
             ),
-        })
+        }
+        try:
+            from services.external_calendar import sync_external_calendar_title_quietly
+            sync_result = sync_external_calendar_title_quietly(
+                current_user, media_type, trakt_id,
+            )
+        except Exception:
+            current_app.logger.exception('Calendar sync after list change failed')
+            sync_result = None
+        if sync_result and sync_result.get('reauth'):
+            try:
+                from services.google_calendar import reauth_authorize_url
+                kind = 'android' if request.path.startswith('/api/v1') else 'web'
+                url = reauth_authorize_url(current_user.id, kind)
+                if url:
+                    payload['google_reauth_url'] = url
+            except Exception:
+                current_app.logger.exception('Could not start Google Calendar reconnect')
+        return jsonify(payload)
     except Exception as exc:
         db.session.rollback()
         return _api_fail(

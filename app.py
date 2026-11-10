@@ -48,6 +48,32 @@ def create_app(config_object=Config):
             return jsonify({'success': False, 'message': 'Login required'}), 401
         return redirect(url_for('auth.login'))
 
+    @app.before_request
+    def google_calendar_reauth_redirect():
+        """Send the browser to Google when the saved calendar login was refused."""
+        if request.method != 'GET':
+            return None
+        path = request.path or ''
+        if (
+            path.startswith(('/api/', '/static/', '/cache/', '/auth/google'))
+            or path == '/favicon.ico'
+        ):
+            return None
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return None
+        from flask_login import current_user
+        if not getattr(current_user, 'is_authenticated', False):
+            return None
+        try:
+            from services.google_calendar import reauth_authorize_url
+            url = reauth_authorize_url(current_user.id, 'web')
+        except Exception:
+            app.logger.exception('Could not start Google Calendar reconnect')
+            return None
+        if not url:
+            return None
+        return redirect(url)
+
     @app.errorhandler(CSRFError)
     def handle_csrf_error(e):
         """Friendly CSRF failure response."""
@@ -370,6 +396,15 @@ def _ensure_schema(app):
                         'ADD COLUMN custom_search_template VARCHAR(500)'
                     ))
                 app.logger.info('Added user_streaming_services.custom_search_template')
+        if 'user_google_calendars' in tables:
+            gcols = {c['name'] for c in insp.get_columns('user_google_calendars')}
+            if 'reauth_required' not in gcols:
+                with db.engine.begin() as conn:
+                    conn.execute(text(
+                        'ALTER TABLE user_google_calendars '
+                        'ADD COLUMN reauth_required BOOLEAN DEFAULT 0 NOT NULL'
+                    ))
+                app.logger.info('Added user_google_calendars.reauth_required')
         if 'scheduler_config' in tables:
             scols = {c['name'] for c in insp.get_columns('scheduler_config')}
             sc_alters = []

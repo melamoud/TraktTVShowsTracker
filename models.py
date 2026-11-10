@@ -559,6 +559,7 @@ class UserGoogleCalendar(db.Model):
     token_expires_at = db.Column(db.DateTime)
     calendar_id = db.Column(db.String(300))
     calendar_name = db.Column(db.String(300))
+    reauth_required = db.Column(db.Boolean, default=False, nullable=False)
     connected_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

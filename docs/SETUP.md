@@ -27,6 +27,7 @@ Each person connects their own Google account from Preferences and picks one cal
 4. Authorized redirect URI (local): `https://localhost:8300/auth/google/callback`
 5. Production: `https://tvtracker.melamoud.com:8300/auth/google/callback` (must match `GOOGLE_CALENDAR_REDIRECT_URI`)
 6. Put the client id and secret in `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+7. Publish the OAuth consent screen to **Production** (Google Auth Platform → Audience). While it stays in Testing, Google expires the refresh token after 7 days. The site then sends that user to Google to approve the same calendar again. Production keeps the login until they revoke it. Calendar scopes are sensitive, so Google shows an unverified-app warning until you complete verification. That warning is fine for a private install.
 
 If you use the app while signed into more than one Google account, the connect button asks which account to use.
 
