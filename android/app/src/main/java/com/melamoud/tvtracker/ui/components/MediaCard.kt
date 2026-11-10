@@ -208,13 +208,6 @@ fun MediaCard(
                             modifier = Modifier.height(32.dp),
                         ) { Text("Set lists") }
                     }
-                    if (foundOnInline) {
-                        OutlinedButton(
-                            onClick = onFoundOn,
-                            contentPadding = PaddingValues(horizontal = 10.dp),
-                            modifier = Modifier.height(32.dp),
-                        ) { Text("Found on") }
-                    }
                     if (!watchInOverflow) {
                         OutlinedButton(
                             onClick = onWatched,
@@ -227,6 +220,13 @@ fun MediaCard(
                         contentPadding = PaddingValues(horizontal = 10.dp),
                         modifier = Modifier.height(32.dp),
                     ) { Text("Feedback") }
+                    if (foundOnInline) {
+                        OutlinedButton(
+                            onClick = onFoundOn,
+                            contentPadding = PaddingValues(horizontal = 10.dp),
+                            modifier = Modifier.height(32.dp),
+                        ) { Text("Found on") }
+                    }
                     if (hideRecommendationInline && onHideRecommendation != null) {
                         OutlinedButton(
                             onClick = onHideRecommendation,

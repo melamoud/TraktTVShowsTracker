@@ -326,17 +326,17 @@ private fun DetailActions(
     onOpenUrl: (String) -> Unit,
 ) {
     ScrollableActionRow(itemSpacing = 8.dp) {
-        ActionBtn(if (item.pinned) "Unpin" else "Pin", primary = item.pinned, onClick = onPin)
-        ActionBtn("Set lists…", onClick = onLists)
-        ActionBtn(if (item.rating != null) "Rate ${item.rating}/10" else "Rate…", onClick = onRate)
-        ActionBtn(if (item.favorited) "Unfavorite" else "Favorite", onClick = onFavorite)
-        ActionBtn("Feedback", onClick = onFeedback)
-        ActionBtn(if (item.watched) "Unwatch" else "Mark watched", onClick = onWatch)
-        ActionBtn("Found on…", onClick = onFoundOn)
-        ActionBtn("Hide recommendation", onClick = onHideRecommendation)
         if (mediaType == "show") {
             ActionBtn("Series progress", primary = true, onClick = onProgress)
         }
+        ActionBtn("Set lists…", onClick = onLists)
+        ActionBtn("Feedback", onClick = onFeedback)
+        ActionBtn(if (item.watched) "Unwatch" else "Mark watched", onClick = onWatch)
+        ActionBtn("Found on…", onClick = onFoundOn)
+        ActionBtn(if (item.pinned) "Unpin" else "Pin", primary = item.pinned, onClick = onPin)
+        ActionBtn(if (item.favorited) "Unfavorite" else "Favorite", onClick = onFavorite)
+        ActionBtn(if (item.rating != null) "Rate ${item.rating}/10" else "Rate…", onClick = onRate)
+        ActionBtn("Hide recommendation", onClick = onHideRecommendation)
         imdbUrl?.let { url -> ActionBtn("IMDb") { onOpenUrl(url) } }
         item.trailerUrl?.takeIf { it.isNotBlank() }?.let { url -> ActionBtn("Trailer") { onOpenUrl(url) } }
         homepage?.takeIf { it.isNotBlank() }?.let { url -> ActionBtn("Homepage") { onOpenUrl(url) } }

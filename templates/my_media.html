@@ -320,6 +320,22 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
                     data-trakt-id="{{ st.trakt_id }}"
                     data-title="{{ (m.title if m else st.trakt_id)|e }}">Progress</button>
           {% endif %}
+          <button class="btn btn-small{% if not st.on_watchlist %} btn-primary{% endif %}" type="button"
+                  data-action="lists-edit"
+                  data-media-type="{{ media_type }}"
+                  data-trakt-id="{{ st.trakt_id }}"
+                  data-title="{{ (m.title if m else st.trakt_id)|e }}">Set lists…</button>
+          {% if st.watched %}
+            <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Unwatch</button>
+          {% else %}
+            <button class="btn btn-small" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Mark watched</button>
+          {% endif %}
+          {% set trakt_id = st.trakt_id %}
+          {% set title = m.title if m else st.trakt_id %}
+          {% set year = m.year if m else none %}
+          {% set providers = row.providers %}
+          {% set found_on = row.found_on %}
+          {% include '_found_on_button.html' %}
           {% if st.pinned %}
             <button class="btn btn-small" type="button"
                     data-action="pin-remove"
@@ -335,24 +351,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
                     data-title="{{ (m.title if m else st.trakt_id)|e }}"
                     title="Keep at the top of My {{ 'shows' if media_type == 'show' else 'movies' }}">Pin</button>
           {% endif %}
-          <button class="btn btn-small{% if not st.on_watchlist %} btn-primary{% endif %}" type="button"
-                  data-action="lists-edit"
-                  data-media-type="{{ media_type }}"
-                  data-trakt-id="{{ st.trakt_id }}"
-                  data-title="{{ (m.title if m else st.trakt_id)|e }}">Set lists…</button>
           {% set rating = st.rating %}{% set favorited = st.favorited %}{% set trakt_id = st.trakt_id %}
           {% include '_rate_favorite_actions.html' %}
-          {% if st.watched %}
-            <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Unwatch</button>
-          {% else %}
-            <button class="btn btn-small" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ st.trakt_id }}">Mark watched</button>
-          {% endif %}
-          {% set trakt_id = st.trakt_id %}
-          {% set title = m.title if m else st.trakt_id %}
-          {% set year = m.year if m else none %}
-          {% set providers = row.providers %}
-          {% set found_on = row.found_on %}
-          {% include '_found_on_button.html' %}
           {% if m and m.imdb_id %}
             <a class="btn btn-small" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>
           {% endif %}

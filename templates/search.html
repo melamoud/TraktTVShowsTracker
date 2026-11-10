@@ -196,26 +196,6 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
             <div class="meta">Match: {{ row.match.reasons|join(' · ') }}</div>
           {% endif %}
           <div class="actions">
-            <button class="btn btn-small{% if not row.on_watchlist %} btn-primary{% endif %}" type="button"
-                    data-action="lists-edit"
-                    data-media-type="{{ media_type }}"
-                    data-trakt-id="{{ m.trakt_id }}"
-                    data-title="{{ m.title|e }}">Set lists…</button>
-            {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
-            {% include '_rate_favorite_actions.html' %}
-            {% if row.watched %}
-              <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
-            {% else %}
-              <button class="btn btn-small" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Mark watched</button>
-            {% endif %}
-            {% set providers = row.providers %}
-            {% include '_found_on_button.html' %}
-            <button class="btn btn-small btn-danger" type="button"
-                    data-action="recommendation-hide"
-                    data-media-type="{{ media_type }}"
-                    data-trakt-id="{{ m.trakt_id }}"
-                    data-title="{{ m.title|e }}"
-                    title="Hide from Trakt recommendations (Not interested)">Hide recommendation</button>
             {% if media_type == 'show' %}
               <button class="btn btn-small btn-primary" type="button"
                       data-action="progress-open"
@@ -223,6 +203,26 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
                       data-trakt-id="{{ m.trakt_id }}"
                       data-title="{{ m.title|e }}">Progress</button>
             {% endif %}
+            <button class="btn btn-small{% if not row.on_watchlist %} btn-primary{% endif %}" type="button"
+                    data-action="lists-edit"
+                    data-media-type="{{ media_type }}"
+                    data-trakt-id="{{ m.trakt_id }}"
+                    data-title="{{ m.title|e }}">Set lists…</button>
+            {% if row.watched %}
+              <button class="btn btn-small" data-action="watched-remove" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Unwatch</button>
+            {% else %}
+              <button class="btn btn-small" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Mark watched</button>
+            {% endif %}
+            {% set providers = row.providers %}
+            {% include '_found_on_button.html' %}
+            {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
+            {% include '_rate_favorite_actions.html' %}
+            <button class="btn btn-small btn-danger" type="button"
+                    data-action="recommendation-hide"
+                    data-media-type="{{ media_type }}"
+                    data-trakt-id="{{ m.trakt_id }}"
+                    data-title="{{ m.title|e }}"
+                    title="Hide from Trakt recommendations (Not interested)">Hide recommendation</button>
             {% if m.imdb_id %}<a class="btn btn-small" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>{% endif %}
             {% if m.trailer_url %}<a class="btn btn-small" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>{% endif %}
             <a class="btn btn-small" href="https://trakt.tv/{{ media_type }}s/{{ m.slug or m.trakt_id }}" target="_blank" rel="noopener">Trakt</a>

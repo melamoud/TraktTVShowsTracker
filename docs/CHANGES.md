@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-11-10 — Series progress is the first show button (1.0.27)
+
+- On a show, **Series progress** is the first action on the title page and on list cards, so it is on screen without scrolling
+- The buttons after it follow how often they are used: **Set lists**, **Feedback**, **Mark watched**, **Found on**, then pin, favorite, rate, and links
+- Updated [Android app](help/user/android.md) and [Search](help/user/search.md)
+
 ## 2026-11-09 — Google Calendar reconnects when the login is refused
 
 - A refused Google login (often a Testing-mode refresh token that expired after 7 days) no longer skips every meeting

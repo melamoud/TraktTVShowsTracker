@@ -74,14 +74,18 @@
     </div>
 
     <div class="actions">
+      {% if media_type == 'show' %}
+        <button class="btn btn-primary" type="button"
+                data-action="progress-open"
+                data-media-type="show"
+                data-trakt-id="{{ m.trakt_id }}"
+                data-title="{{ m.title|e }}">Series progress</button>
+      {% endif %}
       <button class="btn{% if not row.on_watchlist %} btn-primary{% endif %}" type="button"
               data-action="lists-edit"
               data-media-type="{{ media_type }}"
               data-trakt-id="{{ m.trakt_id }}"
               data-title="{{ m.title|e }}">Set lists…</button>
-      {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
-      {% set btn_class = 'btn' %}
-      {% include '_rate_favorite_actions.html' %}
       <button class="btn" type="button"
               data-action="review-add"
               data-media-type="{{ media_type }}"
@@ -93,19 +97,15 @@
         <button class="btn" type="button" data-action="watched-add" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}">Mark watched</button>
       {% endif %}
       <button class="btn" type="button" data-action="found-on" data-media-type="{{ media_type }}" data-trakt-id="{{ m.trakt_id }}" data-title="{{ m.title|e }}"{% if m.year %} data-year="{{ m.year }}"{% endif %} data-providers="{{ row.providers|join('|') }}" data-found-on="{{ row.found_on|join('|') }}">Found on…</button>
+      {% set rating = row.rating %}{% set favorited = row.favorited %}{% set trakt_id = m.trakt_id %}
+      {% set btn_class = 'btn' %}
+      {% include '_rate_favorite_actions.html' %}
       <button class="btn btn-danger" type="button"
               data-action="recommendation-hide"
               data-media-type="{{ media_type }}"
               data-trakt-id="{{ m.trakt_id }}"
               data-title="{{ m.title|e }}"
               title="Hide from Trakt recommendations (Not interested)">Hide recommendation</button>
-      {% if media_type == 'show' %}
-        <button class="btn btn-primary" type="button"
-                data-action="progress-open"
-                data-media-type="show"
-                data-trakt-id="{{ m.trakt_id }}"
-                data-title="{{ m.title|e }}">Series progress</button>
-      {% endif %}
       {% if m.imdb_id %}<a class="btn" href="https://www.imdb.com/title/{{ m.imdb_id }}/" target="_blank" rel="noopener">IMDb</a>{% endif %}
       {% if m.trailer_url %}<a class="btn" href="{{ m.trailer_url }}" target="_blank" rel="noopener">Trailer</a>{% endif %}
       {% if m.homepage %}<a class="btn" href="{{ m.homepage }}" target="_blank" rel="noopener">Homepage</a>{% endif %}
