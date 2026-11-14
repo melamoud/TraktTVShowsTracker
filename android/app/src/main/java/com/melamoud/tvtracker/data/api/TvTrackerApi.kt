@@ -271,6 +271,7 @@ interface TvTrackerApi {
         @Query("match_only") matchOnly: Int? = null,
         @Query("recent_years") recentYears: Int? = null,
         @Query("show_reviewed") showReviewed: Int? = null,
+        @Query("hide_not_interested") hideNotInterested: Int? = null,
         @Query("per_page") perPage: Int? = null,
         @Query("load_older") loadOlder: Int? = null,
         @Query("year") year: String? = null,

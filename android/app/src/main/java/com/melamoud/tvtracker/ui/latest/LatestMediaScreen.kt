@@ -115,6 +115,9 @@ fun LatestMediaScreen(
             BooleanFilterButton("Recent years", state.recentYears) { viewModel.setRecentYears(it) }
             BooleanFilterButton("Hide watched", state.hideWatched) { viewModel.setHideWatched(it) }
             BooleanFilterButton("Hide lists", state.hideLists) { viewModel.setHideLists(it) }
+            BooleanFilterButton("Hide not interested", state.hideNotInterested) {
+                viewModel.setHideNotInterested(it)
+            }
             LatestActionsMenu(
                 hasMarker = state.marker != null,
                 hasMoreOlder = state.hasMoreOlder,

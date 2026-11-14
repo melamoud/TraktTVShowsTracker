@@ -155,7 +155,9 @@ def limit_to_marker_timestamp(query, marker):
 
 
 def _count_latest(user: User, media_type: str) -> dict[str, int | str] | None:
-    """Latest pile: recent years + hide watched + hide personal lists + unreviewed."""
+    """Latest pile: recent years + hide watched/lists/not interested + unreviewed."""
+    from services.dismissed_titles import NOT_INTERESTED, REVIEWED, dismissed_ids
+
     min_year = discovery_year_cutoff()
     marker = ReviewMarker.query.filter_by(user_id=user.id, media_type=media_type).first()
     query = (
@@ -175,11 +177,12 @@ def _count_latest(user: User, media_type: str) -> dict[str, int | str] | None:
     ids = [int(m.trakt_id) for m in items]
     watched = _watched_ids(user.id, media_type, ids)
     listed = _listed_ids(user.id, media_type, ids)
+    not_interested = dismissed_ids(user.id, media_type, NOT_INTERESTED)
 
     remaining: list[CachedMedia] = []
     for media in items:
         tid = int(media.trakt_id)
-        if tid in watched or tid in listed:
+        if tid in watched or tid in listed or tid in not_interested:
             continue
         if media_has_excluded_genre(media, user):
             continue
@@ -195,6 +198,9 @@ def _count_latest(user: User, media_type: str) -> dict[str, int | str] | None:
         # If the marker title itself was filtered out, those ties stay.
         if marker_index is not None:
             remaining = remaining[:marker_index]
+    reviewed = dismissed_ids(user.id, media_type, REVIEWED)
+    if reviewed:
+        remaining = [m for m in remaining if int(m.trakt_id) not in reviewed]
 
     y = len(remaining)
     if y <= 0:

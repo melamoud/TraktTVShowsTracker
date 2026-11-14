@@ -36,10 +36,15 @@ class User(UserMixin, db.Model):
     calendar_synced_at = db.Column(db.DateTime)
     calendar_window_start = db.Column(db.Date)
     calendar_window_end = db.Column(db.Date)
+    # Last full pull of Trakt "Not interested" (hidden recommendations).
+    hidden_recs_synced_at = db.Column(db.DateTime)
 
     preferences = db.relationship('UserPreference', backref='user', uselist=False, cascade='all, delete-orphan')
     streaming_services = db.relationship('UserStreamingService', backref='user', cascade='all, delete-orphan')
     review_markers = db.relationship('ReviewMarker', backref='user', cascade='all, delete-orphan')
+    dismissed_titles = db.relationship(
+        'UserDismissedTitle', backref='user', cascade='all, delete-orphan',
+    )
     found_on = db.relationship('MediaFoundOn', backref='user', cascade='all, delete-orphan')
     favorite_actors = db.relationship('UserFavoriteActor', backref='user', cascade='all, delete-orphan')
     notifications = db.relationship('Notification', backref='user', cascade='all, delete-orphan')
@@ -323,6 +328,29 @@ class ReviewMarker(db.Model):
     trakt_id = db.Column(db.Integer, nullable=False)
     trakt_listed_at = db.Column(db.DateTime, nullable=False)
     title = db.Column(db.String(400))
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+
+class UserDismissedTitle(db.Model):
+    """
+    A title Latest should keep hidden for this user even after Trakt re-lists it.
+
+    reason='not_interested': hidden from Trakt recommendations (mirrors Trakt).
+    reason='reviewed': was at/below the review marker when the user set it.
+    """
+
+    __tablename__ = 'user_dismissed_titles'
+    __table_args__ = (
+        db.UniqueConstraint(
+            'user_id', 'media_type', 'trakt_id', 'reason', name='uq_user_dismissed_title',
+        ),
+    )
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    media_type = db.Column(db.String(16), nullable=False)
+    trakt_id = db.Column(db.Integer, nullable=False)
+    reason = db.Column(db.String(24), nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
 
 

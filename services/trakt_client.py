@@ -787,6 +787,19 @@ def get_recommendations(
     ) or []
 
 
+def get_hidden_recommendations(user: User, media_type: str) -> list:
+    """All titles the user hid from Trakt recommendations ("Not interested")."""
+    if media_type not in ('movie', 'show'):
+        raise ValueError(f'Unsupported media_type: {media_type}')
+    return api_request(
+        'GET',
+        '/users/hidden/recommendations',
+        user=user,
+        params={'type': media_type, 'limit': 100},
+        paginate_max_pages=100,
+    ) or []
+
+
 def hide_recommendation(user: User, media_type: str, trakt_id: int) -> None:
     """Hide a title from future Trakt recommendations for this user."""
     if media_type not in ('movie', 'show'):

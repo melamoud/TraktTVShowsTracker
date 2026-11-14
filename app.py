@@ -336,6 +336,10 @@ def _ensure_schema(app):
                 u_user_alters.append(
                     'ALTER TABLE users ADD COLUMN calendar_window_end DATE'
                 )
+            if 'hidden_recs_synced_at' not in user_cols:
+                u_user_alters.append(
+                    'ALTER TABLE users ADD COLUMN hidden_recs_synced_at DATETIME'
+                )
             if u_user_alters:
                 with db.engine.begin() as conn:
                     for stmt in u_user_alters:

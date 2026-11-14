@@ -8,6 +8,10 @@ The marker uses the title’s **Trakt listing/update time**, not the theatrical 
 
 You can **Clear marker** from Latest, or from Preferences after changing match filters.
 
+## Edited titles stay reviewed
+
+Latest is Trakt’s “recently changed” feed, so any metadata edit (poster, cast, release date) gives a title a new time and lifts it above your marker. When you set the marker (or **Caught up as of now**), the app also remembers every title at or below it. Those titles stay hidden (or dimmed with **Show reviewed**) after a later Trakt edit. **Clear marker** forgets them, so everything can show again.
+
 ## When you change genres / keywords
 
 Purple matches shift. Markers stay on the same titles, which can hide newly matching rows below the marker. After saving Preferences you’ll be asked:

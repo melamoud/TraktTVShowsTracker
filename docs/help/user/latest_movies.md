@@ -2,7 +2,7 @@
 
 Shows titles recently **added or changed in Trakt’s database**, newest Trakt activity first.
 
-The nav badge is **matches / unreviewed** (e.g. `3/12`): purple preference matches over the remaining Latest pile. It follows hide watched, hide list titles, hidden genres, recent years, and the review marker (only titles *above* the marker). It does **not** shrink when you toggle All titles, genre/keyword filters, availability chips, or title search.
+The nav badge is **matches / unreviewed** (e.g. `3/12`): purple preference matches over the remaining Latest pile. It follows hide watched, hide list titles, not interested, hidden genres, recent years, and the review marker (only titles *above* the marker that you have not already reviewed). It does **not** shrink when you toggle All titles, genre/keyword filters, availability chips, or title search.
 
 ## Matches only + recent years (defaults)
 
@@ -13,6 +13,7 @@ By default Latest applies two local filters:
 1. **Recent years** — keep production year ≥ this year (or ≥ last year in Jan–Jun). Toggle **Include older years** to see classics that just got a DB edit.  
 2. **Matches only** — purple genres/keywords. Toggle **All titles** for the unfiltered (but still year-filtered) feed. **Hide these genres** in Preferences still applies on All titles.  
 3. **Hide list titles** — hides titles already saved to your personal Trakt lists (e.g., “TV Show Favs”) so Latest only surfaces new discoveries. Toggle **Show list titles** to see them again.  
+4. **Hiding not interested** — hides titles you marked **Hide recommendation** (Trakt “Not interested”), here or on Trakt.tv. The list is read from Trakt at most once per Trakt read-cache window (default 2 hours); a hide from this app or the Android app counts right away. Toggle **Show not interested** to see them again.  
 
 Without genres/keywords, Matches only is empty — use the setup wizard / Preferences, or All titles.
 
@@ -40,7 +41,7 @@ This is **not** the public release / “coming soon” calendar.
 3. **Older pages**: loaded **only** when you click **Load older Trakt page** — never invent empty UI pages.  
 4. **Hide watched**: uses the same local watched/wishlist cache as My pages (hourly catalog job, **Set lists**, or **Refresh from Trakt** — not on every click).  
 
-The review marker only **dims** titles already in cache; it is not a sync depth target anymore.
+The review marker only **dims** titles already in cache; it is not a sync depth target anymore. A title you already passed stays reviewed when a later Trakt edit lifts it back above the marker — see [Review markers](review_markers).
 
 Trakt’s `/updates` API **cannot** filter by genre/keyword server-side. Matches-only filters locally after each page is cached (genres/overview come from `extended=full`).
 
@@ -50,11 +51,12 @@ Trakt’s `/updates` API **cannot** filter by genre/keyword server-side. Matches
 - **10 / 50 / 100** per page  
 - **Hide watched** on by default  
 - **Hide list titles** on by default (personal Trakt lists)  
+- **Hiding not interested** on by default (titles you hid from Trakt recommendations)  
 - Preference highlights (genres/keywords only), **Set lists…** / watched, **Rate…** / **Favorite**, review marker (set / clear), **Found on…**, **Hide recommendation**  
 - Open a title for the full page; **← Back** returns here (not always to another Latest view)  
 - Poster, description, genres  
 - **Streaming:** read-only TMDB/JustWatch list (needs free `TMDB_API_KEY`)  
-- **Hide recommendation:** sends Trakt a “Not interested” for this title; it disappears from future Trakt recommendations (the title stays in Latest until it pages out naturally)  
+- **Hide recommendation:** sends Trakt a “Not interested” for this title; it disappears from future Trakt recommendations, and from Latest while **Hiding not interested** is on  
 
 Filter and page-size choices are remembered for your account when you leave and return.
 

@@ -900,6 +900,7 @@ def _latest_visible_rows(
     *,
     min_year: int | None = None,
     include_reviewed: bool = False,
+    hide_not_interested: bool = False,
 ) -> tuple[list[dict], dict]:
     """
     Decorate feed rows and apply filters. Returns (rows, stats).
@@ -944,14 +945,28 @@ def _latest_visible_rows(
     if hide_lists:
         rows_all = [r for r in rows_all if not r.get('list_names')]
     after_lists = len(rows_all)
+    if hide_not_interested and getattr(current_user, 'is_authenticated', False):
+        from services.dismissed_titles import NOT_INTERESTED, dismissed_ids
+        hidden = dismissed_ids(current_user.id, media_type, NOT_INTERESTED)
+        rows_all = [r for r in rows_all if int(r['media'].trakt_id) not in hidden]
+    after_not_interested = len(rows_all)
     if match_only:
         rows_all = [r for r in rows_all if r.get('match') and r['match'].get('matched')]
     _apply_marker_to_visible_rows(rows_all, media_type)
+    if getattr(current_user, 'is_authenticated', False):
+        # Reviewed before Trakt re-listed it above the marker: still reviewed.
+        from services.dismissed_titles import REVIEWED, dismissed_ids
+        reviewed = dismissed_ids(current_user.id, media_type, REVIEWED)
+        if reviewed:
+            for r in rows_all:
+                if int(r['media'].trakt_id) in reviewed:
+                    r['older_than_marker'] = True
     stats = {
         'cached_total': cached_total,
         'after_year': after_year,
         'after_watched': after_watched,
         'after_lists': after_lists,
+        'after_not_interested': after_not_interested,
         'visible': len(rows_all),
     }
     return rows_all, stats
@@ -1020,6 +1035,10 @@ def _latest_page_data(media_type: str) -> dict:
     show_reviewed = view_prefs.resolve_bool(
         current_user, view, 'show_reviewed', 'show_reviewed', default=False,
     )
+    # Default: hide titles marked "Not interested" (Trakt hidden recommendations).
+    hide_not_interested = view_prefs.resolve_bool(
+        current_user, view, 'hide_not_interested', 'hide_not_interested', default=True,
+    )
 
     # Hide-watched uses local watched cache — keep it aligned with Trakt activity.
     try:
@@ -1027,6 +1046,13 @@ def _latest_page_data(media_type: str) -> dict:
         ensure_user_media_fresh(current_user, media_types=(media_type,), force=False)
     except Exception as exc:
         current_app.logger.warning('User-state sync before Latest failed: %s', exc)
+    if hide_not_interested:
+        try:
+            from services.dismissed_titles import ensure_not_interested_fresh
+            ensure_not_interested_fresh(current_user)
+        except Exception as exc:
+            db.session.rollback()
+            current_app.logger.warning('Not-interested sync before Latest failed: %s', exc)
 
     from services.sync_jobs import enrich_media_list_for_display
     from services.tmdb_client import is_configured as tmdb_is_configured
@@ -1035,6 +1061,7 @@ def _latest_page_data(media_type: str) -> dict:
         media_type, hide_watched, match_only, hide_lists,
         min_year=min_year,
         include_reviewed=show_reviewed,
+        hide_not_interested=hide_not_interested,
     )
     from services.availability import filter_rows_by_avail, normalize_avail
 
@@ -1144,6 +1171,7 @@ def _latest_page_data(media_type: str) -> dict:
         'match_only': match_only,
         'recent_years': recent_years,
         'show_reviewed': show_reviewed,
+        'hide_not_interested': hide_not_interested,
         'min_discovery_year': min_year,
         'has_match_prefs': has_match_prefs,
         'has_more_older': has_more_older,
@@ -1783,6 +1811,8 @@ def api_review_marker(media_type, trakt_id):
         marker.trakt_listed_at = media.trakt_listed_at
         marker.title = media.title
         marker.created_at = datetime.utcnow()
+    from services.dismissed_titles import record_reviewed_through
+    record_reviewed_through(current_user.id, media_type, media)
     db.session.commit()
     _invalidate_catalog_badges()
     return jsonify({'success': True, 'title': media.title, 'listed_at': media.trakt_listed_at.isoformat()})
@@ -1795,12 +1825,15 @@ def api_review_marker_clear(media_type):
     types = ('movie', 'show') if media_type == 'all' else (media_type,)
     if media_type != 'all' and media_type not in ('movie', 'show'):
         return jsonify({'success': False, 'message': 'Invalid media type'}), 400
+    from services.dismissed_titles import forget_reviewed
+
     deleted = 0
     for mt in types:
         rows = ReviewMarker.query.filter_by(user_id=current_user.id, media_type=mt).all()
         for row in rows:
             db.session.delete(row)
             deleted += 1
+        forget_reviewed(current_user.id, mt)
     db.session.commit()
     _invalidate_catalog_badges()
     return jsonify({'success': True, 'deleted': deleted})
@@ -1839,6 +1872,8 @@ def api_review_marker_caught_up(media_type):
             marker.trakt_listed_at = newest.trakt_listed_at
             marker.title = newest.title
             marker.created_at = datetime.utcnow()
+        from services.dismissed_titles import record_reviewed_through
+        record_reviewed_through(current_user.id, mt, newest)
         results[mt] = {'title': newest.title, 'trakt_id': newest.trakt_id}
     db.session.commit()
     _invalidate_catalog_badges()
@@ -1893,8 +1928,10 @@ def api_hide_recommendation(media_type, trakt_id):
     try:
         trakt_client.hide_recommendation(current_user, media_type, trakt_id)
         try:
+            from services.dismissed_titles import record_not_interested
             from services.trakt_cache import drop_recommendation_from_cache
             drop_recommendation_from_cache(current_user.id, media_type, trakt_id)
+            record_not_interested(current_user.id, media_type, trakt_id)
             db.session.commit()
             _invalidate_catalog_badges()
         except Exception:

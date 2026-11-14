@@ -1,5 +1,13 @@
 # Changes log
 
+## 2026-11-13 — Latest skips Not-interested and already-reviewed titles (1.0.28)
+
+- **Hiding not interested** (on by default, website and app): titles you marked **Hide recommendation** — here, in the app, or on Trakt.tv — no longer show on Latest
+- Setting the review marker remembers every title at or below it. A later Trakt edit that lifts one of them to the top no longer brings it back. **Clear marker** forgets them
+- Nav badges follow both rules
+- One-time, after deploy: `python scripts/backfill_reviewed_titles.py` remembers the titles below markers set before this change
+- Updated [Latest movies](help/user/latest_movies.md), [Latest shows](help/user/latest_shows.md), [Review markers](help/user/review_markers.md), and [Android app](help/user/android.md)
+
 ## 2026-11-13 — Disney+ search finds the working page first
 
 - **Found on** / **Plays on** Disney+ links search Google only on `disneyplus.com/browse` pages, with the title in quotes (for example `site:disneyplus.com/browse "Coven Academy" 2026`)

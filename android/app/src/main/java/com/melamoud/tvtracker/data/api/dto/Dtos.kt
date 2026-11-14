@@ -190,6 +190,7 @@ data class LatestMediaResponse(
     @SerializedName("match_only") val matchOnly: Boolean = false,
     @SerializedName("recent_years") val recentYears: Boolean = true,
     @SerializedName("show_reviewed") val showReviewed: Boolean = false,
+    @SerializedName("hide_not_interested") val hideNotInterested: Boolean = true,
     @SerializedName("has_more_older") val hasMoreOlder: Boolean = false,
     val marker: ReviewMarkerDto? = null,
     @SerializedName("marker_page") val markerPage: Int? = null,
