@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-11-13 — Disney+ search finds the working page first
+
+- **Found on** / **Plays on** Disney+ links search Google only on `disneyplus.com/browse` pages, with the title in quotes (for example `site:disneyplus.com/browse "Coven Academy" 2026`)
+- Regional (`/en-xx/…`) and older Disney+ links that fail to open no longer rank above the `browse/entity-…` page
+- Updated [Streaming vs Found on](help/user/streaming.md)
+
 ## 2026-11-10 — Series progress is the first show button (1.0.27)
 
 - On a show, **Series progress** is the first action on the title page and on list cards, so it is on screen without scrolling

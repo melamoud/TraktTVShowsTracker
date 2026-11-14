@@ -14,15 +14,23 @@ def test_found_on_netflix_uses_search():
 
 
 def test_found_on_disney_plus_uses_google_site_search():
-    """Disney+ has no web search deep link; chips use Google site:disneyplus.com."""
+    """Disney+ chips search Google on disneyplus.com/browse with the exact title."""
     url = found_on_open_url(
-        'Disney+', title='Andor', year=2022, base_urls={}, search_templates=None,
+        'Disney+', title='Coven Academy', year=2026, base_urls={}, search_templates=None,
     )
-    assert 'google.com/search' in url
-    assert 'site%3Adisneyplus.com' in url or 'site:disneyplus.com' in url
-    assert 'Andor' in url
-    assert '2022' in url
+    assert url == (
+        'https://www.google.com/search?q=site%3Adisneyplus.com%2Fbrowse'
+        '+%22Coven+Academy%22+2026'
+    )
     assert 'disneyplus.com/search' not in url
+
+
+def test_found_on_disney_plus_strips_quotes_from_title():
+    """A quote inside the title must not break the exact-phrase search."""
+    url = found_on_open_url(
+        'Disney Plus', title='The "Big" Show', year=None, base_urls={}, search_templates=None,
+    )
+    assert url.endswith('+%22The+Big+Show%22')
 
 
 def test_custom_search_template_title_placeholder():

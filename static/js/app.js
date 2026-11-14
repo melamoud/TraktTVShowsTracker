@@ -147,15 +147,18 @@ function foundOnLinkMaps() {
   }
 }
 
-function applySearchTemplate(tmpl, titleText) {
+function applySearchTemplate(tmpl, titleText, quotedText) {
   const template = String(tmpl || '').trim();
   const text = String(titleText || '').trim();
   if (!template || !text) return null;
   const encPct = encodeURIComponent(text);
   const encPlus = encodeURIComponent(text).replace(/%20/g, '+');
+  const quoted = String(quotedText || '').trim() || text;
+  const encQuoted = encodeURIComponent(quoted).replace(/%20/g, '+');
   const out = template
     .replace(/<title>/g, encPct)
     .replace(/\{title\}/g, encPct)
+    .replace(/\{qt\}/g, encQuoted)
     .replace(/\{q\}/g, encPlus);
   if (out === template) return null;
   return out;
@@ -177,10 +180,12 @@ function foundOnOpenUrl(serviceLabel, title, year) {
     if (year) bits.push(String(year));
   }
   const titleText = bits.join(' ');
+  const cleanTitle = t.replace(/"/g, '');
+  const quotedText = cleanTitle ? ('"' + cleanTitle + '"' + (year ? ' ' + String(year) : '')) : '';
   const maps = foundOnLinkMaps();
   const tmpl = maps.search_templates[key];
   if (tmpl && titleText) {
-    const filled = applySearchTemplate(tmpl, titleText);
+    const filled = applySearchTemplate(tmpl, titleText, quotedText);
     if (filled) return filled;
   }
 

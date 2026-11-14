@@ -11,10 +11,13 @@ from models import StreamingService, User, UserStreamingService
 # Title search pages for known catalog services (homepage alone is weak for queueing).
 # Keys are normalize_service_name() forms (Disney+ → disney plus).
 # Disney+ has no working web search deep link (/search?q= 404s); Google indexes title pages.
+# Only https://www.disneyplus.com/browse/entity-<id> opens reliably; regional
+# (/en-xx/...) and older /series/ /movies/ pages often fail, so search /browse only
+# with the exact title ({qt} = "Title" Year).
 _SEARCH_TEMPLATES = {
     'netflix': 'https://www.netflix.com/search?q={q}',
     'prime video': 'https://www.primevideo.com/search/ref=atv_nb_sr?phrase={q}',
-    'disney plus': 'https://www.google.com/search?q=site%3Adisneyplus.com+{q}',
+    'disney plus': 'https://www.google.com/search?q=site%3Adisneyplus.com%2Fbrowse+{qt}',
     'hulu': 'https://www.hulu.com/search?q={q}',
     'max': 'https://www.max.com/search?q={q}',
     'apple tv plus': 'https://tv.apple.com/search?term={q}',
@@ -40,7 +43,19 @@ def _title_query(title: str | None, year: int | None) -> str:
     return ' '.join(bits)
 
 
-def apply_search_template(template: str, title_text: str) -> str | None:
+def _quoted_title_query(title: str | None, year: int | None) -> str:
+    """Exact-phrase title for web searches: ``"Coven Academy" 2026``."""
+    t = (title or '').strip().replace('"', '')
+    if not t:
+        return ''
+    return f'"{t}" {int(year)}' if year else f'"{t}"'
+
+
+def apply_search_template(
+    template: str,
+    title_text: str,
+    quoted_text: str | None = None,
+) -> str | None:
     """
     Fill a user/catalog search template.
 
@@ -48,6 +63,7 @@ def apply_search_template(template: str, title_text: str) -> str | None:
       <title>  preferred (e.g. https://toflx.com/search?q=<title>)
       {title}  same
       {q}      same (quote_plus style for built-ins)
+      {qt}     quoted title + year (quote_plus), for Google exact-phrase searches
     """
     tmpl = (template or '').strip()
     text = (title_text or '').strip()
@@ -55,7 +71,13 @@ def apply_search_template(template: str, title_text: str) -> str | None:
         return None
     enc_pct = quote(text, safe='')  # The%20Devil%27s%20Mouth%202026
     enc_plus = quote_plus(text)     # The+Devil%27s+Mouth+2026
-    out = tmpl.replace('<title>', enc_pct).replace('{title}', enc_pct).replace('{q}', enc_plus)
+    enc_quoted = quote_plus((quoted_text or '').strip() or text)
+    out = (
+        tmpl.replace('<title>', enc_pct)
+        .replace('{title}', enc_pct)
+        .replace('{qt}', enc_quoted)
+        .replace('{q}', enc_plus)
+    )
     if out == tmpl:
         # No placeholder — not a usable search URL by itself.
         return None
@@ -132,12 +154,11 @@ def found_on_open_url(
     tmpl = templates.get(key) if templates else None
     if tmpl and title_text:
         # Built-in templates use {q}; user templates use <title>.
-        filled = apply_search_template(tmpl, title_text)
+        filled = apply_search_template(
+            tmpl, title_text, _quoted_title_query(title, year),
+        )
         if filled:
             return filled
-        # Built-ins stored as https://...?q={q}
-        if '{q}' in tmpl:
-            return tmpl.format(q=quote_plus(title_text))
 
     base = None
     if base_urls is not None:
