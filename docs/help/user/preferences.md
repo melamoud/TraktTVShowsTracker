@@ -15,7 +15,7 @@ On any title detail page, the **Cast** section lists main actors (expand for the
 - Manage removals under Preferences → **Favorite actors**
 - Headshots: one TMDB credits lookup per title; each actor image is downloaded into the local actors cache **at most once** and reused on every title
 - An actor’s name (or **Titles**) opens Search for their movies/shows, with the same hide-watched / lists / year / genre filters
-- Not synced to Trakt favorites. **New title with a favorite actor** alerts (Preferences → Alerts) fire when a newly listed catalog title includes one of these people — the app does **not** poll each actor’s filmography
+- Not synced to Trakt favorites. **New title with a favorite actor** alerts (Preferences → Alerts) fire when a recent catalog title includes one of these people — the same recent-years cutoff as Latest. An old title that was only just re-listed does not alert, and neither does a title you have already watched. The app does **not** poll each actor’s filmography
 
 ## Trakt lists in Set lists
 

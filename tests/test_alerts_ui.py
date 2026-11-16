@@ -367,8 +367,8 @@ def test_new_episode_alert_stays_when_show_still_counted_complete(app, client, u
         assert note.is_read is False
 
 
-def test_list_add_for_finished_show_shows_watched(app, client, user):
-    """Adding a show you already finished still marks that inbox card Watched."""
+def test_list_add_for_finished_show_is_dropped(app, client, user):
+    """A list alert for a show you already finished does not stay in Inbox."""
     with app.app_context():
         db.session.add(CachedMedia(
             media_type='show', trakt_id=77692, title='Billions', year=2016,
@@ -387,9 +387,10 @@ def test_list_add_for_finished_show_shows_watched(app, client, user):
         db.session.commit()
     login_client(client, app, user)
     html = client.get('/notifications?inbox=1').get_data(as_text=True)
-    assert 'Billions' in html
-    assert 'Watched' in html
-    assert 'data-action="watched-add"' not in html
+    assert 'Billions' not in html
+    with app.app_context():
+        note = Notification.query.filter_by(user_id=user, trakt_id=77692).one()
+        assert note.is_read is True
 
 
 def test_watched_episode_alert_cleared_on_page(app, client, user):
@@ -562,8 +563,10 @@ def test_notifications_page_renders_favorite_actor_card(app, client, user):
         prefs = UserPreference.query.filter_by(user_id=user).one()
         prefs.genres_json = '["drama"]'
         prefs.keywords_json = '["heist"]'
+        from services.streaming_matcher import discovery_year_cutoff
         db.session.add(CachedMedia(
-            media_type='movie', trakt_id=7701, title='Fauda Film', year=2024,
+            media_type='movie', trakt_id=7701, title='Fauda Film',
+            year=discovery_year_cutoff(),
             overview='A clever heist in the city',
             genres_json='["drama","crime"]',
         ))
@@ -589,8 +592,10 @@ def test_notifications_page_renders_favorite_actor_card(app, client, user):
 def test_alerts_page_caches_poster_for_new_title(app, client, user):
     """Alerts download a local poster so the widget is not a blank tile."""
     with app.app_context():
+        from services.streaming_matcher import discovery_year_cutoff
         db.session.add(CachedMedia(
-            media_type='movie', trakt_id=7701, title='Fauda Film', year=2024,
+            media_type='movie', trakt_id=7701, title='Fauda Film',
+            year=discovery_year_cutoff(),
             tmdb_id=55,
         ))
         db.session.add(Notification(

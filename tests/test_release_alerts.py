@@ -904,6 +904,69 @@ def test_notify_lists_added_creates_alert(app, user):
         assert note.trakt_id == 8801
 
 
+def test_notify_lists_added_skips_already_watched(app, user):
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=12, title='Seen It',
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=12, watched=True,
+        ))
+        db.session.commit()
+        u = db.session.get(User, user)
+        assert notify_lists_added(u, 'movie', 12, ['Wishlist']) is False
+        assert Notification.query.filter_by(user_id=user).count() == 0
+
+
+def test_favorite_actor_skips_old_catalog_year(app, user):
+    """An old movie that Trakt just re-listed is not a new favorite-actor title."""
+    with app.app_context():
+        _seed_favorite_actor_catalog(
+            user,
+            listed_at=datetime.utcnow(),
+            favorited_at=datetime.utcnow() - timedelta(days=10),
+        )
+        media = CachedMedia.query.filter_by(trakt_id=7701).one()
+        media.year = 2008
+        db.session.commit()
+        with patch('services.alerts.ensure_user_calendar_fresh', return_value=True), \
+             patch('services.alerts.tmdb_configured', return_value=False):
+            assert run_media_alerts(app) == 0
+        assert Notification.query.filter_by(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR,
+        ).count() == 0
+
+
+def test_opening_alerts_drops_watched_title_and_old_actor(app, client, user):
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=12, title='Seen It', year=2026,
+        ))
+        db.session.add(UserMediaState(
+            user_id=user, media_type='movie', trakt_id=12, watched=True,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type=ALERT_LIST_ADD, title='Seen It',
+            message='Added to Wishlist', media_type='movie', trakt_id=12,
+            is_read=False, payload_key='listadd:seen',
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=13, title='Old Actor Film', year=1999,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type=ALERT_FAVORITE_ACTOR, title='Old Actor Film',
+            message='Someone', media_type='movie', trakt_id=13,
+            is_read=False, payload_key='favactor',
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications').get_data(as_text=True)
+    assert 'Seen It' not in html
+    assert 'Old Actor Film' not in html
+    with app.app_context():
+        assert Notification.query.filter_by(user_id=user, is_read=False).count() == 0
+
+
 def test_notify_lists_added_respects_pref_off(app, user):
     with app.app_context():
         prefs = UserPreference.query.filter_by(user_id=user).one()

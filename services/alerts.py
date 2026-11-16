@@ -172,6 +172,49 @@ def is_finished(user_id: int, media_type: str, trakt_id: int) -> bool:
     return False
 
 
+def state_title_watched(state: UserMediaState | None) -> bool:
+    """True when this movie or show is already watched, so title alerts are noise.
+
+    Movies use the Trakt watched flag. Shows use that flag as well (any plays),
+    or a real caught-up progress summary. Episode and season alerts are separate.
+    """
+    if state is None:
+        return False
+    if state.media_type == 'movie':
+        return bool(state.watched)
+    if state.watched:
+        return True
+    aired = state.episodes_aired
+    completed = state.episodes_completed
+    if aired is not None and completed is not None:
+        return int(aired) > 0 and int(completed) >= int(aired)
+    if (
+        state.progress_detail_at is not None
+        and state.progress_percent is not None
+        and float(state.progress_percent) >= 100.0
+    ):
+        return True
+    return False
+
+
+def title_already_watched(user_id: int, media_type: str, trakt_id: int) -> bool:
+    state = UserMediaState.query.filter_by(
+        user_id=user_id, media_type=media_type, trakt_id=int(trakt_id),
+    ).first()
+    return state_title_watched(state)
+
+
+def favorite_actor_title_is_current(media: CachedMedia | None) -> bool:
+    """Favorite-actor alerts are for new titles, not old ones Trakt just re-listed.
+
+    Same year cutoff as Latest's recent-years filter. A missing year is kept.
+    """
+    if media is None:
+        return True
+    from services.streaming_matcher import discovery_year_cutoff, media_passes_discovery_year
+    return media_passes_discovery_year(media, discovery_year_cutoff())
+
+
 def _event_exists(
     user_id: int,
     alert_type: str,
@@ -278,6 +321,8 @@ def notify_lists_added(
     """Inbox row when the user adds a title to Wishlist and/or personal lists."""
     names = [n.strip() for n in (list_names or []) if (n or '').strip()]
     if not names or media_type not in ('movie', 'show'):
+        return False
+    if title_already_watched(user.id, media_type, int(trakt_id)):
         return False
     media = CachedMedia.query.filter_by(
         media_type=media_type, trakt_id=int(trakt_id),
@@ -461,6 +506,7 @@ def mark_show_alerts_read(user: User, show_trakt_id: int) -> int:
             Notification.trakt_id == show_trakt_id,
             Notification.alert_type.in_((
                 ALERT_EPISODE_AIRED, ALERT_SEASON_AIRED, ALERT_SEASON_STREAMING,
+                ALERT_NEW_STREAMING, ALERT_LIST_ADD, ALERT_FAVORITE_ACTOR,
             )),
         )
         .all()
@@ -492,6 +538,7 @@ def mark_cached_watched_alerts_read(
     """
     from services.trakt_cache import load_progress_payload, watched_keys_from_payload
 
+    marked = _drop_watched_title_alerts(user, notes)
     show_notes: dict[int, list[Notification]] = {}
     for note in notes:
         if note.is_read or note.alert_type not in (
@@ -505,9 +552,15 @@ def mark_cached_watched_alerts_read(
             continue
         show_notes.setdefault(int(trakt_id), []).append(note)
     if not show_notes:
-        return 0
+        if marked:
+            try:
+                db.session.commit()
+            except Exception as exc:
+                logger.warning('Could not commit cached watched-alert cleanup: %s', exc)
+                db.session.rollback()
+                return 0
+        return marked
 
-    marked = 0
     for trakt_id, group in show_notes.items():
         finished = is_finished(user.id, 'show', trakt_id)
         watched_keys = watched_keys_from_payload(load_progress_payload(user.id, trakt_id))
@@ -568,7 +621,10 @@ def mark_movie_alerts_read(user: User, movie_trakt_id: int) -> int:
             Notification.is_read.is_(False),
             Notification.media_type == 'movie',
             Notification.trakt_id == movie_trakt_id,
-            Notification.alert_type.in_((ALERT_RELEASE_DAY, ALERT_NEW_STREAMING)),
+            Notification.alert_type.in_((
+                ALERT_RELEASE_DAY, ALERT_NEW_STREAMING,
+                ALERT_LIST_ADD, ALERT_FAVORITE_ACTOR,
+            )),
         )
         .all()
     )
@@ -629,13 +685,80 @@ def _season_drop_episodes_cleared(
     return True
 
 
+def _drop_watched_title_alerts(
+    user: User,
+    notes: list[Notification] | None = None,
+) -> int:
+    """Dismiss list, favorite-actor, and channel alerts that should not be open.
+
+    A title you have already watched does not keep those cards. A favorite-actor
+    card for an old movie or show that only just entered the catalog is the
+    same kind of noise.
+    """
+    if notes is None:
+        notes = (
+            Notification.query
+            .filter(
+                Notification.user_id == user.id,
+                Notification.is_read.is_(False),
+                Notification.alert_type.in_((
+                    ALERT_LIST_ADD, ALERT_FAVORITE_ACTOR, ALERT_NEW_STREAMING,
+                )),
+                Notification.trakt_id.isnot(None),
+            )
+            .all()
+        )
+    pending = [
+        note for note in notes
+        if not note.is_read
+        and note.alert_type in (ALERT_LIST_ADD, ALERT_FAVORITE_ACTOR, ALERT_NEW_STREAMING)
+        and note.media_type in ('movie', 'show')
+        and note.trakt_id
+    ]
+    if not pending:
+        return 0
+    pairs = {(note.media_type, int(note.trakt_id)) for note in pending}
+    states = {
+        (st.media_type, int(st.trakt_id)): st
+        for st in UserMediaState.query.filter(
+            UserMediaState.user_id == user.id,
+            UserMediaState.trakt_id.in_([tid for _mt, tid in pairs]),
+        ).all()
+        if (st.media_type, int(st.trakt_id)) in pairs
+    }
+    fav_ids = [
+        int(note.trakt_id) for note in pending
+        if note.alert_type == ALERT_FAVORITE_ACTOR
+    ]
+    medias: dict[tuple[str, int], CachedMedia] = {}
+    if fav_ids:
+        for media in CachedMedia.query.filter(
+            CachedMedia.trakt_id.in_(fav_ids),
+            CachedMedia.media_type.in_(('movie', 'show')),
+        ).all():
+            medias[(media.media_type, int(media.trakt_id))] = media
+    marked = 0
+    for note in pending:
+        key = (note.media_type, int(note.trakt_id))
+        drop = state_title_watched(states.get(key))
+        if (
+            note.alert_type == ALERT_FAVORITE_ACTOR
+            and not favorite_actor_title_is_current(medias.get(key))
+        ):
+            drop = True
+        if drop:
+            dismiss_note(note)
+            marked += 1
+    return marked
+
+
 def _mark_watched_alerts_read(user: User, *, rate_limited: bool = False) -> int:
     """
     Mark unread release/episode alerts as read when the movie/episode is watched.
 
     Runs on each alert refresh so watching on Trakt clears the inbox next pass.
     """
-    marked = 0
+    marked = _drop_watched_title_alerts(user)
     movie_notes = (
         Notification.query
         .filter(
@@ -1493,7 +1616,8 @@ def _check_favorite_actor_titles(user: User) -> int:
     Ingest-only: credits are loaded for new Latest/catalog titles, never by
     polling each actor's filmography. Existing catalog outside the grace
     window is baselined silently. Titles listed before the actor was
-    favorited, and titles already on the user's lists or watched, are skipped.
+    favorited, titles already on the user's lists or watched, and titles
+    older than Latest's recent-years cutoff are skipped.
     """
     from services.cast_service import sync_cast_for_media
 
@@ -1548,6 +1672,7 @@ def _check_favorite_actor_titles(user: User) -> int:
             (media.media_type, trakt_id) in watched_pairs
             or (media.media_type == 'movie' and trakt_id in owned_movies)
             or (media.media_type == 'show' and trakt_id in owned_shows)
+            or not favorite_actor_title_is_current(media)
         )
         eligible_ids = set()
         if listed_day is not None:
@@ -1710,9 +1835,10 @@ def _run_alerts_for_user(user: User) -> tuple[int, bool]:
         if not media:
             continue
         finished = is_finished(user.id, 'show', trakt_id)
-        # Streaming alerts stop when truly caught up; episode alerts still use
-        # the calendar so a new season is not skipped by a stale 100% cache.
-        if not finished:
+        # A show you have already watched does not get a title-level channel
+        # alert. Episode alerts still use the calendar so a new season is not
+        # skipped by a stale 100% cache.
+        if not state_title_watched(states.get(trakt_id)):
             created += _check_new_streaming(user, 'show', trakt_id, media)
         created += _check_season_streaming(
             user, trakt_id, media,

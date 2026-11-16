@@ -1,5 +1,12 @@
 # Changes log
 
+## 2026-11-16 — No title alerts for something you already watched
+
+- **Added to a list**, **now streaming**, and **favorite actor** do not alert for a movie or show you have already watched. Open alerts of those types are dismissed
+- A favorite-actor alert also skips an old title that only just reappeared in the catalog. It uses the same recent-years cutoff as Latest
+- Episode, season, and new-season-on-a-service alerts are unchanged
+- Updated [Alerts](help/user/release_alerts.md)
+
 ## 2026-11-15 — Latest aired saves when air times are mixed
 
 - Catalog sync was skipping the latest episode on shows that mix a midnight stamp (`00:00Z`, 8pm Eastern the evening before) with a timed one, so the date never saved
