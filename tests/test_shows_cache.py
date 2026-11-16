@@ -150,6 +150,56 @@ def test_refresh_does_not_use_todays_calendar_as_last_aired(app, user):
         assert st.last_episode_aired_at == datetime(2026, 8, 17, 1, 0, 0)
 
 
+def test_latest_aired_compares_midnight_instant_with_timed_stamp(app):
+    """Order mixed stamps in local time, not by raw UTC wall clock."""
+    from services.local_time import local_date
+    from services.sync_jobs import _latest_aired_from_seasons
+
+    seasons = [{
+        'number': 1,
+        'episodes': [
+            {'number': 1, 'title': 'Drop', 'first_aired': '2026-10-20T00:00:00.000Z'},
+            {'number': 2, 'title': 'Later', 'first_aired': '2026-11-01T05:00:00.000Z'},
+            {'number': 3, 'title': 'Earlier midnight', 'first_aired': '2026-11-01T00:00:00.000Z'},
+        ],
+    }]
+    with app.app_context():
+        latest, label, count = _latest_aired_from_seasons(seasons)
+    assert count == 3
+    assert latest == datetime(2026, 11, 1, 5, 0, 0)
+    assert latest.tzinfo is None
+    assert label == 'S01 · E02 · Later'
+
+    # 03:00Z is 11pm Eastern the evening before. The date-only label is Aug 20.
+    local_day = [{
+        'number': 1,
+        'episodes': [
+            {'number': 1, 'title': 'Cable', 'first_aired': '2026-08-20T03:00:00.000Z'},
+            {'number': 2, 'title': 'Drop', 'first_aired': '2026-08-20'},
+        ],
+    }]
+    with app.app_context():
+        latest, label, count = _latest_aired_from_seasons(local_day)
+        assert local_date(latest) == date(2026, 8, 20)
+    assert count == 2
+    assert latest == datetime(2026, 8, 20, 0, 0, 0)
+    assert latest.tzinfo is None
+    assert label == 'S01 · E02 · Drop'
+
+    midnight_latest = [{
+        'number': 2,
+        'episodes': [
+            {'number': 1, 'title': 'Timed', 'first_aired': '2026-08-24T01:00:00.000Z'},
+            {'number': 2, 'title': 'Drop', 'first_aired': '2026-10-20T00:00:00.000Z'},
+        ],
+    }]
+    with app.app_context():
+        latest, label, count = _latest_aired_from_seasons(midnight_latest)
+        assert local_date(latest) == date(2026, 10, 19)
+    assert count == 2
+    assert latest.tzinfo is not None
+    assert label == 'S02 · E02 · Drop'
+
 
 def test_refresh_seeds_list_only_shows_and_marks_never_aired(app, user):
     """List-only shows get a seasons fetch; never-aired shows stamp checked_at."""

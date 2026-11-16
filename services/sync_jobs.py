@@ -1489,7 +1489,7 @@ def _parse_first_aired(value: str | None) -> datetime | None:
 
 def _latest_aired_from_seasons(seasons: list) -> tuple[datetime | None, str | None, int]:
     """Return (latest aired datetime, label, regular-season aired count)."""
-    from services.local_time import has_aired_at
+    from services.local_time import air_local, has_aired_at
     latest: datetime | None = None
     label: str | None = None
     aired_count = 0
@@ -1504,7 +1504,9 @@ def _latest_aired_from_seasons(seasons: list) -> tuple[datetime | None, str | No
                 continue
             if s_no > 0:
                 aired_count += 1
-            if latest is None or air > latest:
+            # Aware 00:00Z and naive UTC stamps cannot be compared directly.
+            # Order them in the app timezone, same as local_date / has_aired_at.
+            if latest is None or air_local(air) > air_local(latest):
                 latest = air
                 e_no = ep.get('number')
                 title = ep.get('title')

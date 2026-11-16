@@ -1,5 +1,10 @@
 # Changes log
 
+## 2026-11-15 — Latest aired saves when air times are mixed
+
+- Catalog sync was skipping the latest episode on shows that mix a midnight stamp (`00:00Z`, 8pm Eastern the evening before) with a timed one, so the date never saved
+- The latest episode is chosen in the scheduler timezone, same as the rest of the air dates. A date-only day still stays on that calendar day
+
 ## 2026-11-13 — Latest skips Not-interested and already-reviewed titles (1.0.28)
 
 - **Hiding not interested** (on by default, website and app): titles you marked **Hide recommendation** — here, in the app, or on Trakt.tv — no longer show on Latest

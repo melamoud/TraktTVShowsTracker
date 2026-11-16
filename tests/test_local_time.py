@@ -35,6 +35,19 @@ def test_has_aired_uses_local_clock(app):
         assert has_aired_at(e2, now=before) is False
 
 
+def test_air_local_keeps_calendar_day_ahead_of_previous_evening(app):
+    """Date-only Aug 20 is after 03:00Z that morning (11pm Eastern on the 19th)."""
+    from services.local_time import air_local
+
+    with app.app_context():
+        drop = air_local(datetime(2026, 8, 20, 0, 0, 0))
+        cable = air_local(datetime(2026, 8, 20, 3, 0, 0))
+        assert drop.tzinfo is not None and cable.tzinfo is not None
+        assert drop > cable
+        assert drop.date() == date(2026, 8, 20)
+        assert cable.date() == date(2026, 8, 19)
+
+
 def test_parse_trakt_datetime_midnight_vs_timed(app):
     from services.local_time import has_aired_at, local_date, parse_trakt_datetime
 

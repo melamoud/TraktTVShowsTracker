@@ -58,6 +58,19 @@ def to_local(dt: datetime) -> datetime:
     return as_utc(dt).astimezone(app_zone())
 
 
+def air_local(dt: datetime) -> datetime:
+    """App-local datetime for ordering air stamps.
+
+    Same rules as ``local_date`` and ``has_aired_at``. A naive midnight is a
+    calendar label and stays on that day. Every other stamp is a UTC instant
+    shifted into the scheduler timezone, so 00:00Z is 8pm Eastern the evening
+    before and 01:00Z is 9pm. Both kinds come back timezone-aware in that zone.
+    """
+    if is_calendar_midnight(dt):
+        return datetime(dt.year, dt.month, dt.day, tzinfo=app_zone())
+    return to_local(dt)
+
+
 def local_now() -> datetime:
     return datetime.now(app_zone())
 
