@@ -56,7 +56,7 @@ def test_excluded_genre_wins_over_match(app, user):
         )
         db.session.add(media)
         db.session.commit()
-        assert match_preferences(media, u)['matched'] is True
+        assert match_preferences(media, u)['matched'] is False
         assert media_has_excluded_genre(media, u) is True
         comedy = CachedMedia(
             media_type='movie', trakt_id=200, title='Only Drama',

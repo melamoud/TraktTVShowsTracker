@@ -33,8 +33,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import android.graphics.RenderEffect
+import android.os.Build
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asComposeRenderEffect
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
@@ -215,6 +219,22 @@ fun SearchScreen(
                     items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
                         val uriHandler = LocalUriHandler.current
                         val mt = item.mediaType ?: "movie"
+                        val known = item.watched || item.onWatchlist || item.listNames.isNotEmpty()
+                        val gray = if (known && Build.VERSION.SDK_INT >= 31) {
+                            Modifier.graphicsLayer {
+                                alpha = 0.9f
+                                renderEffect = RenderEffect.createColorFilterEffect(
+                                    android.graphics.ColorMatrixColorFilter(
+                                        android.graphics.ColorMatrix().apply { setSaturation(0.45f) },
+                                    ),
+                                ).asComposeRenderEffect()
+                            }
+                        } else if (known) {
+                            Modifier.graphicsLayer { alpha = 0.55f }
+                        } else {
+                            Modifier
+                        }
+                        Box(gray) {
                         MediaCard(
                             item = item,
                             baseUrl = baseUrl,
@@ -238,6 +258,7 @@ fun SearchScreen(
                                 item.mediaType?.let { onOpenDetail(it, item.traktId) }
                             },
                         )
+                        }
                     }
                     if (state.pages > 1) {
                         item {

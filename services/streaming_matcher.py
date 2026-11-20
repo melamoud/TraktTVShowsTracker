@@ -305,6 +305,16 @@ def match_preferences(media: CachedMedia, user: User) -> dict:
     Returns dict with keys: matched (bool), genres, keywords, streaming, reasons.
     ``streaming`` is always empty (kept for template/API compatibility).
     """
+    # A hidden genre wins over liked genres and keywords: no purple match.
+    if media_has_excluded_genre(media, user):
+        return {
+            'matched': False,
+            'genres': [],
+            'keywords': [],
+            'streaming': [],
+            'reasons': [],
+        }
+
     genres, keywords = get_user_genres_keywords(user)
     media_genre_list = media_genres(media)
     text_blob = ' '.join([

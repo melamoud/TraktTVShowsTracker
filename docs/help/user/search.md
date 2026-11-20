@@ -12,7 +12,7 @@ Use **Search** in the top navigation to find movies and shows in Trakt’s datab
 
 Exact title matches are listed before broader fuzzy hits. Actor search uses that person’s Trakt **cast** filmography (newest first; crew credits are skipped). Title + actor together keeps only that actor’s titles whose name matches the title box.
 
-Trakt search results are cached locally for the admin **Trakt read cache** TTL (default 2 hours), same as My / Recs — browser **Back** reuses that cache instead of calling Trakt again. **Refresh from Trakt** on the Search page forces a new pull. Hide-watched / lists / year / genre still apply locally on each view.
+Trakt search results are cached locally for the admin **Trakt read cache** TTL (default 2 hours), same as My / Recs — browser **Back** reuses that cache instead of calling Trakt again. **Refresh from Trakt** on the Search page forces a new pull. Hide-watched / lists / year / genre still apply locally on each view. Shown watched and listed titles are dimmed.
 
 You can start an actor search from:
 
@@ -24,8 +24,10 @@ You can start an actor search from:
 
 Defaults keep Search focused on new discoveries:
 
-- **Not watched** (default) — hides titles you already marked watched. Use **Show watched** to include them.
-- **Not in lists** (default) — hides titles on **Wishlist** or any personal Trakt list. Use **In lists** to include them.
+- **Not watched** (default) — hides titles you already marked watched. Click **Show watched** to include them. Those cards are dimmed and tagged **Watched**.
+- **Not in lists** (default) — hides titles on **Wishlist** or any personal Trakt list. Click **In lists** to include them. Those cards are dimmed and tagged **Watchlist** or with the list name.
+
+A title in a genre you hide (Preferences → **Hide these genres**) still appears. It does not get the purple **Preference match** mark, even when its other genres match.
 
 - **Actor** — name or a favorite-actor pick (Trakt cast filmography). Optional; can be used with or without a title.
 - **Year** — `2018` or `2015-2020` (production year, else release year). Narrows hits.

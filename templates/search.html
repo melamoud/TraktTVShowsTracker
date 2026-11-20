@@ -118,7 +118,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
     {% for row in rows %}
       {% set m = row.media %}
       {% set media_type = row.media_type %}
-      <article class="media-row {% if row.match.matched %}match{% endif %}"
+      <article class="media-row {% if row.match.matched %}match{% endif %} {% if row.watched or row.on_watchlist or row.list_names %}already-known{% endif %}"
                data-media-type="{{ media_type }}"
                data-trakt-id="{{ m.trakt_id }}"
                data-title="{{ m.title|e }}">

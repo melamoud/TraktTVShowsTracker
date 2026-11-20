@@ -284,6 +284,7 @@ def test_search_hides_watched_and_list_titles_by_default(app, client, user):
     assert 'data-trakt-id="2"' in shown_html
     assert 'data-trakt-id="3"' in shown_html
     assert 'data-trakt-id="4"' in shown_html
+    assert shown_html.count('already-known') == 3
 
 
 def test_search_remembers_filter_prefs(app, client, user):

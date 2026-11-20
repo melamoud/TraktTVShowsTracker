@@ -382,11 +382,6 @@ def home():
     return render_template('home.html', unread=unread)
 
 
-def _search_on_any_list(row: dict) -> bool:
-    """True when the title is on Wishlist or any personal list."""
-    return bool(row.get('on_watchlist') or row.get('list_names'))
-
-
 @catalog_bp.route('/search')
 @login_required
 def search():
@@ -394,9 +389,16 @@ def search():
     Trakt-wide title and/or actor search (movies and/or shows).
 
     Results use the same decorated card fields as Latest (lists / watched / streaming).
-    Defaults hide watched and already-listed titles (Wishlist + personal lists).
+    Defaults hide watched and already-listed titles. When those filters are off,
+    the cards stay in the list and are dimmed. A hidden genre cancels the
+    preference-match mark.
     """
     return render_template('search.html', **_search_catalog())
+
+
+def _search_on_any_list(row: dict) -> bool:
+    """True when the title is on Wishlist or any personal list."""
+    return bool(row.get('on_watchlist') or row.get('list_names'))
 
 
 def _search_catalog() -> dict:

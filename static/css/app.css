@@ -270,6 +270,10 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
   opacity: .42;
   filter: grayscale(.25);
 }
+.media-row.already-known {
+  filter: grayscale(.45);
+  opacity: .85;
+}
 .media-row.dimmed.marker-line {
   opacity: .48;
 }

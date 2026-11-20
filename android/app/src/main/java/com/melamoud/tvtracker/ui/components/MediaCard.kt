@@ -102,6 +102,7 @@ fun MediaCard(
                     overflow = TextOverflow.Ellipsis,
                 )
                 val meta = buildList {
+                    if (item.onWatchlist) add("Watchlist")
                     if (item.listNames.isNotEmpty()) add(item.listNames.joinToString(", "))
                     val showStillOpen = item.mediaType == "show"
                         && item.progressPercent != null

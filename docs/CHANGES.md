@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-11-20 — Search dims watched and listed titles, and drops the match on a hidden genre (1.0.29)
+
+- **Not watched** and **Not in lists** stay on Search (on by default). Turning either off keeps those titles in the results, dimmed and tagged
+- A genre in **Hide these genres** still appears in Search, and it cancels the purple preference match
+- Updated [Search](help/user/search.md) and [Android app](help/user/android.md)
+
 ## 2026-11-16 — No title alerts for something you already watched
 
 - **Added to a list**, **now streaming**, and **favorite actor** do not alert for a movie or show you have already watched. Open alerts of those types are dismissed
