@@ -758,3 +758,38 @@ def test_notifications_title_filter(app, client, user):
     titles = [item.get('media_title') or item.get('title') for item in api['items']]
     assert 'Ghostbusters' in titles
     assert 'Alpha Movie' not in titles
+
+
+def test_notifications_no_found_on_keeps_titles_without_it(app, client, user):
+    """No Found on shows only alerts whose movie or show still has no Found on."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=1, title='Needs Found', year=1984,
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=2, title='Already Found', year=1999,
+        ))
+        db.session.add(MediaFoundOn(
+            user_id=user, media_type='movie', trakt_id=2, service_label='Netflix',
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='release_day', title='Needs Found',
+            message='out', media_type='movie', trakt_id=1, is_read=False, is_new=False,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='release_day', title='Already Found',
+            message='out', media_type='movie', trakt_id=2, is_read=False, is_new=False,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    both = client.get('/notifications').get_data(as_text=True)
+    assert 'Needs Found' in both
+    assert 'Already Found' in both
+    html = client.get('/notifications?no_found_on=1').get_data(as_text=True)
+    assert 'Needs Found' in html
+    assert 'Already Found' not in html
+    api = client.get('/api/v1/alerts?no_found_on=1').get_json()
+    assert api['no_found_on'] is True
+    titles = [item.get('media_title') or item.get('title') for item in api['items']]
+    assert 'Needs Found' in titles
+    assert 'Already Found' not in titles

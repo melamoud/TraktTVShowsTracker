@@ -154,6 +154,11 @@ fun MyMediaScreen(
                     TextButton(onClick = { dismiss(); viewModel.showCreateList() }) { Text("Manage lists…") }
                 }
             }
+            FilterChip(
+                selected = state.noFoundOn,
+                onClick = { viewModel.setNoFoundOn(!state.noFoundOn) },
+                label = { Text("No Found on") },
+            )
             FilterMenuButton(availLabel) { dismiss ->
                 listOf("" to "Any", "upcoming" to "Upcoming", "theater" to "Theater", "streaming" to "Streaming")
                     .forEach { (id, label) ->

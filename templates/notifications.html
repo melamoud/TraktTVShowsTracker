@@ -29,6 +29,9 @@
       <span class="pill on" title="Newest alerts first (pinned titles still stay on top)">Newest first</span>
       <a class="pill" href="{{ url_for('user.notifications', hide_read=q_hide, sort='asc', group_shows=q_group, inbox=q_inbox) }}" title="Oldest alerts first">Oldest first</a>
     {% endif %}
+    <a class="pill {% if no_found_on %}on{% endif %}"
+       href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=q_group, inbox=q_inbox, no_found_on=(0 if no_found_on else 1)) }}"
+       title="Only alerts for titles that do not have Found on yet, so you can set it">No Found on</a>
     {% if not inbox %}
       {% if group_shows %}
         <span class="pill on" title="Multiple episode alerts for the same show are collapsed">Grouped by show</span>
@@ -76,6 +79,7 @@
     <input type="hidden" name="sort" value="{{ sort }}">
     <input type="hidden" name="group_shows" value="{{ q_group }}">
     <input type="hidden" name="inbox" value="{{ q_inbox }}">
+    {% if no_found_on %}<input type="hidden" name="no_found_on" value="1">{% endif %}
     <label class="sr-only" for="alerts-search-q">Filter titles</label>
     <input class="search-input" id="alerts-search-q" type="search" name="q" value="{{ search_q|default('') }}"
            placeholder="Filter titles…" autocomplete="off"
@@ -182,6 +186,8 @@
   {% else %}
     {% if search_q %}
       <p class="muted">No alerts match “{{ search_q }}”.</p>
+    {% elif no_found_on %}
+      <p class="muted">No alerts without Found on. Turn off <strong>No Found on</strong> to see the rest.</p>
     {% elif inbox %}
       <p class="muted">No new alerts. <a href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=q_group, inbox=0) }}">Show all alerts</a></p>
     {% elif hide_read %}

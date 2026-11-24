@@ -259,6 +259,99 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
   color: #a7f3d0; border-color: #34d399; background: rgba(52, 211, 153, .14);
 }
 .avail-filters { margin-top: .35rem; }
+.toolbar.my-filters {
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: .4rem;
+}
+.my-filters .pill-row { align-items: center; }
+.my-filters .pill {
+  box-sizing: border-box;
+  min-height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1.2;
+}
+.my-filters button.pill {
+  font-size: .85rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+.my-filters .my-filter-band {
+  margin-top: 0;
+  align-items: center;
+}
+.my-filters .my-filter-band .pill,
+.my-filters .my-filter-band .adv-filters > summary,
+.my-filters .my-filter-band .search-input {
+  box-sizing: border-box;
+  min-height: 2rem;
+}
+.my-filters .my-filter-band .pill {
+  display: inline-flex;
+  align-items: center;
+}
+.my-filters .my-view-pills {
+  flex: 0 1 auto;
+  order: 1;
+  align-items: center;
+}
+.my-filters .avail-filters {
+  display: contents;
+  margin-top: 0;
+}
+.my-filters .avail-filters > .pill { order: 2; }
+.my-filters .search-input {
+  order: 4;
+  flex: 1 1 12rem;
+  max-width: none;
+  padding-top: 0;
+  padding-bottom: 0;
+}
+.my-filters [data-live-filter-clear] { order: 5; }
+.my-filters .adv-filters:not([open]) {
+  display: flex;
+  align-items: center;
+}
+.my-filters .adv-filters {
+  order: 3;
+  width: auto;
+  margin-top: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+.my-filters .adv-filters > summary {
+  list-style: none;
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: .25rem .65rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  font-size: .85rem;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--muted);
+}
+.my-filters .adv-filters > summary::-webkit-details-marker { display: none; }
+.my-filters .adv-filters[open] {
+  display: block;
+  order: 10;
+  flex: 1 0 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: .55rem .75rem;
+  background: rgba(12, 16, 24, .45);
+}
+.my-filters .adv-filters[open] > summary {
+  color: #041210;
+  background: var(--accent);
+  border-color: var(--accent);
+  margin-bottom: .15rem;
+}
 .media-row.match { box-shadow: inset 3px 0 0 var(--match); }
 .media-row.on-my-services {
   box-shadow: inset 3px 0 0 var(--accent);

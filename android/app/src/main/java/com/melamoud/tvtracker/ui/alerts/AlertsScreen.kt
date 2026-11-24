@@ -125,6 +125,11 @@ fun AlertsScreen(
                 },
             )
             FilterChip(
+                selected = state.noFoundOn,
+                onClick = { viewModel.setNoFoundOn(!state.noFoundOn) },
+                label = { Text("No Found on") },
+            )
+            FilterChip(
                 selected = state.hideRead,
                 onClick = { viewModel.setHideRead(!state.hideRead) },
                 label = { Text(if (state.hideRead) "Hide dismissed" else "Show dismissed") },

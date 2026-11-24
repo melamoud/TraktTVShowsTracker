@@ -4,7 +4,9 @@ import json
 from datetime import datetime
 from unittest.mock import patch
 
-from models import CachedMedia, UserListMembership, UserMediaState, UserPreference, db
+from models import (
+    CachedMedia, MediaFoundOn, UserListMembership, UserMediaState, UserPreference, db,
+)
 from tests.conftest import login_client
 
 
@@ -580,3 +582,52 @@ def test_my_movies_title_filter_includes_other_pages(app, client, user):
     assert 'matching' in html
     # Live refilter must not pull Trakt again.
     sync.assert_called_once()
+
+
+def test_my_movies_no_found_on_excludes_titles_that_have_it(app, client, user):
+    """No Found on keeps only titles still missing Found on, across pages."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=1, title='Already Found', year=1984,
+        ))
+        _seed_state(user, trakt_id=1, on_watchlist=True)
+        db.session.add(MediaFoundOn(
+            user_id=user, media_type='movie', trakt_id=1, service_label='Netflix',
+        ))
+        for tid in range(2, 12):
+            db.session.add(CachedMedia(
+                media_type='movie', trakt_id=tid, title=f'Needs Found {tid}', year=2000,
+            ))
+            _seed_state(user, trakt_id=tid, on_watchlist=True)
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False), \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        both = client.get(
+            '/my/movies?lists_set=1&lists=watchlist&filter=both&per_page=10'
+        )
+        missing = client.get(
+            '/my/movies?lists_set=1&lists=watchlist&filter=both&per_page=10&no_found_on=1'
+        )
+        api = client.get(
+            '/api/v1/my/movies?lists_set=1&lists=watchlist&filter=both&per_page=10&no_found_on=1'
+        )
+    assert both.status_code == 200
+    both_html = both.get_data(as_text=True)
+    assert 'Already Found' not in both_html
+    assert '>10</strong> of <strong>11</strong>' in both_html
+    html = missing.get_data(as_text=True)
+    assert missing.status_code == 200
+    assert 'Already Found' not in html
+    assert 'Needs Found 11' in html
+    assert '>10</strong> of <strong>10</strong>' in html
+    assert 'No Found on' in html
+    body = api.get_json()
+    assert body['no_found_on'] is True
+    assert body['total'] == 10
+    assert all(item['trakt_id'] != 1 for item in body['items'])

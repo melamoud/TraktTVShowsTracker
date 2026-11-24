@@ -12,6 +12,7 @@ Opening this page uses a local cache. **Watchlist and personal-list membership**
 - **Watched** — among those lists, watched titles only  
 - **Both** — every title on the selected lists (watched and not)  
 - **Unwatched** — among those lists, titles that are not watched yet
+- **No Found on** — only titles that do not have **Found on** yet, so you can set it. Remembered. Covers every page.
 - **Filter titles…** — as you type, keeps titles whose name contains that text, across every page (backfills missing local titles first; not remembered; see [Search](search) for Trakt-wide search)
 - **More filters** — year (`2018` or `2015-2020`), actor (jumps to Search), and genres (any selected); year/genres are remembered like other My filters
 - **View: List / Newest aired / Weekly / Daily / Monthly** — switch to a **Newest aired** sort (movies sorted by release date, newest released first, future releases hidden; pins stay on top) or a Trakt-style **calendar** of upcoming releases limited to your current **Lists…** selection and status filter; click an entry to open the title. Mode is remembered.

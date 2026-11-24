@@ -27,6 +27,7 @@ data class AlertsUiState(
     val sort: String = "desc",
     val groupShows: Boolean = true,
     val inbox: Boolean = false,
+    val noFoundOn: Boolean = false,
     val query: String = "",
     val expandedKeys: Set<String> = emptySet(),
     val foundOnChoices: List<String> = emptyList(),
@@ -46,6 +47,7 @@ class AlertsViewModel(
     private var persistSort = false
     private var persistGroup = false
     private var persistInbox = false
+    private var persistNoFoundOn = false
     private var loadSeq = 0
     private val titleQuery = DebouncedTitleQuery(viewModelScope) { reload() }
 
@@ -59,6 +61,7 @@ class AlertsViewModel(
                 sort = s.sort.takeIf { persistSort },
                 groupShows = s.groupShows.takeIf { persistGroup },
                 inbox = s.inbox.takeIf { persistInbox },
+                noFoundOn = s.noFoundOn.takeIf { persistNoFoundOn },
                 query = s.query,
             )
             if (seq != loadSeq) return@launch
@@ -76,6 +79,7 @@ class AlertsViewModel(
                         sort = it.sort,
                         groupShows = it.groupShows,
                         inbox = it.inbox,
+                        noFoundOn = it.noFoundOn,
                     )
                 },
                 onFailure = { _state.value.copy(loading = false, error = it.message) },
@@ -111,6 +115,12 @@ class AlertsViewModel(
     fun setInbox(value: Boolean) {
         persistInbox = true
         _state.value = _state.value.copy(inbox = value)
+        reload()
+    }
+
+    fun setNoFoundOn(value: Boolean) {
+        persistNoFoundOn = true
+        _state.value = _state.value.copy(noFoundOn = value)
         reload()
     }
 

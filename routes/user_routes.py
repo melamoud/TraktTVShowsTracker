@@ -633,6 +633,17 @@ def _my_media(media_type: str):
     else:
         stored_avail = view_prefs.get_view(current_user, view).get('avail')
         avail = normalize_avail(stored_avail if isinstance(stored_avail, str) else None)
+    no_found_on = view_prefs.resolve_bool(
+        current_user, view, 'no_found_on', 'no_found_on',
+        default=False, true_when='one',
+    )
+    found_on_ids: set[int] = set()
+    if no_found_on:
+        found_on_ids = {
+            int(tid) for (tid,) in MediaFoundOn.query.filter_by(
+                user_id=current_user.id, media_type=media_type,
+            ).with_entities(MediaFoundOn.trakt_id).distinct().all()
+        }
 
     # View mode: List (rows), calendar grid, or newest-aired sort.
     display_mode = view_prefs.resolve_choice(
@@ -660,6 +671,8 @@ def _my_media(media_type: str):
         cal_ids = _calendar_trakt_ids(
             current_user.id, media_type, filt, list_trakt_ids,
         )
+        if no_found_on:
+            cal_ids = {tid for tid in cal_ids if int(tid) not in found_on_ids}
         calendar_ctx = cal_view.build_calendar_view(
             current_user.id, media_type, display_mode, anchor, cal_ids,
         )
@@ -709,6 +722,9 @@ def _my_media(media_type: str):
     else:
         # lists / both — every title on the selected lists
         q = q.filter(UserMediaState.trakt_id.in_(list_trakt_ids))
+
+    if no_found_on and found_on_ids:
+        q = q.filter(~UserMediaState.trakt_id.in_(found_on_ids))
 
     # Title search and/or availability filters need CachedMedia (before pagination).
     # Backfill missing titles for the filtered candidate set first — otherwise
@@ -1054,6 +1070,7 @@ def _my_media(media_type: str):
         'page_links': _pagination_pages(page, pages),
         'search_q': search_q,
         'avail': avail,
+        'no_found_on': no_found_on,
         **advanced_context(year, filter_genres),
         'display_mode': display_mode,
         'calendar': calendar_ctx,
@@ -2062,8 +2079,13 @@ def _collect_alert_cards(*, force_inbox=None) -> dict:
         inbox = view_prefs.resolve_bool(
             current_user, 'alerts', 'inbox', 'inbox', default=False,
         )
+        no_found_on = view_prefs.resolve_bool(
+            current_user, 'alerts', 'no_found_on', 'no_found_on',
+            default=False, true_when='one',
+        )
     else:
         inbox = bool(force_inbox)
+        no_found_on = False
     q = Notification.query.filter_by(user_id=current_user.id)
     unread_count = q.filter_by(is_read=False).count()
     new_count = new_alert_count(current_user.id)
@@ -2245,6 +2267,11 @@ def _collect_alert_cards(*, force_inbox=None) -> dict:
     if search_q:
         needle = search_q.casefold()
         cards = [c for c in cards if _alert_card_matches(c, needle)]
+    if no_found_on:
+        cards = [
+            c for c in cards
+            if c.get('media_pair') and not c.get('found_on')
+        ]
     display_group = False if inbox else group_shows
     entries = _group_alert_cards(cards, group_shows=display_group, sort=sort)
     return {
@@ -2257,6 +2284,7 @@ def _collect_alert_cards(*, force_inbox=None) -> dict:
         'group_shows': group_shows,
         'inbox': inbox,
         'search_q': search_q,
+        'no_found_on': no_found_on,
     }
 
 

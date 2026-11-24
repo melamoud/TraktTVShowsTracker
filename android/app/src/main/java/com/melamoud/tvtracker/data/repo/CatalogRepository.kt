@@ -67,6 +67,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
         kind: String,
         filter: String? = null,
         avail: String? = null,
+        noFoundOn: Boolean? = null,
         query: String? = null,
         display: String? = null,
         calDate: String? = null,
@@ -81,6 +82,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
             kind = kind,
             filter = filter,
             avail = avail,
+            noFoundOn = noFoundOn?.let { if (it) 1 else 0 },
             query = query?.takeIf { it.length >= 2 },
             display = display,
             calDate = calDate,
@@ -150,6 +152,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
         sort: String? = null,
         groupShows: Boolean? = null,
         inbox: Boolean? = null,
+        noFoundOn: Boolean? = null,
         query: String? = null,
     ): Result<AlertsResponse> =
         runCatching {
@@ -158,6 +161,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
                 sort,
                 groupShows?.let { if (it) 1 else 0 },
                 inbox?.let { if (it) 1 else 0 },
+                noFoundOn?.let { if (it) 1 else 0 },
                 query?.trim()?.takeIf { it.length >= 2 },
             )
         }

@@ -54,6 +54,7 @@ Episode titles put the number **and episode name** together — **The Ark S3E9 C
 - **Immediately** when you click **Watch** / **Mark season watched** / **Mark watched** in this app (Progress or title cards), matching alerts for that episode/season/movie are dismissed without waiting for the next refresh. On Android, the Alerts list also reloads when you return from Progress.
 - **Hide dismissed** (default on) — only active alerts; toggle **Show dismissed** to browse older ones. Choice is remembered.
 - **Filter titles…** — as you type, keep alerts whose show, movie, or episode title contains that text. It covers the whole list (not remembered). Clear the box to see every alert again.
+- **No Found on** — only alerts for a movie or show that does not have **Found on** yet, so you can set it from the card. Remembered. Admin alerts with no title are hidden while this is on.
 
 ## Turning types / lists off
 

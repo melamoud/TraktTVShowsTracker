@@ -157,6 +157,7 @@ data class MyMediaResponse(
     val total: Int = 0,
     val q: String? = null,
     val avail: String? = null,
+    @SerializedName("no_found_on") val noFoundOn: Boolean = false,
     val display: String? = null,
     val calendar: CalendarDto? = null,
     val title: String? = null,
@@ -508,6 +509,7 @@ data class AlertsResponse(
     val sort: String = "desc",
     @SerializedName("group_shows") val groupShows: Boolean = true,
     val inbox: Boolean = false,
+    @SerializedName("no_found_on") val noFoundOn: Boolean = false,
     val items: List<AlertItemDto> = emptyList(),
     val entries: List<AlertEntryDto> = emptyList(),
 )

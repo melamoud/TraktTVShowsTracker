@@ -23,6 +23,7 @@ data class MyMediaUiState(
     val items: List<MediaItemDto> = emptyList(),
     val filter: String = "lists",
     val avail: String = "",
+    val noFoundOn: Boolean = false,
     val display: String = "",
     val calDate: String? = null,
     val calendar: CalendarDto? = null,
@@ -74,6 +75,7 @@ class MyMediaViewModel(
     }
     private var persistFilter = false
     private var persistAvail = false
+    private var persistNoFoundOn = false
     private var persistDisplay = false
 
     fun reload(lists: List<String>? = null, refresh: Boolean = false) {
@@ -85,6 +87,7 @@ class MyMediaViewModel(
                 kind = kind,
                 filter = s.filter.takeIf { persistFilter },
                 avail = s.avail.takeIf { persistAvail },
+                noFoundOn = s.noFoundOn.takeIf { persistNoFoundOn },
                 query = s.query,
                 display = s.display.takeIf { persistDisplay && it.isNotBlank() },
                 calDate = s.calDate,
@@ -104,6 +107,7 @@ class MyMediaViewModel(
                         items = it.items,
                         filter = it.filter ?: _state.value.filter,
                         avail = it.avail.orEmpty(),
+                        noFoundOn = it.noFoundOn,
                         display = it.display ?: _state.value.display,
                         calendar = it.calendar,
                         page = it.page,
@@ -130,6 +134,11 @@ class MyMediaViewModel(
     fun setAvail(value: String) {
         persistAvail = true
         _state.value = _state.value.copy(avail = value, page = 1)
+        reload()
+    }
+    fun setNoFoundOn(value: Boolean) {
+        persistNoFoundOn = true
+        _state.value = _state.value.copy(noFoundOn = value, page = 1)
         reload()
     }
     fun setDisplay(value: String) {

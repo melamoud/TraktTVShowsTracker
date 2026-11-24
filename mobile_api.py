@@ -240,6 +240,7 @@ def api_my_media(media_type):
         'total': ctx.get('total') or 0,
         'q': ctx.get('search_q') or '',
         'avail': ctx.get('avail') or '',
+        'no_found_on': bool(ctx.get('no_found_on')),
         'display': ctx.get('display_mode') or 'list',
         'calendar': _serialize_calendar(ctx.get('calendar')),
         'title': ctx.get('title'),
@@ -411,6 +412,7 @@ def api_alerts():
         'sort': ctx.get('sort') or 'desc',
         'group_shows': bool(ctx.get('group_shows')),
         'inbox': bool(ctx.get('inbox')),
+        'no_found_on': bool(ctx.get('no_found_on')),
         'items': [serialize_alert_card(card) for card in (ctx.get('cards') or [])],
         'entries': [serialize_alert_entry(e) for e in (ctx.get('entries') or [])],
     })

@@ -10,7 +10,9 @@ Sorted by in-progress first, then most recently watched (`last_watched_at` from 
 
 Each show card shows **x / y episodes watched** and **Next: SxEy — title · air date** when known. Counts use the scheduler timezone. `01:00 UTC` is 9pm Eastern, and `00:00 UTC` is 8pm Eastern during daylight time, so that episode is not in **y** until that evening. A finished show stays finished. It comes back only when an episode has aired locally and that episode is not already in the watch list. The show’s last-watch time alone does not put a checked-off episode back. **Refresh from Trakt** reloads the watched totals.
 
-Filter choices (status, Lists…, titles per page) are remembered for your account. Leaving My shows and coming back via the menu restores the same settings.
+**No Found on** keeps only shows that do not have **Found on** yet, so you can set it. It is remembered and covers every page.
+
+Filter choices (status, Lists…, titles per page, No Found on) are remembered for your account. Leaving My shows and coming back via the menu restores the same settings.
 
 **View: List / Newest aired / Weekly / Daily / Monthly** — switch between the normal title rows, a **Newest aired** sort (shows sorted by the air date of their latest episode — including shows you’re caught up on — movies by release date; future titles hidden), and a Trakt-style **calendar**. The calendar uses Trakt’s **My calendar** limited to your current **Lists…** selection and status filter; click an entry to open the title. A clock time such as HBO’s `1:00 UTC` lands on the previous evening. A midnight `00:00 UTC` stamp stays on that labeled day, so the calendar does not shift. View modes are remembered. **Newest aired** is a pure cache view: the background job keeps last-aired dates fresh (33 days back / 33 ahead via My calendar for watchlisted shows, plus per-show checks for list-only titles), so the page loads instantly even on big collections. A show that already has aired episodes still appears if the last-aired date is not cached yet (it sorts by premiere until the job fills the date). Pins stay on top.
 

@@ -66,6 +66,7 @@ interface TvTrackerApi {
         @Path("kind") kind: String,
         @Query("filter") filter: String? = null,
         @Query("avail") avail: String? = null,
+        @Query("no_found_on") noFoundOn: Int? = null,
         @Query("q") query: String? = null,
         @Query("display") display: String? = null,
         @Query("cal_date") calDate: String? = null,
@@ -109,6 +110,7 @@ interface TvTrackerApi {
         @Query("sort") sort: String? = null,
         @Query("group_shows") groupShows: Int? = null,
         @Query("inbox") inbox: Int? = null,
+        @Query("no_found_on") noFoundOn: Int? = null,
         @Query("q") query: String? = null,
     ): AlertsResponse
 
