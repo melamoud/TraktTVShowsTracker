@@ -10,6 +10,7 @@ import com.melamoud.tvtracker.data.api.dto.ListMembershipDto
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.data.api.dto.ServiceLinkDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
+import com.melamoud.tvtracker.ui.components.DebouncedTitleQuery
 import com.melamoud.tvtracker.ui.components.FeedbackDraft
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,6 +68,10 @@ class MyMediaViewModel(
     val state: StateFlow<MyMediaUiState> = _state.asStateFlow()
     private val mediaType = if (kind == "shows") "show" else "movie"
     private var loadSeq = 0
+    private val titleQuery = DebouncedTitleQuery(viewModelScope) {
+        _state.value = _state.value.copy(page = 1)
+        reload()
+    }
     private var persistFilter = false
     private var persistAvail = false
     private var persistDisplay = false
@@ -136,8 +141,11 @@ class MyMediaViewModel(
         _state.value = _state.value.copy(calDate = value, page = 1)
         reload()
     }
-    fun setQuery(value: String) { _state.value = _state.value.copy(query = value) }
-    fun applyQuery() { _state.value = _state.value.copy(page = 1); reload() }
+    fun setQuery(value: String) {
+        _state.value = _state.value.copy(query = value)
+        titleQuery.onChange(value)
+    }
+    fun applyQuery() { titleQuery.applyNow(_state.value.query) }
     fun setPage(page: Int) { _state.value = _state.value.copy(page = page); reload() }
     fun setPerPage(value: Int) { _state.value = _state.value.copy(perPage = value, page = 1); reload() }
     fun setYear(value: String) {

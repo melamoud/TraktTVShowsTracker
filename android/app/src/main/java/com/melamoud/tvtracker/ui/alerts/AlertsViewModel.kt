@@ -10,6 +10,7 @@ import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.ui.media.FoundOnDialogState
 import com.melamoud.tvtracker.ui.media.ListsDialogState
 import com.melamoud.tvtracker.data.repo.CatalogRepository
+import com.melamoud.tvtracker.ui.components.DebouncedTitleQuery
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +27,7 @@ data class AlertsUiState(
     val sort: String = "desc",
     val groupShows: Boolean = true,
     val inbox: Boolean = false,
+    val query: String = "",
     val expandedKeys: Set<String> = emptySet(),
     val foundOnChoices: List<String> = emptyList(),
     val rateTarget: AlertItemDto? = null,
@@ -44,8 +46,11 @@ class AlertsViewModel(
     private var persistSort = false
     private var persistGroup = false
     private var persistInbox = false
+    private var loadSeq = 0
+    private val titleQuery = DebouncedTitleQuery(viewModelScope) { reload() }
 
     fun reload() {
+        val seq = ++loadSeq
         viewModelScope.launch {
             val s = _state.value
             _state.value = s.copy(loading = true, error = null)
@@ -54,12 +59,15 @@ class AlertsViewModel(
                 sort = s.sort.takeIf { persistSort },
                 groupShows = s.groupShows.takeIf { persistGroup },
                 inbox = s.inbox.takeIf { persistInbox },
+                query = s.query,
             )
+            if (seq != loadSeq) return@launch
             _state.value = result.fold(
                 onSuccess = {
                     onUnread(AlertCounts(newCount = it.newCount, unreadCount = it.unreadCount))
-                    s.copy(
+                    _state.value.copy(
                         loading = false,
+                        error = null,
                         items = it.items,
                         entries = it.entries.ifEmpty { fallbackEntries(it.items) },
                         unreadCount = it.unreadCount,
@@ -70,10 +78,17 @@ class AlertsViewModel(
                         inbox = it.inbox,
                     )
                 },
-                onFailure = { s.copy(loading = false, error = it.message) },
+                onFailure = { _state.value.copy(loading = false, error = it.message) },
             )
         }
     }
+
+    fun setQuery(value: String) {
+        _state.value = _state.value.copy(query = value)
+        titleQuery.onChange(value)
+    }
+
+    fun applyQuery() { titleQuery.applyNow(_state.value.query) }
 
     fun setHideRead(value: Boolean) {
         persistHideRead = true

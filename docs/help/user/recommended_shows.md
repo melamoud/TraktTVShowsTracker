@@ -20,7 +20,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - **Matches only** — purple preference matches  
 - Hidden genres from Preferences are always dropped  
 - **10 / 50 / 100** per page  
-- **Filter this page…** — filter current results by title  
+- **Filter titles…** — as you type, keep recommendations whose title contains that text, across every page  
 - **More filters** — year range, actor (jumps to Search), and genres (any selected)
 
 ## Highlights

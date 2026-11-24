@@ -104,7 +104,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <span class="meta">— air dates / first releases from Trakt’s My calendar</span>
     {% endif %}
   </div>
-  <form class="search-fields" method="get" action="" style="margin-top:.55rem;">
+  <form class="search-fields" method="get" action="" data-live-title-filter style="margin-top:.55rem;">
+    <button class="sr-only" type="submit">Filter titles</button>
     <input type="hidden" name="lists_set" value="1">
     {% for lid in selected_lists %}
       <input type="hidden" name="lists" value="{{ lid }}">
@@ -117,14 +118,11 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
       <input type="hidden" name="display" value="{{ display_mode }}">
       {% if calendar %}<input type="hidden" name="cal_date" value="{{ calendar.anchor.isoformat() }}">{% endif %}
     {% endif %}
-    <label class="sr-only" for="my-search-q">Filter this page</label>
+    <label class="sr-only" for="my-search-q">Filter titles</label>
     <input class="search-input" id="my-search-q" type="search" name="q" value="{{ search_q }}"
-           placeholder="Filter this page…" minlength="2"
-           title="Filters titles already on this page. To find new movies or shows by name, use Search in the top nav.">
-    <button class="btn btn-small btn-primary" type="submit">Filter</button>
-    {% if search_q %}
-      <a class="btn btn-small" href="?{{ qs(page_n=1, q_v='') }}">Clear</a>
-    {% endif %}
+           placeholder="Filter titles…" autocomplete="off"
+           title="Filters by title across every page as you type. To find new movies or shows, use Search in the top nav.">
+    <button class="btn btn-small" type="button" data-live-filter-clear {% if not search_q %}hidden{% endif %}>Clear</button>
     {% set collapsed = true %}
     {% set include_actor_filter = true %}
     {% set actor_jump = true %}
@@ -137,6 +135,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   {% include '_avail_filters.html' %}
 </div>
 
+<div id="list-results">
 {% if calendar %}
 <div class="cal-header">
   <nav class="pill-row cal-nav" aria-label="Calendar navigation">
@@ -155,7 +154,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   <section class="cal-day-list">
     {% if day.events %}
       {% for ev in day.events %}
-        <a class="cal-event card" href="{{ media_detail_url(ev.media_type, ev.trakt_id) }}">
+        <a class="cal-event card" href="{{ media_detail_url(ev.media_type, ev.trakt_id) }}"
+           data-title="{{ ev.title|e }}">
           {% if ev.poster_url %}
             <img class="cal-thumb" src="{{ ev.poster_url }}" alt="" width="40" height="60" loading="lazy">
           {% endif %}
@@ -178,6 +178,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
         <div class="cal-events">
           {% for ev in day.events %}
             <a class="cal-event" href="{{ media_detail_url(ev.media_type, ev.trakt_id) }}"
+               data-title="{{ ev.title|e }}"
                title="{{ ev.title }}{% if ev.label %} — {{ ev.label }}{% endif %}">
               {% if ev.poster_url %}
                 <img class="cal-thumb" src="{{ ev.poster_url }}" alt="" width="28" height="42" loading="lazy">
@@ -372,4 +373,5 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
 
 {{ pager('bottom') }}
 {% endif %}
+</div>
 {% endblock %}

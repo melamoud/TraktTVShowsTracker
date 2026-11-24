@@ -941,6 +941,10 @@ window.addEventListener('pageshow', function (ev) {
 document.addEventListener('submit', function (ev) {
   const form = ev.target.closest('form');
   if (!form) return;
+  const submitter = ev.submitter;
+  if (form.hasAttribute('data-live-title-filter') && !(submitter && submitter.hasAttribute('data-full-submit'))) {
+    return;
+  }
   const submitBtn = form.querySelector('button[type="submit"], input[type="submit"]');
   if (submitBtn) submitBtn.disabled = true;
   showPageLoading('Submitting…');
@@ -1471,3 +1475,149 @@ document.addEventListener('input', function (ev) {
   const sel = inp.form.elements.namedItem('actor');
   if (sel && sel.tagName === 'SELECT') sel.value = '';
 });
+
+/* List title boxes (My / Latest / Recommended) filter as you type.
+   The current page hides immediately; a short debounce reloads every page. */
+(function initLiveTitleFilters() {
+  function normalized(raw) {
+    const text = (raw || '').trim();
+    return text.length >= 2 ? text : '';
+  }
+
+  function syncQueryLinks(raw) {
+    const q = normalized(raw);
+    document.querySelectorAll('a[href]').forEach(function (a) {
+      const href = a.getAttribute('href') || '';
+      if (!href || href.charAt(0) === '#' || href.indexOf('://') !== -1) return;
+      if (href.charAt(0) !== '?' && href.indexOf('?') === -1) return;
+      const url = new URL(href, window.location.href);
+      if (url.origin !== window.location.origin) return;
+      if (url.pathname !== window.location.pathname) return;
+      if (q) url.searchParams.set('q', q);
+      else url.searchParams.delete('q');
+      a.setAttribute('href', '?' + url.searchParams.toString());
+    });
+  }
+
+  function paintLocal(root, raw) {
+    if (!root) return;
+    const needle = (raw || '').trim().toLowerCase();
+    root.querySelectorAll('.media-row[data-title], .cal-event[data-title]').forEach(function (el) {
+      const title = (el.getAttribute('data-title') || '').toLowerCase();
+      const year = el.getAttribute('data-year') || '';
+      const show = !needle || title.indexOf(needle) !== -1 || (year && year.indexOf(needle) !== -1);
+      el.hidden = !show;
+    });
+    root.querySelectorAll('.alert-group[data-title]').forEach(function (group) {
+      const title = (group.getAttribute('data-title') || '').toLowerCase();
+      if (!needle || title.indexOf(needle) !== -1) {
+        group.hidden = false;
+        return;
+      }
+      let any = false;
+      group.querySelectorAll('.media-row[data-title]').forEach(function (el) {
+        if (!el.hidden) any = true;
+      });
+      group.hidden = !any;
+    });
+  }
+
+  document.querySelectorAll('form[data-live-title-filter]').forEach(function (form) {
+    const input = form.querySelector('input[name="q"]');
+    if (!input) return;
+    const clearBtn = form.querySelector('[data-live-filter-clear]');
+    let timer = null;
+    let applied = normalized(input.value);
+    let controller = null;
+
+    function syncClear() {
+      if (!clearBtn) return;
+      clearBtn.hidden = input.value.trim() === '';
+    }
+
+    function listUrl() {
+      const params = new URLSearchParams();
+      new FormData(form).forEach(function (value, key) {
+        if (key === 'q') return;
+        params.append(key, value);
+      });
+      const q = normalized(input.value);
+      if (q) params.set('q', q);
+      params.set('page', '1');
+      const url = new URL(form.action, window.location.href);
+      url.search = params.toString();
+      return url;
+    }
+
+    async function fetchFiltered() {
+      const root = document.getElementById('list-results');
+      if (controller) controller.abort();
+      controller = new AbortController();
+      const signal = controller.signal;
+      const url = listUrl();
+      if (root) root.setAttribute('aria-busy', 'true');
+      try {
+        const resp = await fetch(url.toString(), {
+          headers: { 'X-Live-Filter': '1', 'Accept': 'text/html' },
+          credentials: 'same-origin',
+          signal: signal,
+        });
+        if (!resp.ok) return;
+        const html = await resp.text();
+        if (signal.aborted) return;
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const next = doc.getElementById('list-results');
+        const cur = document.getElementById('list-results');
+        if (!next || !cur) return;
+        cur.innerHTML = next.innerHTML;
+        history.replaceState(null, '', url.toString());
+        syncQueryLinks(normalized(input.value));
+        paintLocal(cur, input.value);
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+      } finally {
+        const cur = document.getElementById('list-results');
+        if (cur && !signal.aborted) cur.setAttribute('aria-busy', 'false');
+      }
+    }
+
+    function schedule() {
+      paintLocal(document.getElementById('list-results'), input.value);
+      syncClear();
+      clearTimeout(timer);
+      timer = setTimeout(function () {
+        const next = normalized(input.value);
+        if (next === applied) return;
+        applied = next;
+        fetchFiltered();
+      }, 160);
+    }
+
+    input.addEventListener('input', schedule);
+    form.addEventListener('submit', function (ev) {
+      const submitter = ev.submitter;
+      if (submitter && submitter.hasAttribute('data-full-submit')) return;
+      ev.preventDefault();
+      clearTimeout(timer);
+      const next = normalized(input.value);
+      applied = next;
+      fetchFiltered();
+    });
+    if (clearBtn) {
+      clearBtn.addEventListener('click', function () {
+        input.value = '';
+        input.focus();
+        clearTimeout(timer);
+        paintLocal(document.getElementById('list-results'), '');
+        syncClear();
+        if (applied === '') {
+          syncQueryLinks('');
+          return;
+        }
+        applied = '';
+        fetchFiltered();
+      });
+    }
+    syncClear();
+  });
+})();

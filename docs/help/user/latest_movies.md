@@ -17,7 +17,7 @@ By default Latest applies two local filters:
 
 Without genres/keywords, Matches only is empty — use the setup wizard / Preferences, or All titles.
 
-**Filter this page…** filters the loaded Latest cache (after your year / match / watched filters) by title. **More filters** adds year, actor (jumps to Search), and genres. For Trakt-wide search, use nav **Search**.
+**Filter titles…** filters the loaded Latest cache as you type (after your year / match / watched filters), across every page, by title. **More filters** adds year, actor (jumps to Search), and genres. For Trakt-wide search, use nav **Search**.
 
 **Upcoming / Theater window / Streaming** chips and filter pills use public release date (±30 / >30 days) and TMDB streaming lists.
 

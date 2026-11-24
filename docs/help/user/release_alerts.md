@@ -53,6 +53,7 @@ Episode titles put the number **and episode name** together — **The Ark S3E9 C
 - On the next **alert refresh**, movie release/streaming alerts auto-dismiss when the movie is watched on Trakt, and episode/season alerts auto-dismiss when that episode (or every episode in the season drop) is watched on Trakt.
 - **Immediately** when you click **Watch** / **Mark season watched** / **Mark watched** in this app (Progress or title cards), matching alerts for that episode/season/movie are dismissed without waiting for the next refresh. On Android, the Alerts list also reloads when you return from Progress.
 - **Hide dismissed** (default on) — only active alerts; toggle **Show dismissed** to browse older ones. Choice is remembered.
+- **Filter titles…** — as you type, keep alerts whose show, movie, or episode title contains that text. It covers the whole list (not remembered). Clear the box to see every alert again.
 
 ## Turning types / lists off
 

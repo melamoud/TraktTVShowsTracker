@@ -45,7 +45,8 @@ def test_latest_and_my_use_filter_this_page(app, client, user):
             '/latest/movies?hide_lists=0&hide_watched=0&match_only=0'
         ).get_data(as_text=True)
     assert latest.count('href="/help/latest_movies"') >= 1
-    assert 'Filter this page…' in latest
+    assert 'Filter titles…' in latest
+    assert 'data-live-title-filter' in latest
     assert 'Search titles in this list' not in latest
     assert 'By default: <strong>recent years</strong>' not in latest
     assert 'official /updates API' not in latest
@@ -58,7 +59,8 @@ def test_latest_and_my_use_filter_this_page(app, client, user):
             as_text=True
         )
     assert 'href="/help/my_movies"' in mine
-    assert 'Filter this page…' in mine
+    assert 'Filter titles…' in mine
+    assert 'data-live-title-filter' in mine
     assert 'Search titles in this list' not in mine
     assert 'watch history alone never adds' not in mine
 
@@ -82,5 +84,6 @@ def test_recs_use_filter_this_page(app, client, user):
          patch('services.sync_jobs.enrich_media_list_for_display'):
         html = client.get('/recommendations/movies').get_data(as_text=True)
     assert 'href="/help/recommended_movies"' in html
-    assert 'Filter this page…' in html
+    assert 'Filter titles…' in html
+    assert 'data-live-title-filter' in html
     assert 'Personalized picks from Trakt' not in html

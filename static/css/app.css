@@ -226,6 +226,10 @@ button.pill-btn.on { color: #041210; background: var(--accent); border-color: va
   text-underline-offset: 3px;
 }
 
+.media-row[hidden],
+.cal-event[hidden],
+.alert-group[hidden],
+.btn[hidden] { display: none !important; }
 .media-list { display: grid; gap: .85rem; }
 .media-row {
   display: grid; grid-template-columns: 100px 1fr; gap: .9rem;

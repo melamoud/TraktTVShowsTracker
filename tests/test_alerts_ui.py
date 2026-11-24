@@ -728,3 +728,33 @@ def test_alerts_nav_badge_is_new_over_unread(app, client, user):
     me = client.get('/api/v1/me').get_json()
     assert me['user']['new_alerts'] == 1
     assert me['user']['unread_alerts'] == 2
+
+
+def test_notifications_title_filter(app, client, user):
+    """The alerts box keeps only titles that contain the typed text."""
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=1, title='Ghostbusters', year=1984,
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=2, title='Alpha Movie', year=1999,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='release_day', title='Ghostbusters',
+            message='out', media_type='movie', trakt_id=1, is_read=False, is_new=False,
+        ))
+        db.session.add(Notification(
+            user_id=user, alert_type='release_day', title='Alpha Movie',
+            message='out', media_type='movie', trakt_id=2, is_read=False, is_new=False,
+        ))
+        db.session.commit()
+    login_client(client, app, user)
+    html = client.get('/notifications?q=gho').get_data(as_text=True)
+    assert 'Ghostbusters' in html
+    assert 'Alpha Movie' not in html
+    assert 'Filter titles…' in html
+    assert 'data-live-title-filter' in html
+    api = client.get('/api/v1/alerts?q=gho').get_json()
+    titles = [item.get('media_title') or item.get('title') for item in api['items']]
+    assert 'Ghostbusters' in titles
+    assert 'Alpha Movie' not in titles

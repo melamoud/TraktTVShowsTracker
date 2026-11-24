@@ -67,6 +67,8 @@ import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
 import com.melamoud.tvtracker.ui.components.FeedbackDialog
 import com.melamoud.tvtracker.ui.components.FilterMenuButton
+import com.melamoud.tvtracker.ui.components.filterByTitle
+import com.melamoud.tvtracker.ui.components.filteredByTitle
 import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
@@ -108,6 +110,8 @@ fun MyMediaScreen(
     }
     val listsSelected = state.filterLists.count { it.selected }
     val listsLabel = if (listsSelected == 0) "Lists" else "Lists ($listsSelected)"
+    val visibleItems = state.items.filterByTitle(state.query)
+    val shownCalendar = state.calendar?.filteredByTitle(state.query)
     ReloadOnResume(viewModel::reload)
 
     Column(Modifier.fillMaxSize()) {
@@ -204,12 +208,15 @@ fun MyMediaScreen(
                 state.loading && state.items.isEmpty() && state.calendar == null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 state.error != null && state.items.isEmpty() && state.calendar == null -> Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
                 displayMode in setOf("daily", "weekly", "monthly") -> CalendarGridView(
-                    calendar = state.calendar,
+                    calendar = shownCalendar,
+                    filtering = state.query.isNotBlank(),
                     onOpen = onOpenDetail,
                 )
+                state.loading && visibleItems.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                visibleItems.isEmpty() && state.query.isNotBlank() -> Text(stringResource(R.string.list_filter_empty), color = TextMuted, modifier = Modifier.padding(24.dp))
                 state.items.isEmpty() -> Text(stringResource(R.string.empty_list), color = TextMuted, modifier = Modifier.padding(24.dp))
                 else -> LazyColumn(contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
+                    items(visibleItems, key = { "${it.mediaType}-${it.traktId}" }) { item ->
                         val uriHandler = LocalUriHandler.current
                         val mt = item.mediaType ?: if (isShows) "show" else "movie"
                         MediaCard(
@@ -424,6 +431,7 @@ private fun CalendarHeader(state: MyMediaUiState, viewModel: MyMediaViewModel) {
 @Composable
 private fun CalendarGridView(
     calendar: com.melamoud.tvtracker.data.api.dto.CalendarDto?,
+    filtering: Boolean,
     onOpen: (String, Int) -> Unit,
 ) {
     if (calendar == null) {
@@ -433,7 +441,10 @@ private fun CalendarGridView(
     val allEvents = remember(calendar) { calendar.days.flatMap { it.events } }
     if (allEvents.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-            Text("Nothing airing or releasing in this period.", color = TextMuted)
+            Text(
+                if (filtering) stringResource(R.string.list_filter_empty) else "Nothing airing or releasing in this period.",
+                color = TextMuted,
+            )
         }
         return
     }

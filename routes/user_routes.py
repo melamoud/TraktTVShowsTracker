@@ -75,7 +75,7 @@ from services.streaming_matcher import (
     user_has_match_prefs,
     match_preferences,
 )
-from routes.catalog_routes import _pagination_pages, _per_page
+from routes.catalog_routes import _live_list_filter, _pagination_pages, _per_page
 from services.sync_jobs import (
     ensure_local_poster,
     ensure_media_cached,
@@ -587,26 +587,28 @@ def _my_media(media_type: str):
     # Local DB is a cache. Page loads skip Trakt while last_sync_at is fresh;
     # the hourly catalog job probes last_activities for every user. Manual
     # Refresh forces a full pull and queues a background cycle for
-    # progress/episode data (page never blocks).
-    try:
-        synced = ensure_user_media_fresh(
-            current_user,
-            media_types=(media_type,),
-            force=request.args.get('refresh') == '1',
-        )
-        if request.args.get('refresh') == '1':
-            from services.shows_cache import queue_user_media_cycle
-            queue_user_media_cycle(current_app._get_current_object(), current_user.id)
-            flash(
-                'Updated from Trakt. Episode and progress data refresh in the '
-                'background — check back in a minute.',
-                'success',
+    # progress/episode data (page never blocks). Typing in the title box
+    # refilters the cache only.
+    if not _live_list_filter():
+        try:
+            synced = ensure_user_media_fresh(
+                current_user,
+                media_types=(media_type,),
+                force=request.args.get('refresh') == '1',
             )
-        # New shows discovered by the sync are last-aired-seeded inside
-        # sync_user_media_state (bounded), so Newest-aired picks them up.
-    except Exception as exc:
-        current_app.logger.warning('Sync before my-media failed: %s', exc)
-        flash('Could not refresh from Trakt right now. Showing cached titles.', 'warning')
+            if request.args.get('refresh') == '1':
+                from services.shows_cache import queue_user_media_cycle
+                queue_user_media_cycle(current_app._get_current_object(), current_user.id)
+                flash(
+                    'Updated from Trakt. Episode and progress data refresh in the '
+                    'background — check back in a minute.',
+                    'success',
+                )
+            # New shows discovered by the sync are last-aired-seeded inside
+            # sync_user_media_state (bounded), so Newest-aired picks them up.
+        except Exception as exc:
+            current_app.logger.warning('Sync before my-media failed: %s', exc)
+            flash('Could not refresh from Trakt right now. Showing cached titles.', 'warning')
 
     filter_lists = _my_filter_lists(current_user)
     selected_lists = _resolve_selected_lists(current_user, filter_lists, view)
@@ -648,18 +650,26 @@ def _my_media(media_type: str):
             anchor = local_today()
         cal_start, cal_end = cal_view.period_bounds(display_mode, anchor)
         cal_days = (cal_end - cal_start).days + 1
-        try:
-            cal_view.ensure_user_calendar_fresh(
-                current_user, cal_start, cal_days,
-            )
-        except Exception as exc:
-            current_app.logger.warning('Calendar sync failed: %s', exc)
+        if not _live_list_filter():
+            try:
+                cal_view.ensure_user_calendar_fresh(
+                    current_user, cal_start, cal_days,
+                )
+            except Exception as exc:
+                current_app.logger.warning('Calendar sync failed: %s', exc)
         cal_ids = _calendar_trakt_ids(
             current_user.id, media_type, filt, list_trakt_ids,
         )
         calendar_ctx = cal_view.build_calendar_view(
             current_user.id, media_type, display_mode, anchor, cal_ids,
         )
+        if search_q and calendar_ctx:
+            needle = search_q.casefold()
+            for day in calendar_ctx.get('days') or []:
+                day['events'] = [
+                    ev for ev in (day.get('events') or [])
+                    if needle in (ev.get('title') or '').casefold()
+                ]
         if not cal_ids and filt in ('lists', 'unwatched', 'unwatched_episodes', 'watched', 'both'):
             flash(
                 'Calendar covers titles on your selected lists — nothing matches '
@@ -1845,6 +1855,21 @@ def _alert_presentation(n, media, episode_code: str = '') -> dict:
     }
 
 
+def _alert_card_matches(card: dict, needle: str) -> bool:
+    """True when the show/movie title, episode name, or alert title contains needle."""
+    n = card.get('n')
+    media = card.get('media')
+    bits = [
+        card.get('display_title') or '',
+        card.get('headline') or '',
+        card.get('episode_name') or '',
+        getattr(n, 'title', '') or '',
+        media.title if media is not None else '',
+        str(media.year) if media is not None and media.year else '',
+    ]
+    return needle in ' '.join(bits).casefold()
+
+
 def _alert_display_title(media, n, episode_code: str, episode_name: str = '') -> str:
     name = media.title if media else (n.title or '')
     parts = [p for p in (name, episode_code, episode_name) if p]
@@ -2214,6 +2239,12 @@ def _collect_alert_cards(*, force_inbox=None) -> dict:
     cards.sort(key=lambda c: _alert_sort_key(c, sort))
     if inbox:
         cards = [c for c in cards if c.get('is_new')]
+    search_q = (request.args.get('q') or '').strip()
+    if len(search_q) < 2:
+        search_q = ''
+    if search_q:
+        needle = search_q.casefold()
+        cards = [c for c in cards if _alert_card_matches(c, needle)]
     display_group = False if inbox else group_shows
     entries = _group_alert_cards(cards, group_shows=display_group, sort=sort)
     return {
@@ -2225,6 +2256,7 @@ def _collect_alert_cards(*, force_inbox=None) -> dict:
         'sort': sort,
         'group_shows': group_shows,
         'inbox': inbox,
+        'search_q': search_q,
     }
 
 

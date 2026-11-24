@@ -70,8 +70,21 @@
       </form>
     {% endif %}
   </div>
+  <form class="search-fields" method="get" action="" data-live-title-filter style="margin-top:.55rem;">
+    <button class="sr-only" type="submit">Filter titles</button>
+    <input type="hidden" name="hide_read" value="{{ q_hide }}">
+    <input type="hidden" name="sort" value="{{ sort }}">
+    <input type="hidden" name="group_shows" value="{{ q_group }}">
+    <input type="hidden" name="inbox" value="{{ q_inbox }}">
+    <label class="sr-only" for="alerts-search-q">Filter titles</label>
+    <input class="search-input" id="alerts-search-q" type="search" name="q" value="{{ search_q|default('') }}"
+           placeholder="Filter titles…" autocomplete="off"
+           title="Filters alerts by title as you type, across the whole list.">
+    <button class="btn btn-small" type="button" data-live-filter-clear {% if not search_q %}hidden{% endif %}>Clear</button>
+  </form>
 </div>
 
+<div id="list-results">
 <div class="media-list">
   {% for entry in entries %}
     {% if entry.kind == 'group' %}
@@ -167,7 +180,9 @@
       {% include '_alert_card.html' %}
     {% endif %}
   {% else %}
-    {% if inbox %}
+    {% if search_q %}
+      <p class="muted">No alerts match “{{ search_q }}”.</p>
+    {% elif inbox %}
       <p class="muted">No new alerts. <a href="{{ url_for('user.notifications', hide_read=q_hide, sort=sort, group_shows=q_group, inbox=0) }}">Show all alerts</a></p>
     {% elif hide_read %}
       <p class="muted">No active alerts.{% if unread_count == 0 %} <a href="{{ url_for('user.notifications', hide_read=0, sort=sort, group_shows=q_group, inbox=q_inbox) }}">Show dismissed</a> to browse older ones.{% endif %}</p>
@@ -175,5 +190,6 @@
       <p class="muted">No alerts yet.</p>
     {% endif %}
   {% endfor %}
+</div>
 </div>
 {% endblock %}

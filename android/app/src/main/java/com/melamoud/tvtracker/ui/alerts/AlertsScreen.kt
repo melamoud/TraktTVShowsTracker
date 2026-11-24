@@ -20,6 +20,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ExpandLess
@@ -27,6 +29,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,6 +41,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -54,6 +58,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -70,6 +75,7 @@ import com.melamoud.tvtracker.ui.components.RateDialog
 import com.melamoud.tvtracker.ui.components.ReloadOnResume
 import com.melamoud.tvtracker.ui.components.ScrollableActionRow
 import com.melamoud.tvtracker.ui.components.ServerRefreshBox
+import com.melamoud.tvtracker.ui.components.filterAlertsByTitle
 import com.melamoud.tvtracker.ui.components.ServiceLinksLine
 import com.melamoud.tvtracker.ui.theme.AccentGold
 import com.melamoud.tvtracker.ui.theme.SurfaceAlt
@@ -87,9 +93,20 @@ fun AlertsScreen(
     onOpenDetail: (String, Int) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val visibleEntries = state.entries.filterAlertsByTitle(state.query)
     val uriHandler = LocalUriHandler.current
     ReloadOnResume(viewModel::reload)
     Column(Modifier.fillMaxSize()) {
+        OutlinedTextField(
+            value = state.query,
+            onValueChange = viewModel::setQuery,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+            placeholder = { Text(stringResource(R.string.list_search_hint)) },
+            leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+            keyboardActions = KeyboardActions(onSearch = { viewModel.applyQuery() }),
+        )
         Row(
             Modifier
                 .fillMaxWidth()
@@ -139,20 +156,26 @@ fun AlertsScreen(
             }
         }
         ServerRefreshBox(
-            isRefreshing = state.loading && state.entries.isNotEmpty(),
+            isRefreshing = state.loading && visibleEntries.isNotEmpty(),
             onRefresh = viewModel::reload,
             modifier = Modifier.weight(1f),
         ) {
             when {
                 state.loading && state.entries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 state.error != null && state.entries.isEmpty() -> Text(state.error ?: "", modifier = Modifier.padding(16.dp))
+                state.loading && visibleEntries.isEmpty() -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                visibleEntries.isEmpty() && state.query.isNotBlank() -> Text(
+                    stringResource(R.string.list_filter_empty),
+                    color = TextMuted,
+                    modifier = Modifier.padding(24.dp),
+                )
                 state.entries.isEmpty() -> Text(
                     if (state.inbox) "No new alerts." else stringResource(R.string.empty_alerts),
                     color = TextMuted,
                     modifier = Modifier.padding(24.dp),
                 )
                 else -> LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    state.entries.forEach { entry ->
+                    visibleEntries.forEach { entry ->
                         if (entry.kind == "group") {
                             val key = "show-${entry.traktId}"
                             val expanded = key in state.expandedKeys

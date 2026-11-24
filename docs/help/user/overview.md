@@ -8,7 +8,7 @@ TraktTV Shows Tracker helps you review newly listed movies and shows on Trakt, h
 - **Recommended movies / shows** — personalized Trakt picks; genre categories; highlight services you own. Nav badge is **matches / remaining** (after recs have been cached)
 - **Preferences** — your services, genres, keywords, **hidden genres**, favorite actors, which Trakt lists show in **Set lists…**, and **create / delete** personal lists on trakt.tv
 - **My movies / My shows** — titles on the **Lists…** you pick (Wishlist + personal lists). Watch history alone does not put a title here. See [Wishlist vs lists](wishlist): Trakt **removes Wishlist after the first watch**, so in-progress / finished titles need a personal list
-- **Search** — Trakt-wide title and/or actor search; actor / year / genres sit in **More filters**; defaults hide watched + already-listed titles. List pages have **Filter this page…** (titles already on that page) plus **Search actor** in More filters (opens this Search page)
+- **Search** — Trakt-wide title and/or actor search; actor / year / genres sit in **More filters**; defaults hide watched + already-listed titles. List pages have **Filter titles…** (types ahead across every page of that list) plus **Search actor** in More filters (opens this Search page)
 - **Availability** — under-poster chips + filters for Upcoming (>30d), Theater window (±30d), and Streaming
 - **Series progress** — mark seasons/episodes; **Rate / Review** dialog (rating + comment + optional watch); updates Trakt
 - **Title detail** — open a movie/show page for cast (favorite / search titles by actor), **Write review…**, rate / favorite / lists. **← Back** returns to the list you came from (Search, My, Latest, Recs, Alerts)

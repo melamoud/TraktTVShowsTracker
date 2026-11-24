@@ -572,7 +572,10 @@ def api_latest_media(media_type):
     from routes.catalog_routes import _ensure_latest_catalog, _latest_page_data
 
     singular = 'movie' if media_type == 'movies' else 'show'
-    _ensure_latest_catalog(singular, load_older=(request.args.get('load_older') == '1'))
+    # Title filtering should stay a local query. Opening the feed still syncs.
+    filtering = len((request.args.get('q') or '').strip()) >= 2
+    if not filtering:
+        _ensure_latest_catalog(singular, load_older=(request.args.get('load_older') == '1'))
     ctx = _latest_page_data(singular)
     items = [
         serialize_media_item(row, singular) for row in (ctx.get('rows') or [])

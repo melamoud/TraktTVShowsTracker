@@ -49,6 +49,7 @@ import com.melamoud.tvtracker.ui.components.CheckMenuItem
 import com.melamoud.tvtracker.ui.components.ConfirmDialog
 import com.melamoud.tvtracker.ui.components.FeedbackDialog
 import com.melamoud.tvtracker.ui.components.FilterMenuButton
+import com.melamoud.tvtracker.ui.components.filterByTitle
 import com.melamoud.tvtracker.ui.components.FoundOnDialog
 import com.melamoud.tvtracker.ui.components.ListsDialog
 import com.melamoud.tvtracker.ui.components.MediaCard
@@ -69,6 +70,7 @@ fun LatestMediaScreen(
     onSearchActor: (String) -> Unit,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val visibleItems = state.items.filterByTitle(state.query)
     var showPageJump by remember { mutableStateOf(false) }
     val availLabel = when (state.avail) {
         "upcoming" -> "Upcoming"
@@ -159,13 +161,17 @@ fun LatestMediaScreen(
                     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
                 state.error != null && state.items.isEmpty() ->
                     Text(state.error ?: "", color = Danger, modifier = Modifier.padding(16.dp))
+                state.loading && visibleItems.isEmpty() ->
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+                visibleItems.isEmpty() && state.query.isNotBlank() ->
+                    Text(stringResource(R.string.list_filter_empty), color = TextMuted, modifier = Modifier.padding(24.dp))
                 state.items.isEmpty() ->
                     Text(stringResource(R.string.empty_list), color = TextMuted, modifier = Modifier.padding(24.dp))
                 else -> LazyColumn(
                     contentPadding = PaddingValues(12.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    items(state.items, key = { "${it.mediaType}-${it.traktId}" }) { item ->
+                    items(visibleItems, key = { "${it.mediaType}-${it.traktId}" }) { item ->
                         val uriHandler = LocalUriHandler.current
                         val mt = item.mediaType ?: if (isShows) "show" else "movie"
                         MediaCard(

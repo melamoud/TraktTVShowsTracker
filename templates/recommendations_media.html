@@ -87,7 +87,8 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     <a class="btn btn-small" data-loading data-loading-message="Refreshing recommendations…" href="?{{ qs(page_n=1) }}"
        title="Reload Trakt recommendations">Refresh</a>
   </div>
-  <form class="search-fields" method="get" action="" style="width:100%;">
+  <form class="search-fields" method="get" action="" data-live-title-filter style="width:100%;">
+    <button class="sr-only" type="submit">Filter titles</button>
     <input type="hidden" name="per_page" value="{{ per_page }}">
     <input type="hidden" name="hide_watched" value="{{ hw }}">
     <input type="hidden" name="hide_wishlist" value="{{ hwish }}">
@@ -96,14 +97,11 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     <input type="hidden" name="category" value="{{ category }}">
     <input type="hidden" name="page" value="1">
     {% if avail %}<input type="hidden" name="avail" value="{{ avail }}">{% endif %}
-    <label class="sr-only" for="rec-search-q">Filter this page</label>
+    <label class="sr-only" for="rec-search-q">Filter titles</label>
     <input class="search-input" id="rec-search-q" type="search" name="q" value="{{ search_q }}"
-           placeholder="Filter this page…" minlength="2"
-           title="Filters titles already on this page. To find new movies or shows by name, use Search in the top nav.">
-    <button class="btn btn-small btn-primary" type="submit">Filter</button>
-    {% if search_q %}
-      <a class="btn btn-small" href="?{{ qs(page_n=1, q_v='') }}">Clear</a>
-    {% endif %}
+           placeholder="Filter titles…" autocomplete="off"
+           title="Filters by title across every page as you type. To find new movies or shows, use Search in the top nav.">
+    <button class="btn btn-small" type="button" data-live-filter-clear {% if not search_q %}hidden{% endif %}>Clear</button>
     {% set collapsed = true %}
     {% set include_actor_filter = true %}
     {% set actor_jump = true %}
@@ -140,6 +138,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
   </p>
 {% endif %}
 
+<div id="list-results">
 <p class="meta">
   Showing <strong>{{ total }}</strong> recommendation{{ '' if total == 1 else 's' }}
   {% if avail == 'upcoming' %} · upcoming{% elif avail == 'theater' %} · theater window{% elif avail == 'streaming' %} · streaming{% endif %}
@@ -153,7 +152,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
     <article class="media-row {% if row.match.matched %}match{% endif %} {% if row.my_providers %}on-my-services{% endif %}"
              data-media-type="{{ media_type }}"
              data-trakt-id="{{ m.trakt_id }}"
-             data-title="{{ m.title|e }}">
+             data-title="{{ m.title|e }}"{% if m.year %} data-year="{{ m.year }}"{% endif %}>
       <div class="media-poster-col">
         <a class="media-poster" href="{{ media_detail_url(media_type, m.trakt_id) }}">
           {% if m.poster_url %}
@@ -276,4 +275,5 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
 </div>
 
 {{ pager('bottom') }}
+</div>
 {% endblock %}

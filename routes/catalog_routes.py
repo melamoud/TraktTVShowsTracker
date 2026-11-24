@@ -354,6 +354,11 @@ def _apply_marker_to_visible_rows(rows: list[dict], media_type: str) -> None:
         row['older_than_marker'] = (i >= marker_index)
 
 
+def _live_list_filter() -> bool:
+    """In-list title box is refiltering; skip a Trakt refresh on this request."""
+    return request.headers.get('X-Live-Filter') == '1'
+
+
 def _normalize_search_q(raw: str | None) -> str:
     """Strip search query; empty when shorter than 2 chars."""
     q = (raw or '').strip()
@@ -685,11 +690,13 @@ def _recommendations_page_data(media_type: str) -> dict:
     genre_filter = None if category == 'all' else category
 
     # Local wishlist/watched tags + client-side filters need a fresh cache too.
-    try:
-        from services.user_media_sync import ensure_user_media_fresh
-        ensure_user_media_fresh(current_user, media_types=(media_type,), force=False)
-    except Exception as exc:
-        current_app.logger.warning('User-state sync before Recs failed: %s', exc)
+    # The title box refilters the cache already on the page.
+    if not _live_list_filter():
+        try:
+            from services.user_media_sync import ensure_user_media_fresh
+            ensure_user_media_fresh(current_user, media_types=(media_type,), force=False)
+        except Exception as exc:
+            current_app.logger.warning('User-state sync before Recs failed: %s', exc)
 
     fetch_limit = 100
     items: list[CachedMedia] = []
@@ -1043,12 +1050,14 @@ def _latest_page_data(media_type: str) -> dict:
     )
 
     # Hide-watched uses local watched cache — keep it aligned with Trakt activity.
-    try:
-        from services.user_media_sync import ensure_user_media_fresh
-        ensure_user_media_fresh(current_user, media_types=(media_type,), force=False)
-    except Exception as exc:
-        current_app.logger.warning('User-state sync before Latest failed: %s', exc)
-    if hide_not_interested:
+    # The title box refilters titles already in the Latest cache.
+    if not _live_list_filter():
+        try:
+            from services.user_media_sync import ensure_user_media_fresh
+            ensure_user_media_fresh(current_user, media_types=(media_type,), force=False)
+        except Exception as exc:
+            current_app.logger.warning('User-state sync before Latest failed: %s', exc)
+    if hide_not_interested and not _live_list_filter():
         try:
             from services.dismissed_titles import ensure_not_interested_fresh
             ensure_not_interested_fresh(current_user)
@@ -1201,7 +1210,8 @@ def _latest_page(media_type: str):
             'catalog.latest_movies' if media_type == 'movie' else 'catalog.latest_shows',
             **args,
         ))
-    _ensure_latest_catalog(media_type)
+    if not _live_list_filter():
+        _ensure_latest_catalog(media_type)
     return render_template('latest_media.html', **_latest_page_data(media_type))
 
 

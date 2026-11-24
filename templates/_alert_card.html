@@ -2,7 +2,8 @@
 {% set n = card.n %}
 {% set m = card.media %}
 {% set nested = nested|default(false) %}
-<article class="media-row alert-row {% if n.is_read %}dimmed{% endif %} {% if card.alerts_pinned %}is-pinned{% endif %} {% if nested %}alert-nested{% endif %} {% if card.is_new %}is-new{% endif %}">
+<article class="media-row alert-row {% if n.is_read %}dimmed{% endif %} {% if card.alerts_pinned %}is-pinned{% endif %} {% if nested %}alert-nested{% endif %} {% if card.is_new %}is-new{% endif %}"
+         data-title="{{ card.display_title|e }}"{% if m and m.year %} data-year="{{ m.year }}"{% endif %}>
   {% if m and not nested %}
     <div class="media-poster-col">
       <a class="media-poster"

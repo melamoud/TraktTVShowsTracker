@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 from unittest.mock import patch
 
-from models import UserListMembership, UserMediaState, UserPreference, db
+from models import CachedMedia, UserListMembership, UserMediaState, UserPreference, db
 from tests.conftest import login_client
 
 
@@ -537,3 +537,46 @@ def test_my_shows_unwatched_excludes_finished_list_titles(app, client, user):
     assert 'data-trakt-id="103"' not in html  # trusted finished, not on list
     assert 'data-trakt-id="104"' in html      # fake 100% without detail
     assert '>3</strong> of <strong>3</strong>' in html
+
+
+def test_my_movies_title_filter_includes_other_pages(app, client, user):
+    """Typing a title fragment matches the whole list, including later pages."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).one()
+        prefs.default_selected_list_ids_json = '["watchlist"]'
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=1, title='Ghostbusters', year=1984,
+        ))
+        _seed_state(user, trakt_id=1, on_watchlist=True)
+        for tid in range(2, 12):
+            db.session.add(CachedMedia(
+                media_type='movie', trakt_id=tid, title=f'Alpha {tid}', year=2000 + tid,
+            ))
+            _seed_state(user, trakt_id=tid, on_watchlist=True)
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.user_routes.ensure_user_media_fresh', return_value=False) as sync, \
+         patch('routes.user_routes.trakt_client.get_personal_lists', return_value=[]), \
+         patch('routes.user_routes.ensure_media_cached'), \
+         patch('routes.user_routes.enrich_media_list_for_display'):
+        page1 = client.get(
+            '/my/movies?lists_set=1&lists=watchlist&filter=both&per_page=10'
+        )
+        filtered = client.get(
+            '/my/movies?lists_set=1&lists=watchlist&filter=both&per_page=10&q=gho',
+            headers={'X-Live-Filter': '1'},
+        )
+    assert page1.status_code == 200
+    first = page1.get_data(as_text=True)
+    # Highest state ids fill page 1; Ghostbusters was inserted first so it is page 2.
+    assert 'data-trakt-id="1"' not in first
+    assert 'Alpha 11' in first
+    assert filtered.status_code == 200
+    html = filtered.get_data(as_text=True)
+    assert 'Ghostbusters' in html
+    assert 'data-trakt-id="1"' in html
+    assert 'Alpha 11' not in html
+    assert 'matching' in html
+    # Live refilter must not pull Trakt again.
+    sync.assert_called_once()

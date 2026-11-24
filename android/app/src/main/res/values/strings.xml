@@ -22,7 +22,8 @@
     <string name="review_marker_clear">Clear marker</string>
     <string name="review_marker_caught_up">Mark all caught up</string>
     <string name="search_hint">Search Trakt titles…</string>
-    <string name="list_search_hint">Search titles in this list…</string>
+    <string name="list_search_hint">Filter titles…</string>
+    <string name="list_filter_empty">No titles match.</string>
     <string name="empty_search">Type at least 2 characters, then press Search.</string>
     <string name="empty_search_no_results">No titles matched. Try another query, or turn off Not watched / Not in lists.</string>
     <string name="empty_list">Nothing matches these filters.</string>

@@ -7,6 +7,7 @@ import com.melamoud.tvtracker.data.api.dto.AlertCounts
 import com.melamoud.tvtracker.data.api.dto.CategoryDto
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
+import com.melamoud.tvtracker.ui.components.DebouncedTitleQuery
 import com.melamoud.tvtracker.ui.components.FeedbackDraft
 import com.melamoud.tvtracker.ui.media.FoundOnDialogState
 import com.melamoud.tvtracker.ui.media.ListsDialogState
@@ -54,6 +55,10 @@ class RecommendedMediaViewModel(
     private val _state = MutableStateFlow(RecommendedMediaUiState())
     val state: StateFlow<RecommendedMediaUiState> = _state.asStateFlow()
     private var loadSeq = 0
+    private val titleQuery = DebouncedTitleQuery(viewModelScope) {
+        _state.value = _state.value.copy(page = 1)
+        reload()
+    }
 
     init { reload() }
 
@@ -108,8 +113,11 @@ class RecommendedMediaViewModel(
         }
     }
 
-    fun setQuery(value: String) { _state.value = _state.value.copy(query = value) }
-    fun applyQuery() { _state.value = _state.value.copy(page = 1); reload() }
+    fun setQuery(value: String) {
+        _state.value = _state.value.copy(query = value)
+        titleQuery.onChange(value)
+    }
+    fun applyQuery() { titleQuery.applyNow(_state.value.query) }
     fun setPage(page: Int) { _state.value = _state.value.copy(page = page); reload() }
 
     fun setCategory(value: String) {

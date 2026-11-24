@@ -109,6 +109,7 @@ interface TvTrackerApi {
         @Query("sort") sort: String? = null,
         @Query("group_shows") groupShows: Int? = null,
         @Query("inbox") inbox: Int? = null,
+        @Query("q") query: String? = null,
     ): AlertsResponse
 
     @POST("/api/v1/alerts/read-all")

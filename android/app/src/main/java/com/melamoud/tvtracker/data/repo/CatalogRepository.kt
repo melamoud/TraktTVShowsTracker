@@ -150,6 +150,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
         sort: String? = null,
         groupShows: Boolean? = null,
         inbox: Boolean? = null,
+        query: String? = null,
     ): Result<AlertsResponse> =
         runCatching {
             api.alerts(
@@ -157,6 +158,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
                 sort,
                 groupShows?.let { if (it) 1 else 0 },
                 inbox?.let { if (it) 1 else 0 },
+                query?.trim()?.takeIf { it.length >= 2 },
             )
         }
             .recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
