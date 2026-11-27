@@ -247,6 +247,7 @@ private fun DetailHero(item: MediaItemDto, detail: MediaDetailResponse, baseUrl:
                 detail.traktListedAt?.take(10)?.let { add("Trakt DB: $it") }
                 detail.releasedAt?.take(10)?.let { add("Released: $it") }
                 item.network?.takeIf { it.isNotBlank() }?.let { add(it) }
+                item.countryName?.takeIf { it.isNotBlank() }?.let { add(it) }
                 item.runtime?.let { add("$it min") }
             }
             if (meta.isNotEmpty()) {

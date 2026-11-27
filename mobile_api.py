@@ -248,6 +248,8 @@ def api_my_media(media_type):
         'year': ctx.get('year') or '',
         'genres': ctx.get('filter_genres') or [],
         'genre_choices': ctx.get('genre_choices') or [],
+        'countries': ctx.get('filter_countries') or [],
+        'country_choices': ctx.get('country_choices') or [],
     })
 
 
@@ -307,6 +309,8 @@ def api_search():
         'year': ctx.get('year') or '',
         'genres': ctx.get('filter_genres') or [],
         'genre_choices': ctx.get('genre_choices') or [],
+        'countries': ctx.get('filter_countries') or [],
+        'country_choices': ctx.get('country_choices') or [],
         'fetch_error': ctx.get('fetch_error'),
         'found_on_choices': found_on_service_choices(current_user),
     })
@@ -617,6 +621,8 @@ def api_latest_media(media_type):
         'year': ctx.get('year') or '',
         'genres': ctx.get('filter_genres') or [],
         'genre_choices': ctx.get('genre_choices') or [],
+        'countries': ctx.get('filter_countries') or [],
+        'country_choices': ctx.get('country_choices') or [],
     })
 
 
@@ -658,6 +664,8 @@ def api_recommendations(media_type):
         'genres': ctx.get('filter_genres') or [],
         'year': ctx.get('year') or '',
         'genre_choices': ctx.get('genre_choices') or [],
+        'countries': ctx.get('filter_countries') or [],
+        'country_choices': ctx.get('country_choices') or [],
     })
 
 
@@ -685,6 +693,8 @@ def api_preferences():
     ]
     user_genres, user_keywords = get_user_genres_keywords(current_user)
     user_excluded = get_user_excluded_genres(current_user)
+    from services.countries import country_choices_payload
+    from services.streaming_matcher import get_user_excluded_countries
     from services.cast_service import list_favorite_actors
     from routes.user_routes import _personal_lists, WATCHLIST_LIST_ID
     hidden_list_ids = set(get_hidden_list_ids(current_user))
@@ -718,6 +728,8 @@ def api_preferences():
         'genres': user_genres,
         'keywords': user_keywords,
         'excluded_genres': user_excluded,
+        'excluded_countries': get_user_excluded_countries(current_user),
+        'country_choices': country_choices_payload(),
         'lists': [
             {
                 'id': lst['id'],
@@ -871,6 +883,19 @@ def api_preferences_save():
     prefs.genres_json = g_json
     prefs.keywords_json = k_json
     prefs.excluded_genres_json = excluded_json
+    if 'excluded_countries' in data:
+        from services.countries import normalize_country_code
+        country_codes: list[str] = []
+        seen_codes: set[str] = set()
+        for raw in data.get('excluded_countries') or []:
+            if not isinstance(raw, str):
+                continue
+            code = normalize_country_code(raw)
+            if not code or code in seen_codes:
+                continue
+            seen_codes.add(code)
+            country_codes.append(code)
+        prefs.excluded_countries_json = json.dumps(country_codes)
 
     if genres or keywords:
         prefs.onboarding_completed_at = prefs.onboarding_completed_at or datetime.utcnow()

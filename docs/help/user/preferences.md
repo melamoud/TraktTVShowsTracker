@@ -58,6 +58,10 @@ If you check the same genre in both lists, **hide wins** (it is dropped from “
 
 Does not apply to titles with no cached genres yet (nothing to hide on).
 
+## Hide these countries
+
+Same rule as **Hide these genres**. Check **India** (or any other country) once. Those titles stay off **Latest** and **Recommended**, and they do not get the purple match or an alert. My lists, Search, and the title page still show them. A title with no country yet is not hidden.
+
 ## Google Calendar
 
 Connect a Google account and pick one calendar. Create a calendar in Google that is only for TV Tracker, and pick that one, so these meetings stay off your personal calendar. Saving a title’s lists updates the calendar for that title only, and only when it has a future date. A finished title does not call Google. The title has to be on **Wishlist** or a list you marked **Auto-select**. A title that is only on some other personal list is skipped.

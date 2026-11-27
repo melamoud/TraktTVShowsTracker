@@ -17,7 +17,7 @@ By default Latest applies two local filters:
 
 Without genres/keywords, Matches only is empty — use the setup wizard / Preferences, or All titles.
 
-**Filter titles…** filters the loaded Latest cache as you type (after your year / match / watched filters), across every page, by title. **More filters** adds year, actor (jumps to Search), and genres. For Trakt-wide search, use nav **Search**.
+**Filter titles…** filters the loaded Latest cache as you type (after your year / match / watched filters), across every page, by title. **More filters** adds year, actor (jumps to Search), and genres. **Hide these countries** in Preferences drops those titles here, same as hidden genres. For Trakt-wide search, use nav **Search**.
 
 **Upcoming / Theater window / Streaming** chips and filter pills use public release date (±30 / >30 days) and TMDB streaming lists.
 
@@ -54,7 +54,7 @@ Trakt’s `/updates` API **cannot** filter by genre/keyword server-side. Matches
 - **Hiding not interested** on by default (titles you hid from Trakt recommendations)  
 - Preference highlights (genres/keywords only), **Set lists…** / watched, **Rate…** / **Favorite**, review marker (set / clear), **Found on…**, **Hide recommendation**  
 - Open a title for the full page; **← Back** returns here (not always to another Latest view)  
-- Poster, description, genres  
+- Poster, description, country, genres  
 - **Streaming:** read-only TMDB/JustWatch list (needs free `TMDB_API_KEY`)  
 - **Hide recommendation:** sends Trakt a “Not interested” for this title; it disappears from future Trakt recommendations, and from Latest while **Hiding not interested** is on  
 

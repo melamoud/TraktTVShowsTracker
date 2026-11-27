@@ -98,7 +98,8 @@ fun LatestMediaScreen(
         )
         val advancedCount = (if (state.perPage != 50) 1 else 0) +
             (if (state.year.isNotBlank()) 1 else 0) +
-            state.genres.size
+            state.genres.size +
+            state.countries.size
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),

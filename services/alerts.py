@@ -39,7 +39,7 @@ from models import (
 )
 from services import trakt_client
 from services.calendar_view import ensure_user_calendar_fresh
-from services.streaming_matcher import get_alert_enabled_list_ids, media_has_excluded_genre
+from services.streaming_matcher import get_alert_enabled_list_ids, title_hidden_by_prefs
 from services.sync_jobs import (
     alert_collection_trakt_ids,
     collection_trakt_ids,
@@ -277,7 +277,7 @@ def _notify(
         media = CachedMedia.query.filter_by(
             media_type=media_type, trakt_id=int(trakt_id),
         ).first()
-        if media_has_excluded_genre(media, user):
+        if title_hidden_by_prefs(media, user):
             return False
     db.session.add(Notification(
         user_id=user_id,
@@ -1186,7 +1186,7 @@ def _upsert_streaming_card(
         title = f'Now streaming: {media.title}'
     if not alert_pref_enabled(user, alert_type):
         return 0
-    if media_has_excluded_genre(media, user):
+    if title_hidden_by_prefs(media, user):
         return 0
     ensure_local_poster(media)
     if notes:
@@ -1688,7 +1688,7 @@ def _check_favorite_actor_titles(user: User) -> int:
             continue
 
         prefs = user.preferences
-        if media_has_excluded_genre(media, user):
+        if title_hidden_by_prefs(media, user):
             _record_event(
                 user.id, ALERT_FAVORITE_ACTOR, media.media_type, trakt_id,
                 'baseline:favactor',

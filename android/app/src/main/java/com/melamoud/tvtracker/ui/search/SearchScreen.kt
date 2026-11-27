@@ -85,7 +85,8 @@ fun SearchScreen(
         "show" -> "Shows"
         else -> "Type"
     }
-    val advancedCount = (if (state.year.isNotBlank()) 1 else 0) + state.genres.size
+    val advancedCount = (if (state.year.isNotBlank()) 1 else 0) +
+        state.genres.size + state.countries.size
     ReloadOnResume(viewModel::reloadFromServer)
 
     Column(Modifier.fillMaxSize()) {

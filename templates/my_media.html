@@ -3,14 +3,15 @@
 {% block content %}
 {% set _year = year|default('') %}
 {% set _genres = filter_genres|default([]) %}
+{% set _countries = filter_countries|default([]) %}
 {% macro lists_qs() -%}
 lists_set=1{% for lid in selected_lists %}&lists={{ lid }}{% endfor %}
 {%- endmacro %}
 {% macro cal_qs(anchor=None, mode_v=None) -%}
-{% set mm = mode_v if mode_v is not none else display_mode %}display={{ mm }}&{{ lists_qs() }}&filter={{ filt }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if avail %}&avail={{ avail }}{% endif %}{% if no_found_on %}&no_found_on=1{% endif %}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}{% if anchor %}&cal_date={{ anchor.isoformat() }}{% endif %}
+{% set mm = mode_v if mode_v is not none else display_mode %}display={{ mm }}&{{ lists_qs() }}&filter={{ filt }}{% if search_q %}&q={{ search_q|urlencode }}{% endif %}{% if avail %}&avail={{ avail }}{% endif %}{% if no_found_on %}&no_found_on=1{% endif %}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}{% for c in _countries %}&country={{ c }}{% endfor %}{% if anchor %}&cal_date={{ anchor.isoformat() }}{% endif %}
 {%- endmacro %}
 {% macro qs(page_n=None, per=None, filter_v=None, q_v=None, avail_v=None, mode_v=None, cal_anchor=None, no_found_v=None) -%}
-page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&filter={{ filter_v if filter_v is not none else filt }}&{{ lists_qs() }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}{% set nf = no_found_v if no_found_v is not none else (1 if no_found_on else none) %}{% if nf == 1 %}&no_found_on=1{% elif nf == 0 %}&no_found_on=0{% endif %}{% set mm = mode_v if mode_v is not none else display_mode %}{% if mm %}&display={{ mm }}{% if mm != 'list' %}{% if cal_anchor %}&cal_date={{ cal_anchor.isoformat() }}{% elif calendar %}&cal_date={{ calendar.anchor.isoformat() }}{% endif %}{% endif %}{% endif %}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&filter={{ filter_v if filter_v is not none else filt }}&{{ lists_qs() }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}{% set nf = no_found_v if no_found_v is not none else (1 if no_found_on else none) %}{% if nf == 1 %}&no_found_on=1{% elif nf == 0 %}&no_found_on=0{% endif %}{% set mm = mode_v if mode_v is not none else display_mode %}{% if mm %}&display={{ mm }}{% if mm != 'list' %}{% if cal_anchor %}&cal_date={{ cal_anchor.isoformat() }}{% elif calendar %}&cal_date={{ calendar.anchor.isoformat() }}{% endif %}{% endif %}{% endif %}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}{% for c in _countries %}&country={{ c }}{% endfor %}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 %}
@@ -281,6 +282,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% set rating = st.rating %}{% set favorited = st.favorited %}
           {% include '_rate_favorite_tags.html' %}
           {% if st.progress_percent and st.progress_percent < 100 %}<span class="tag partial">{{ '%.0f'|format(st.progress_percent) }}%</span>{% endif %}
+          {% if m and m.country %}<span class="tag">{{ country_label(m.country) }}</span>{% endif %}
           {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
         </div>
         {% set found_on = row.found_on %}

@@ -21,7 +21,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - Hidden genres from Preferences are always dropped  
 - **10 / 50 / 100** per page  
 - **Filter titles…** — as you type, keep recommendations whose title contains that text, across every page  
-- **More filters** — year range, actor (jumps to Search), and genres (any selected)
+- **More filters** — year range, actor (jumps to Search), and genres (any selected). Countries are hidden from Preferences, same as hidden genres
 
 ## Highlights
 

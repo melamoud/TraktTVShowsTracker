@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.melamoud.tvtracker.data.api.dto.AlertPrefsDto
+import com.melamoud.tvtracker.data.api.dto.CountryChoiceDto
 import com.melamoud.tvtracker.data.api.dto.CustomServiceDto
 import com.melamoud.tvtracker.data.api.dto.FavoriteActorDto
 import com.melamoud.tvtracker.data.api.dto.GoogleCalendarStatusDto
@@ -32,6 +33,8 @@ data class PreferencesUiState(
     val genres: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     val excludedGenres: List<String> = emptyList(),
+    val excludedCountries: List<String> = emptyList(),
+    val countryChoices: List<CountryChoiceDto> = emptyList(),
     val lists: List<ListPreferenceDto> = emptyList(),
     val listsError: String? = null,
     val alerts: AlertPrefsDto = AlertPrefsDto(),
@@ -68,6 +71,8 @@ class PreferencesViewModel(
                         genres = it.genres,
                         keywords = it.keywords,
                         excludedGenres = it.excludedGenres,
+                        excludedCountries = it.excludedCountries,
+                        countryChoices = it.countryChoices,
                         lists = it.lists,
                         listsError = it.listsError,
                         alerts = it.alerts ?: AlertPrefsDto(),
@@ -271,6 +276,19 @@ class PreferencesViewModel(
         )
     }
 
+    fun toggleExcludedCountry(code: String) {
+        val c = code.trim().lowercase()
+        val current = _state.value.excludedCountries.toSet()
+        _state.value = _state.value.copy(
+            excludedCountries = if (c in current) {
+                _state.value.excludedCountries.filter { it != c }
+            } else {
+                _state.value.excludedCountries + c
+            },
+            saved = false,
+        )
+    }
+
     fun toggleExcludedGenre(genre: String) {
         val g = genre.trim().lowercase()
         val current = _state.value.excludedGenres.map { it.lowercase() }.toSet()
@@ -437,6 +455,7 @@ class PreferencesViewModel(
                 genres = s.genres,
                 keywords = s.keywords,
                 excludedGenres = s.excludedGenres,
+                excludedCountries = s.excludedCountries,
                 lists = s.lists,
                 listsPrefs = ListPrefsSaveRequest(
                     shownIds = shownIds,

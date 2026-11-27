@@ -82,6 +82,8 @@ class UserPreference(db.Model):
     keywords_json = db.Column(db.Text, default='[]')  # JSON list of keyword strings
     # Genres to hide everywhere (Latest, Recs, alerts). Wins over liked genres/keywords/actors.
     excluded_genres_json = db.Column(db.Text, default='[]')
+    # Country codes to hide the same way (Latest, Recs, alerts, purple match).
+    excluded_countries_json = db.Column(db.Text, default='[]')
     # Trakt personal list ids (stringified trakt ids) hidden from Set lists menu.
     # Empty/default = all lists shown (Wishlist is always shown).
     hidden_list_ids_json = db.Column(db.Text, default='[]')
@@ -206,6 +208,8 @@ class CachedMedia(db.Model):
     overview = db.Column(db.Text)
     runtime = db.Column(db.Integer)
     network = db.Column(db.String(200))  # broadcast channel / network when known
+    # Trakt primary country (ISO 3166-1 alpha-2, lowercase). One code, not co-producers.
+    country = db.Column(db.String(8), index=True)
     genres_json = db.Column(db.Text, default='[]')
     imdb_id = db.Column(db.String(32))
     tmdb_id = db.Column(db.Integer, index=True)

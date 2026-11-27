@@ -284,12 +284,22 @@ def preferences():
         genres = [g for g in genres if g.casefold() not in excluded_fold]
         g_json, k_json = serialize_prefs(genres, keywords)
         excluded_json, _ = serialize_prefs(excluded, [])
+        import json
+        from services.countries import normalize_country_code
+        excluded_countries: list[str] = []
+        seen_countries: set[str] = set()
+        for raw in request.form.getlist('exclude_country_checks'):
+            code = normalize_country_code(raw)
+            if not code or code in seen_countries:
+                continue
+            seen_countries.add(code)
+            excluded_countries.append(code)
         prefs.genres_json = g_json
         prefs.keywords_json = k_json
         prefs.excluded_genres_json = excluded_json
+        prefs.excluded_countries_json = json.dumps(excluded_countries)
 
         # List prefs: show in menu, auto-select, and which lists generate alerts.
-        import json
         if request.form.get('lists_prefs_present') == '1':
             known_list_ids = {
                 str(x).strip()
@@ -399,6 +409,7 @@ def preferences():
     user_genres = json.loads(prefs.genres_json or '[]')
     user_keywords = json.loads(prefs.keywords_json or '[]')
     user_excluded_genres = json.loads(getattr(prefs, 'excluded_genres_json', None) or '[]')
+    user_excluded_countries = json.loads(getattr(prefs, 'excluded_countries_json', None) or '[]')
     hidden_list_ids = set(get_hidden_list_ids(current_user))
     default_selected_list_ids = set(get_default_selected_list_ids(current_user))
     alert_enabled_list_ids = set(get_alert_enabled_list_ids(current_user))
@@ -416,6 +427,7 @@ def preferences():
         'show': ReviewMarker.query.filter_by(user_id=current_user.id, media_type='show').first(),
     }
     from services.cast_service import list_favorite_actors
+    from services.countries import country_choices_payload
     from services.external_calendar import calendar_settings
     favorite_actors = list_favorite_actors(current_user)
     gcal = calendar_settings(current_user)
@@ -428,6 +440,8 @@ def preferences():
         user_genres=user_genres,
         user_keywords=user_keywords,
         user_excluded_genres=user_excluded_genres,
+        user_excluded_countries=user_excluded_countries,
+        country_choices=country_choices_payload(),
         extra_genres_text=', '.join(extra_genre_terms(user_genres)),
         extra_excluded_text=', '.join(extra_genre_terms(user_excluded_genres)),
         keywords_text=', '.join(user_keywords),
@@ -622,7 +636,7 @@ def _my_media(media_type: str):
     from services.list_filters import (
         advanced_context, parse_year_filter, resolve_advanced,
     )
-    year, filter_genres = resolve_advanced(current_user, view)
+    year, filter_genres, filter_countries = resolve_advanced(current_user, view)
     year_range = parse_year_filter(year)
     from services.availability import (
         normalize_avail, theater_window_bounds, upcoming_after,
@@ -730,7 +744,10 @@ def _my_media(media_type: str):
     # Backfill missing titles for the filtered candidate set first — otherwise
     # q= cannot match rows that only exist in UserMediaState (Search page used
     # to "unlock" them by upserting CachedMedia as a side effect).
-    needs_media_join = bool(search_q) or bool(avail) or bool(year_range) or bool(filter_genres)
+    needs_media_join = (
+        bool(search_q) or bool(avail) or bool(year_range)
+        or bool(filter_genres) or bool(filter_countries)
+    )
     if needs_media_join:
         # Snapshot ids without mutating `q` (legacy Query.with_entities is in-place).
         candidate_ids = [
@@ -778,6 +795,8 @@ def _my_media(media_type: str):
         q = q.filter(or_(*[
             CachedMedia.genres_json.ilike(f'%{g}%') for g in filter_genres
         ]))
+    if filter_countries:
+        q = q.filter(CachedMedia.country.in_(filter_countries))
     if avail == 'upcoming':
         q = q.filter(CachedMedia.released_at >= upcoming_after())
         if media_type == 'show':
@@ -1071,7 +1090,7 @@ def _my_media(media_type: str):
         'search_q': search_q,
         'avail': avail,
         'no_found_on': no_found_on,
-        **advanced_context(year, filter_genres),
+        **advanced_context(year, filter_genres, filter_countries),
         'display_mode': display_mode,
         'calendar': calendar_ctx,
         'tmdb_configured': tmdb_ok,

@@ -207,6 +207,20 @@
   </section>
 
   <section>
+    <h2 title="Hidden on Latest, Recommendations, and alerts, same as Hide these genres">Hide these countries</h2>
+    <p class="meta">Same as hide genres. Checked countries stay off Latest and Recommendations, and they do not get the purple match. My lists and Search still show them.</p>
+    {% set excluded_countries = user_excluded_countries|default([]) %}
+    <div class="checks">
+      {% for c in country_choices|default([]) %}
+        <label>
+          <input type="checkbox" name="exclude_country_checks" value="{{ c.code }}" {% if c.code in excluded_countries %}checked{% endif %}>
+          {{ c.name }}
+        </label>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section>
     <h2 title="Used with genres for purple preference matches">Keywords</h2>
     <label>Keywords / themes (comma-separated)
       <textarea name="keywords" rows="3" placeholder="space, heist, time travel">{{ keywords_text }}</textarea>

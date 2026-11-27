@@ -181,6 +181,8 @@ def create_app(config_object=Config):
     app.add_template_global(_media_detail_url, name='media_detail_url')
     from services.local_time import format_local_date as _format_local_date
     app.add_template_filter(_format_local_date, name='local_date')
+    from services.countries import country_label as _country_label
+    app.add_template_global(_country_label, name='country_label')
 
     from routes import register_routes
     register_routes(app)
@@ -223,11 +225,21 @@ def _ensure_schema(app):
                 cm_alters.append(
                     'ALTER TABLE cached_media ADD COLUMN provider_checked_at DATETIME'
                 )
+            if 'country' not in cols:
+                cm_alters.append(
+                    'ALTER TABLE cached_media ADD COLUMN country VARCHAR(8)'
+                )
+            with db.engine.begin() as conn:
+                for stmt in cm_alters:
+                    conn.execute(text(stmt))
+                conn.execute(text(
+                    'CREATE INDEX IF NOT EXISTS ix_cached_media_country '
+                    'ON cached_media (country)'
+                ))
             if cm_alters:
-                with db.engine.begin() as conn:
-                    for stmt in cm_alters:
-                        conn.execute(text(stmt))
-                app.logger.info('Added cached_media feed_source / cast_fetched_at columns')
+                app.logger.info('Added cached_media columns: %s', ', '.join(
+                    stmt.split('ADD COLUMN ', 1)[-1].split(' ', 1)[0] for stmt in cm_alters
+                ))
         if 'user_preferences' in tables:
             cols = {c['name'] for c in insp.get_columns('user_preferences')}
             alters = []
@@ -278,6 +290,11 @@ def _ensure_schema(app):
             if 'excluded_genres_json' not in cols:
                 alters.append(
                     "ALTER TABLE user_preferences ADD COLUMN excluded_genres_json "
+                    "TEXT DEFAULT '[]'"
+                )
+            if 'excluded_countries_json' not in cols:
+                alters.append(
+                    "ALTER TABLE user_preferences ADD COLUMN excluded_countries_json "
                     "TEXT DEFAULT '[]'"
                 )
             if 'calendar_reminder_method' not in cols:

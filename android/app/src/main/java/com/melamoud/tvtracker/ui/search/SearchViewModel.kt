@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.melamoud.tvtracker.data.api.dto.AlertCounts
+import com.melamoud.tvtracker.data.api.dto.CountryChoiceDto
 import com.melamoud.tvtracker.data.api.dto.MediaItemDto
 import com.melamoud.tvtracker.data.api.dto.PersonDto
 import com.melamoud.tvtracker.data.repo.CatalogRepository
@@ -27,6 +28,8 @@ data class SearchUiState(
         "drama", "family", "fantasy", "history", "horror", "music", "mystery",
         "romance", "science fiction", "thriller", "war", "western", "reality",
     ),
+    val countries: Set<String> = emptySet(),
+    val countryChoices: List<CountryChoiceDto> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
     val items: List<MediaItemDto> = emptyList(),
@@ -56,6 +59,7 @@ class SearchViewModel(
     private var persistHideLists = false
     private var persistYear = false
     private var persistGenres = false
+    private var persistCountries = false
 
     init {
         loadPrefs()
@@ -71,6 +75,8 @@ class SearchViewModel(
                     year = if (persistYear) cur.year else (it.year ?: cur.year),
                     genres = if (persistGenres) cur.genres else it.genres.toSet(),
                     genreChoices = it.genreChoices.ifEmpty { cur.genreChoices },
+                    countries = if (persistCountries) cur.countries else it.countries.toSet(),
+                    countryChoices = it.countryChoices.ifEmpty { cur.countryChoices },
                     foundOnChoices = it.foundOnChoices.ifEmpty { cur.foundOnChoices },
                 )
             }
@@ -170,6 +176,13 @@ class SearchViewModel(
         _state.value = _state.value.copy(genres = cur)
         if (canSearch()) search()
     }
+    fun toggleCountry(code: String) {
+        persistCountries = true
+        val cur = _state.value.countries.toMutableSet()
+        if (!cur.add(code)) cur.remove(code)
+        _state.value = _state.value.copy(countries = cur)
+        if (canSearch()) search()
+    }
 
     private fun canSearch(): Boolean {
         val s = _state.value
@@ -203,6 +216,8 @@ class SearchViewModel(
             year = s.year.trim().takeIf { persistYear },
             genres = s.genres.toList().takeIf { persistGenres },
             persistGenres = persistGenres,
+            countries = s.countries.toList().takeIf { persistCountries },
+            persistCountries = persistCountries,
             actor = s.actorId,
             actorQ = s.actorName.takeIf { it.isNotBlank() },
             refresh = refresh,
@@ -220,6 +235,8 @@ class SearchViewModel(
                     year = it.year ?: s.year,
                     genres = if (it.genres.isNotEmpty() || s.genres.isEmpty()) it.genres.toSet() else s.genres,
                     genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
+                    countries = if (persistCountries) s.countries else it.countries.toSet(),
+                    countryChoices = it.countryChoices.ifEmpty { s.countryChoices },
                     foundOnChoices = it.foundOnChoices.ifEmpty { s.foundOnChoices },
                     error = it.fetchError,
                     actorId = it.actorId ?: s.actorId,

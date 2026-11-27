@@ -39,6 +39,8 @@ data class RecommendedMediaUiState(
     val year: String = "",
     val genres: List<String> = emptyList(),
     val genreChoices: List<String> = emptyList(),
+    val countries: List<String> = emptyList(),
+    val countryChoices: List<com.melamoud.tvtracker.data.api.dto.CountryChoiceDto> = emptyList(),
     val listsDialog: ListsDialogState? = null,
     val foundOnDialog: FoundOnDialogState? = null,
     val rateTarget: MediaItemDto? = null,
@@ -55,6 +57,7 @@ class RecommendedMediaViewModel(
     private val _state = MutableStateFlow(RecommendedMediaUiState())
     val state: StateFlow<RecommendedMediaUiState> = _state.asStateFlow()
     private var loadSeq = 0
+    private var persistCountries = false
     private val titleQuery = DebouncedTitleQuery(viewModelScope) {
         _state.value = _state.value.copy(page = 1)
         reload()
@@ -81,6 +84,7 @@ class RecommendedMediaViewModel(
                 refresh = s.refresh,
                 year = s.year,
                 genres = s.genres,
+                countries = s.countries.takeIf { persistCountries },
             )
             if (seq != loadSeq) return@launch
             _state.value = result.fold(
@@ -105,6 +109,8 @@ class RecommendedMediaViewModel(
                         year = it.year ?: s.year,
                         genres = it.genres.ifEmpty { s.genres },
                         genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
+                        countries = it.countries,
+                        countryChoices = it.countryChoices.ifEmpty { s.countryChoices },
                         refresh = false,
                     )
                 },
@@ -170,6 +176,21 @@ class RecommendedMediaViewModel(
         val current = _state.value.genres.toSet()
         _state.value = _state.value.copy(
             genres = if (g in current) _state.value.genres.filter { it != g } else _state.value.genres + g,
+            page = 1,
+        )
+        reload()
+    }
+
+    fun toggleCountry(code: String) {
+        persistCountries = true
+        val c = code.trim()
+        val current = _state.value.countries.toSet()
+        _state.value = _state.value.copy(
+            countries = if (c in current) {
+                _state.value.countries.filter { it != c }
+            } else {
+                _state.value.countries + c
+            },
             page = 1,
         )
         reload()

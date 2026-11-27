@@ -3,6 +3,8 @@ package com.melamoud.tvtracker.ui.components
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,6 +20,7 @@ import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -35,6 +38,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.melamoud.tvtracker.data.api.dto.CountryChoiceDto
 import com.melamoud.tvtracker.ui.theme.Primary
 import com.melamoud.tvtracker.ui.theme.TextMuted
 
@@ -141,5 +145,33 @@ fun ActorJumpField(onSearch: (String) -> Unit) {
             onClick = { onSearch(name.trim()) },
             enabled = name.trim().length >= 2,
         ) { Text("Search actor") }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun CountrySection(
+    selected: List<String>,
+    choices: List<CountryChoiceDto>,
+    onToggle: (String) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text("Countries", style = MaterialTheme.typography.labelMedium, color = TextMuted)
+        if (choices.isEmpty()) {
+            Text("No countries available", color = TextMuted)
+        } else {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                choices.forEach { country ->
+                    FilterChip(
+                        selected = selected.contains(country.code),
+                        onClick = { onToggle(country.code) },
+                        label = { Text(country.name) },
+                    )
+                }
+            }
+        }
     }
 }

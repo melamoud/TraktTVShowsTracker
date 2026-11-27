@@ -5,11 +5,12 @@
 {% set hl = 1 if hide_lists else 0 %}
 {% set _year = year|default('') %}
 {% set _genres = filter_genres|default([]) %}
+{% set _countries = filter_countries|default([]) %}
 {% set _actor_q = actor_q|default('') %}
 {% set _actor_id = actor_id|default('') %}
 {% set has_search = q or actor_name %}
 {% macro qs(page_n=None, type_v=None, q_v=None, hw_v=None, hl_v=None, actor_v=None, actor_q_v=None) -%}
-page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is not none else search_type }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_lists={{ hl_v if hl_v is not none else hl }}&q={{ (q_v if q_v is not none else q)|urlencode }}{%- if actor_v is not none -%}{%- if actor_v -%}&actor={{ actor_v }}{%- endif -%}{%- elif _actor_id -%}&actor={{ _actor_id }}{%- endif -%}{%- if actor_q_v is not none -%}{%- if actor_q_v -%}&actor_q={{ actor_q_v|urlencode }}{%- endif -%}{%- elif _actor_q -%}&actor_q={{ _actor_q|urlencode }}{%- endif -%}{%- if _year -%}&year={{ _year|urlencode }}{%- endif -%}{%- for g in _genres -%}&genre={{ g|urlencode }}{%- endfor -%}
+page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is not none else search_type }}&hide_watched={{ hw_v if hw_v is not none else hw }}&hide_lists={{ hl_v if hl_v is not none else hl }}&q={{ (q_v if q_v is not none else q)|urlencode }}{%- if actor_v is not none -%}{%- if actor_v -%}&actor={{ actor_v }}{%- endif -%}{%- elif _actor_id -%}&actor={{ _actor_id }}{%- endif -%}{%- if actor_q_v is not none -%}{%- if actor_q_v -%}&actor_q={{ actor_q_v|urlencode }}{%- endif -%}{%- elif _actor_q -%}&actor_q={{ _actor_q|urlencode }}{%- endif -%}{%- if _year -%}&year={{ _year|urlencode }}{%- endif -%}{%- for g in _genres -%}&genre={{ g|urlencode }}{%- endfor -%}{%- for c in _countries -%}&country={{ c }}{%- endfor -%}
 {%- endmacro %}
 {% macro pager(position) %}
   {% if pages > 1 and has_search %}
@@ -95,7 +96,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
 {% if actor_missing %}
   <p class="muted">No actor matched “{{ _actor_q or _actor_id }}”. Try a full name or pick a favorite.</p>
 {% elif not has_search %}
-  <p class="muted">Type a title (min. 2 characters), or open More filters for an actor / year / genres, then press Search.</p>
+  <p class="muted">Type a title (min. 2 characters), or open More filters for an actor / year / genres / countries, then press Search.</p>
 {% elif fetch_error %}
   <p class="muted">Search failed. Try again in a moment.</p>
 {% else %}
@@ -157,6 +158,7 @@ page={{ page_n if page_n is not none else page }}&type={{ type_v if type_v is no
             {% set rating = row.rating %}{% set favorited = row.favorited %}
             {% include '_rate_favorite_tags.html' %}
             {% if row.partial %}<span class="tag partial">Partial</span>{% endif %}
+            {% if m.country %}<span class="tag">{{ country_label(m.country) }}</span>{% endif %}
             {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
           </div>
           {% set found_on = row.found_on %}

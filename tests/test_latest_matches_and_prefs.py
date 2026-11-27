@@ -90,6 +90,33 @@ def test_latest_show_all_hides_excluded_genre(app, client, user):
     assert 'Drawn Drama' not in html
 
 
+def test_latest_hides_excluded_country(app, client, user):
+    """Hide these countries drops that country from Latest, same as hide genres."""
+    with app.app_context():
+        prefs = UserPreference.query.filter_by(user_id=user).first()
+        prefs.excluded_countries_json = '["in"]'
+        us = _add_movie('Hollywood', 11, datetime(2026, 8, 3))
+        us.country = 'us'
+        india = _add_movie('Bollywood', 12, datetime(2026, 8, 2))
+        india.country = 'in'
+        db.session.add(us)
+        db.session.add(india)
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.catalog_routes.feed_count', return_value=2), patch(
+        'routes.catalog_routes.ensure_catalog_through_marker'
+    ), patch('routes.catalog_routes.catalog_has_more_older', return_value=False), patch(
+        'services.sync_jobs.enrich_media_list_for_display'
+    ):
+        page = client.get('/preferences')
+        resp = client.get('/latest/movies?match_only=0&hide_watched=0&hide_lists=0&recent_years=0')
+    assert 'Hide these countries' in page.get_data(as_text=True)
+    html = resp.get_data(as_text=True)
+    assert 'Hollywood' in html
+    assert 'Bollywood' not in html
+
+
 def test_extra_genre_terms_keeps_anime_distinct_from_animation():
     """'anime' must not be treated as the 'animation' checkbox."""
     from services.seed import extra_genre_terms

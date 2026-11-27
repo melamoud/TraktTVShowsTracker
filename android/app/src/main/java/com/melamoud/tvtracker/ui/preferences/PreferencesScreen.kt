@@ -278,6 +278,27 @@ fun PreferencesScreen(
             }
         }
 
+        ExpandableSection("Hide these countries") {
+            Text(
+                "Same as hide genres. Checked countries stay off Latest and Recommendations.",
+                color = TextMuted,
+                style = MaterialTheme.typography.bodySmall,
+            )
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                state.countryChoices.forEach { country ->
+                    val selected = state.excludedCountries.contains(country.code)
+                    FilterChip(
+                        selected = selected,
+                        onClick = { viewModel.toggleExcludedCountry(country.code) },
+                        label = { Text(country.name) },
+                    )
+                }
+            }
+        }
+
         ExpandableSection("Excluded genres") {
             Text("Titles with these genres are hidden everywhere.", color = TextMuted, style = MaterialTheme.typography.bodySmall)
             FlowRow(

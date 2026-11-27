@@ -12,6 +12,7 @@ from typing import Any
 
 from flask import request
 
+from services.countries import country_choices_payload, normalize_country_code
 from services.seed import COMMON_GENRES
 from services.streaming_matcher import genre_to_trakt_slug, media_genres, media_year_for_discovery
 from services import view_prefs
@@ -114,21 +115,74 @@ def media_matches_genres(media, genres: list[str] | set[str] | None) -> bool:
     return bool(wanted & have)
 
 
+def parse_country_filters(args=None) -> list[str]:
+    """Collect unique country codes from ``country=`` repeats and ``countries=a,b``."""
+    src = args if args is not None else request.args
+    raw: list[str] = []
+    if hasattr(src, 'getlist'):
+        raw.extend(src.getlist('country') or [])
+        extra = src.get('countries')
+        if extra:
+            raw.extend(str(extra).split(','))
+    elif isinstance(src, dict):
+        g = src.get('country')
+        if isinstance(g, (list, tuple)):
+            raw.extend(g)
+        elif g:
+            raw.append(str(g))
+        extra = src.get('countries')
+        if extra:
+            raw.extend(str(extra).split(','))
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw:
+        code = normalize_country_code(item)
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        out.append(code)
+    return out
+
+
+def media_matches_countries(media, countries: list[str] | set[str] | None) -> bool:
+    """True when the title's country is one of the selected codes (OR).
+
+    Empty selection = no filter. A title with no country does not match a
+    selection, same as a title with none of the selected genres.
+    """
+    if not countries:
+        return True
+    if media is None:
+        return False
+    code = normalize_country_code(getattr(media, 'country', None))
+    if not code:
+        return False
+    wanted = {normalize_country_code(c) for c in countries}
+    wanted.discard(None)
+    return code in wanted
+
+
 def row_passes_advanced(
     row: dict,
     year_range: tuple[int, int] | None,
     genres: list[str] | set[str] | None,
+    countries: list[str] | set[str] | None = None,
 ) -> bool:
     media = row.get('media') if isinstance(row, dict) else row
-    return media_matches_year(media, year_range) and media_matches_genres(media, genres)
+    return (
+        media_matches_year(media, year_range)
+        and media_matches_genres(media, genres)
+        and media_matches_countries(media, countries)
+    )
 
 
-def resolve_advanced(user, view: str) -> tuple[str, list[str]]:
+def resolve_advanced(user, view: str) -> tuple[str, list[str], list[str]]:
     """
-    Resolve year string + genre labels from query args, then saved prefs.
+    Resolve year string, genre labels, and country codes.
 
     ``year`` present (even empty) updates saved year.
     ``genre`` present or ``genres_set=1`` updates saved genres (empty = clear).
+    ``country`` present or ``countries_set=1`` updates saved countries (empty = clear).
     """
     if 'year' in request.args:
         raw = (request.args.get('year') or '').strip()
@@ -149,15 +203,30 @@ def resolve_advanced(user, view: str) -> tuple[str, list[str]]:
             genres = [g for g in (normalize_genre_label(x) for x in stored_g) if g]
         else:
             genres = []
-    return year, genres
+
+    if 'country' in request.args or request.args.get('countries_set') == '1':
+        countries = parse_country_filters(request.args)
+        view_prefs.update_view(user, view, countries=countries)
+    else:
+        stored_c = view_prefs.get_view(user, view).get('countries')
+        if isinstance(stored_c, list):
+            countries = [
+                c for c in (normalize_country_code(x) for x in stored_c) if c
+            ]
+        else:
+            countries = []
+    return year, genres, countries
 
 
-def advanced_context(year: str, genres: list[str]) -> dict[str, Any]:
-    """Template/JSON extras for year + genre filters."""
+def advanced_context(year: str, genres: list[str], countries: list[str] | None = None) -> dict[str, Any]:
+    """Template/JSON extras for year, genre, and country filters."""
+    selected = list(countries or [])
     return {
         'year': year or '',
         'filter_genres': list(genres),
         'genre_choices': list(COMMON_GENRES),
+        'filter_countries': selected,
+        'country_choices': country_choices_payload(),
         'year_range': parse_year_filter(year),
-        'has_advanced': bool(parse_year_filter(year) or genres),
+        'has_advanced': bool(parse_year_filter(year) or genres or selected),
     }

@@ -101,7 +101,7 @@ fun RecommendedMediaScreen(
             state.onMyServices,
             state.perPage != 50,
             state.year.isNotBlank(),
-        ).count { it } + state.genres.size
+        ).count { it } + state.genres.size + state.countries.size
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),

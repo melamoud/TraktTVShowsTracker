@@ -36,6 +36,8 @@ data class MyMediaUiState(
     val year: String = "",
     val genres: List<String> = emptyList(),
     val genreChoices: List<String> = emptyList(),
+    val countries: List<String> = emptyList(),
+    val countryChoices: List<com.melamoud.tvtracker.data.api.dto.CountryChoiceDto> = emptyList(),
     val listsDialog: ListsDialogState? = null,
     val foundOnDialog: FoundOnDialogState? = null,
     val foundOnChoices: List<String> = emptyList(),
@@ -77,6 +79,7 @@ class MyMediaViewModel(
     private var persistAvail = false
     private var persistNoFoundOn = false
     private var persistDisplay = false
+    private var persistCountries = false
 
     fun reload(lists: List<String>? = null, refresh: Boolean = false) {
         val seq = ++loadSeq
@@ -97,6 +100,7 @@ class MyMediaViewModel(
                 lists = lists,
                 year = s.year,
                 genres = s.genres,
+                countries = s.countries.takeIf { persistCountries },
             )
             if (seq != loadSeq) return@launch
             _state.value = result.fold(
@@ -118,6 +122,8 @@ class MyMediaViewModel(
                         year = it.year ?: s.year,
                         genres = it.genres.ifEmpty { s.genres },
                         genreChoices = it.genreChoices.ifEmpty { s.genreChoices },
+                        countries = it.countries,
+                        countryChoices = it.countryChoices.ifEmpty { s.countryChoices },
                         foundOnChoices = it.foundOnChoices.ifEmpty { _state.value.foundOnChoices },
                     )
                 },
@@ -167,6 +173,21 @@ class MyMediaViewModel(
         val current = _state.value.genres.toSet()
         _state.value = _state.value.copy(
             genres = if (g in current) _state.value.genres.filter { it != g } else _state.value.genres + g,
+            page = 1,
+        )
+        reload()
+    }
+
+    fun toggleCountry(code: String) {
+        persistCountries = true
+        val c = code.trim()
+        val current = _state.value.countries.toSet()
+        _state.value = _state.value.copy(
+            countries = if (c in current) {
+                _state.value.countries.filter { it != c }
+            } else {
+                _state.value.countries + c
+            },
             page = 1,
         )
         reload()

@@ -9,8 +9,9 @@
 {% set ni = 1 if hide_not_interested else 0 %}
 {% set _year = year|default('') %}
 {% set _genres = filter_genres|default([]) %}
+{% set _countries = filter_countries|default([]) %}
 {% macro qs(page_n=None, per=None, hw_v=None, mo_v=None, ry_v=None, hl_v=None, sr_v=None, q_v=None, avail_v=None, ni_v=None) -%}
-page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&match_only={{ mo_v if mo_v is not none else mo }}&recent_years={{ ry_v if ry_v is not none else ry }}&hide_lists={{ hl_v if hl_v is not none else hl }}&show_reviewed={{ sr_v if sr_v is not none else sr }}&hide_not_interested={{ ni_v if ni_v is not none else ni }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}
+page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not none else per_page }}&hide_watched={{ hw_v if hw_v is not none else hw }}&match_only={{ mo_v if mo_v is not none else mo }}&recent_years={{ ry_v if ry_v is not none else ry }}&hide_lists={{ hl_v if hl_v is not none else hl }}&show_reviewed={{ sr_v if sr_v is not none else sr }}&hide_not_interested={{ ni_v if ni_v is not none else ni }}{% set qq = q_v if q_v is not none else search_q %}{% if qq %}&q={{ qq|urlencode }}{% endif %}{% set av = avail_v if avail_v is not none else avail %}{% if av %}&avail={{ av }}{% endif %}{% if _year %}&year={{ _year|urlencode }}{% endif %}{% for g in _genres %}&genre={{ g|urlencode }}{% endfor %}{% for c in _countries %}&country={{ c }}{% endfor %}
 {%- endmacro %}
 {% macro pager(position, marker_page=none) %}
   {% if pages > 1 %}
@@ -214,6 +215,7 @@ page={{ page_n if page_n is not none else page }}&per_page={{ per if per is not 
           {% set rating = row.rating %}{% set favorited = row.favorited %}
           {% include '_rate_favorite_tags.html' %}
           {% if row.partial %}<span class="tag partial">Partial</span>{% endif %}
+          {% if m.country %}<span class="tag">{{ country_label(m.country) }}</span>{% endif %}
           {% for g in row.genres[:6] %}<span class="tag">{{ g }}</span>{% endfor %}
         </div>
         {% set found_on = row.found_on %}

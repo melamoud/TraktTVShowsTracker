@@ -127,6 +127,52 @@ def test_latest_year_genre_filter_without_title_q(app, client, user):
     assert 'More filters' in html
 
 
+def test_latest_country_filter_keeps_checked(app, client, user):
+    """Country checkboxes keep the countries you check, same as genres."""
+    from datetime import datetime
+    with app.app_context():
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=51, title='Hollywood', year=2020,
+            country='us', trakt_listed_at=datetime(2026, 8, 1),
+            feed_source='trakt_db_updates',
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=52, title='Bollywood', year=2020,
+            country='in', trakt_listed_at=datetime(2026, 8, 2),
+            feed_source='trakt_db_updates',
+        ))
+        db.session.add(CachedMedia(
+            media_type='movie', trakt_id=53, title='Unknown Origin', year=2020,
+            trakt_listed_at=datetime(2026, 8, 3),
+            feed_source='trakt_db_updates',
+        ))
+        db.session.commit()
+
+    login_client(client, app, user)
+    with patch('routes.catalog_routes.feed_count', return_value=3), \
+         patch('routes.catalog_routes.ensure_catalog_through_marker'), \
+         patch('routes.catalog_routes.catalog_has_more_older', return_value=False), \
+         patch('services.sync_jobs.enrich_media_list_for_display'), \
+         patch('services.user_media_sync.ensure_user_media_fresh', return_value=False):
+        resp = client.get(
+            '/latest/movies?hide_lists=0&hide_watched=0&match_only=0'
+            '&recent_years=0&country=us&countries_set=1'
+        )
+        again = client.get(
+            '/latest/movies?hide_lists=0&hide_watched=0&match_only=0&recent_years=0'
+        )
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+    assert 'data-trakt-id="51"' in html
+    assert 'data-trakt-id="52"' not in html
+    assert 'data-trakt-id="53"' not in html
+    assert 'United States' in html
+    remembered = again.get_data(as_text=True)
+    assert 'name="country" value="us"' in remembered
+    assert 'value="us"\n                   checked' in remembered
+    assert 'data-trakt-id="52"' not in remembered
+
+
 def test_search_type_pills_toggle_movies_and_shows(app, client, user):
     """Movies + Shows pills sit with other filters; both on means type=both."""
     login_client(client, app, user)

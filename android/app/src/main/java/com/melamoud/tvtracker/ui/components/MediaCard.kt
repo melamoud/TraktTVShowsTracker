@@ -150,9 +150,11 @@ fun MediaCard(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                if (item.genres.isNotEmpty()) {
+                val origin = item.countryName?.takeIf { it.isNotBlank() }
+                val genreLine = listOfNotNull(origin) + item.genres.take(6)
+                if (genreLine.isNotEmpty()) {
                     Text(
-                        item.genres.take(6).joinToString(" · "),
+                        genreLine.joinToString(" · "),
                         color = TextMuted,
                         style = MaterialTheme.typography.bodySmall,
                         maxLines = 1,

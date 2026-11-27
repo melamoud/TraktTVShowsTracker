@@ -49,6 +49,38 @@ def media_has_excluded_genre(media: CachedMedia | None, user: User) -> bool:
     return any(g.casefold() in excluded for g in media_genres(media))
 
 
+def get_user_excluded_countries(user: User) -> list[str]:
+    """Return country codes the user never wants on Latest, Recs, or alerts."""
+    from services.countries import normalize_country_code
+    prefs = getattr(user, 'preferences', None)
+    if not prefs:
+        return []
+    out: list[str] = []
+    seen: set[str] = set()
+    for raw in _parse_json_list(getattr(prefs, 'excluded_countries_json', None)):
+        code = normalize_country_code(raw)
+        if not code or code in seen:
+            continue
+        seen.add(code)
+        out.append(code)
+    return out
+
+
+def media_has_excluded_country(media: CachedMedia | None, user: User) -> bool:
+    """True when the title's country is one the user hid. Unknown country does not hide."""
+    from services.countries import normalize_country_code
+    excluded = set(get_user_excluded_countries(user))
+    if not excluded or media is None:
+        return False
+    code = normalize_country_code(getattr(media, 'country', None))
+    return bool(code and code in excluded)
+
+
+def title_hidden_by_prefs(media: CachedMedia | None, user: User) -> bool:
+    """Hidden genre or hidden country. Same pages as Hide these genres."""
+    return media_has_excluded_genre(media, user) or media_has_excluded_country(media, user)
+
+
 def get_hidden_list_ids(user: User) -> list[str]:
     """Return Trakt personal list ids the user hid from the Set lists menu."""
     prefs = user.preferences
@@ -306,7 +338,7 @@ def match_preferences(media: CachedMedia, user: User) -> dict:
     ``streaming`` is always empty (kept for template/API compatibility).
     """
     # A hidden genre wins over liked genres and keywords: no purple match.
-    if media_has_excluded_genre(media, user):
+    if title_hidden_by_prefs(media, user):
         return {
             'matched': False,
             'genres': [],

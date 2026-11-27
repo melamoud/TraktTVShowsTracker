@@ -1,5 +1,11 @@
 # Changes log
 
+## 2026-11-26 — Hide countries in Preferences (1.0.35)
+
+- Trakt’s primary country (one code, such as India) is stored on each title and shown on the card and title page
+- **Preferences → Hide these countries** works like **Hide these genres**: those titles stay off Latest and Recommendations, and they do not get the purple match or an alert. My lists and Search still show them
+- Updated [Preferences](help/user/preferences.md), [My movies](help/user/my_movies.md), and [Android app](help/user/android.md)
+
 ## 2026-11-20 — Search dims watched and listed titles, and drops the match on a hidden genre (1.0.29)
 
 - **Not watched** and **Not in lists** stay on Search (on by default). Turning either off keeps those titles in the results, dimmed and tagged

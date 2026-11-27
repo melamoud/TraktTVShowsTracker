@@ -21,7 +21,7 @@ Genre tabs come from **your Preferences genres** (plus **All**). Selecting a gen
 - Hidden genres from Preferences are always dropped (even with Matches only off)  
 - **10 / 50 / 100** per page  
 - **Filter titles…** — as you type, keep recommendations whose title contains that text, across every page (not remembered)
-- **More filters** — year range, actor (jumps to Search), and genres (any selected); remembered for this page
+- **More filters** — year range, actor (jumps to Search), and genres (any selected); remembered for this page. **Hide these countries** in Preferences drops those titles here, same as hidden genres
 - **Upcoming / Theater window / Streaming** — same availability chips/filters as My / Latest
 
 The recommendation list is cached locally for the admin **Trakt read cache** TTL (default 2 hours). Wishlist/watched **tags** always come from the same local title state as My / Latest, so a watch on another screen shows up here immediately.

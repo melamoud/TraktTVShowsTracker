@@ -78,6 +78,8 @@ interface TvTrackerApi {
         @Query("year") year: String? = null,
         @Query("genre") genres: List<String>? = null,
         @Query("genres_set") genresSet: Int? = null,
+        @Query("country") countries: List<String>? = null,
+        @Query("countries_set") countriesSet: Int? = null,
     ): MyMediaResponse
 
     @GET("/api/v1/people/search")
@@ -93,6 +95,8 @@ interface TvTrackerApi {
         @Query("year") year: String? = null,
         @Query("genre") genre: List<String>? = null,
         @Query("genres_set") genresSet: Int? = null,
+        @Query("country") countries: List<String>? = null,
+        @Query("countries_set") countriesSet: Int? = null,
         @Query("actor") actor: Int? = null,
         @Query("actor_q") actorQ: String? = null,
         @Query("refresh") refresh: Int? = null,
@@ -279,6 +283,8 @@ interface TvTrackerApi {
         @Query("load_older") loadOlder: Int? = null,
         @Query("year") year: String? = null,
         @Query("genre") genres: List<String>? = null,
+        @Query("country") countries: List<String>? = null,
+        @Query("countries_set") countriesSet: Int? = null,
     ): LatestMediaResponse
 
     @POST("/api/v1/review-marker/{mediaType}/{traktId}")
@@ -317,6 +323,8 @@ interface TvTrackerApi {
         @Query("refresh") refresh: Int? = null,
         @Query("year") year: String? = null,
         @Query("genre") genres: List<String>? = null,
+        @Query("country") countries: List<String>? = null,
+        @Query("countries_set") countriesSet: Int? = null,
     ): RecommendedMediaResponse
 
     @POST("/api/v1/recommendations/{mediaType}/{traktId}/hide")

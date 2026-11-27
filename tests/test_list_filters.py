@@ -1,9 +1,12 @@
 """Unit tests for year / genre advanced filters."""
 
+from services.countries import country_from_payload, country_label
 from services.list_filters import (
+    media_matches_countries,
     media_matches_genres,
     media_matches_year,
     normalize_genre_label,
+    parse_country_filters,
     parse_genre_filters,
     parse_year_filter,
     row_passes_advanced,
@@ -70,3 +73,16 @@ def test_row_passes_advanced():
     assert row_passes_advanced(row, (2015, 2018), ['action']) is True
     assert row_passes_advanced(row, (2010, 2012), ['action']) is False
     assert row_passes_advanced(row, (2015, 2018), ['horror']) is False
+
+
+def test_country_filter_matches_like_genre():
+    india = CachedMedia(media_type='movie', trakt_id=5, title='A', country='in')
+    blank = CachedMedia(media_type='movie', trakt_id=6, title='B')
+    assert media_matches_countries(india, ['in', 'us']) is True
+    assert media_matches_countries(india, ['us']) is False
+    assert media_matches_countries(blank, ['in']) is False
+    assert media_matches_countries(india, []) is True
+    assert parse_country_filters({'country': ['IN', 'us', 'nope']}) == ['in', 'us']
+    assert country_label('in') == 'India'
+    assert country_from_payload({'country': 'GB'}) == 'gb'
+    assert country_from_payload({'movie': {'country': 'in'}}, 'movie') == 'in'

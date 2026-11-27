@@ -27,7 +27,7 @@ Defaults keep Search focused on new discoveries:
 - **Not watched** (default) — hides titles you already marked watched. Click **Show watched** to include them. Those cards are dimmed and tagged **Watched**.
 - **Not in lists** (default) — hides titles on **Wishlist** or any personal Trakt list. Click **In lists** to include them. Those cards are dimmed and tagged **Watchlist** or with the list name.
 
-A title in a genre you hide (Preferences → **Hide these genres**) still appears. It does not get the purple **Preference match** mark, even when its other genres match.
+A title in a genre you hide (Preferences → **Hide these genres**), or from a country you hide (**Hide these countries**), still appears. It does not get the purple **Preference match** mark.
 
 - **Actor** — name or a favorite-actor pick (Trakt cast filmography). Optional; can be used with or without a title.
 - **Year** — `2018` or `2015-2020` (production year, else release year). Narrows hits.

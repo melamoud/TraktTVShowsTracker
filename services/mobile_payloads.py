@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
+from services.countries import country_label
 from services.local_time import format_local_date
 
 
@@ -97,6 +98,8 @@ def serialize_media_item(row: dict, media_type: str | None = None) -> dict:
         'overview': (media.overview or '') if media else '',
         'poster_url': poster_url,
         'genres': row.get('genres') or [],
+        'country': (media.country or None) if media else None,
+        'country_name': country_label(media.country) if media and media.country else None,
         'watched': bool(st.watched) if st is not None else bool(row.get('watched')),
         'on_watchlist': bool(st.on_watchlist) if st is not None else bool(row.get('on_watchlist')),
         'list_names': row.get('list_names') or [],

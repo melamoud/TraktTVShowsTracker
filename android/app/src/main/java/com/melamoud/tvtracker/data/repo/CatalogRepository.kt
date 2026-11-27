@@ -77,6 +77,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
         lists: List<String>? = null,
         year: String? = null,
         genres: List<String>? = null,
+        countries: List<String>? = null,
     ): Result<MyMediaResponse> = runCatching {
         api.myMedia(
             kind = kind,
@@ -94,6 +95,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
             year = year,
             genres = genres,
             genresSet = if (genres != null) 1 else null,
+            countries = countries,
+            countriesSet = if (countries != null) 1 else null,
         )
     }.recoverCatching { e ->
         throw IllegalStateException(AuthLog.userMessage(e), e)
@@ -112,6 +115,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
         year: String? = null,
         genres: List<String>? = null,
         persistGenres: Boolean = false,
+        countries: List<String>? = null,
+        persistCountries: Boolean = false,
         actor: Int? = null,
         actorQ: String? = null,
         refresh: Boolean = false,
@@ -125,6 +130,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
             year = year,
             genre = genres?.takeIf { persistGenres },
             genresSet = if (persistGenres) 1 else null,
+            countries = countries?.takeIf { persistCountries },
+            countriesSet = if (persistCountries) 1 else null,
             actor = actor,
             actorQ = actorQ,
             refresh = if (refresh) 1 else null,
@@ -284,6 +291,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
         loadOlder: Boolean? = null,
         year: String? = null,
         genres: List<String>? = null,
+        countries: List<String>? = null,
     ): Result<LatestMediaResponse> = runCatching {
         api.latestMedia(
             kind = kind,
@@ -300,6 +308,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
             loadOlder = loadOlder?.let { if (it) 1 else 0 },
             year = year,
             genres = genres?.takeIf { it.isNotEmpty() },
+            countries = countries,
+            countriesSet = if (countries != null) 1 else null,
         )
     }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 
@@ -317,6 +327,7 @@ class CatalogRepository(private val api: TvTrackerApi) {
         refresh: Boolean = false,
         year: String? = null,
         genres: List<String>? = null,
+        countries: List<String>? = null,
     ): Result<RecommendedMediaResponse> = runCatching {
         api.recommendations(
             kind = kind,
@@ -332,6 +343,8 @@ class CatalogRepository(private val api: TvTrackerApi) {
             refresh = if (refresh) 1 else null,
             year = year,
             genres = genres?.takeIf { it.isNotEmpty() },
+            countries = countries,
+            countriesSet = if (countries != null) 1 else null,
         )
     }.recoverCatching { e -> throw IllegalStateException(AuthLog.userMessage(e), e) }
 

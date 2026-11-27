@@ -16,7 +16,7 @@ from models import CachedMedia, ReviewMarker, User, UserListMembership, UserMedi
 from services.streaming_matcher import (
     discovery_year_cutoff,
     match_preferences,
-    media_has_excluded_genre,
+    title_hidden_by_prefs,
     media_passes_discovery_year,
 )
 
@@ -184,7 +184,7 @@ def _count_latest(user: User, media_type: str) -> dict[str, int | str] | None:
         tid = int(media.trakt_id)
         if tid in watched or tid in listed or tid in not_interested:
             continue
-        if media_has_excluded_genre(media, user):
+        if title_hidden_by_prefs(media, user):
             continue
         remaining.append(media)
 
@@ -253,7 +253,7 @@ def _count_recs(user: User, media_type: str) -> dict[str, int | str] | None:
         if tid in watched or tid in listed or tid in wishlisted:
             continue
         media = media_by_id.get(tid)
-        if media_has_excluded_genre(media, user):
+        if title_hidden_by_prefs(media, user):
             continue
         remaining_media.append(media)
 

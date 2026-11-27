@@ -150,11 +150,20 @@ def enrich_media_details_for_display(media: CachedMedia) -> bool:
 
     Returns False when Trakt rate-limits (429) so callers can stop early.
     """
+    from services.countries import country_from_raw_json
     from services.poster_cache import is_local_poster_url
+
+    if not media.country:
+        cached_country = country_from_raw_json(media.raw_json, media.media_type)
+        if cached_country:
+            media.country = cached_country
+            db.session.commit()
+            db.session.refresh(media)
 
     needs_summary = (
         not media.overview
         or media.genres_json in (None, '', '[]')
+        or not media.country
         or not media.poster_url
         or not is_local_poster_url(media.poster_url)
         or not media.runtime
@@ -210,6 +219,7 @@ def enrich_media_list_for_display(
         needs = (
             not media.overview
             or media.genres_json in (None, '', '[]')
+            or not media.country
             or not media.poster_url
             or not is_local_poster_url(media.poster_url)
         )
@@ -256,6 +266,10 @@ def upsert_cached_media(
     row.overview = entity.get('overview') or row.overview
     row.runtime = entity.get('runtime') or row.runtime
     row.network = entity.get('network') or row.network
+    from services.countries import country_from_payload
+    country = country_from_payload(item, media_type)
+    if country:
+        row.country = country
     if entity.get('genres') is not None:
         row.genres_json = json.dumps(entity.get('genres') or [])
     row.imdb_id = ids.get('imdb') or row.imdb_id

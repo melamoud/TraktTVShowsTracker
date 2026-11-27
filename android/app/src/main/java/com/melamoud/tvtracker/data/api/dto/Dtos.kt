@@ -87,6 +87,11 @@ data class ServiceLinkDto(
     val url: String? = null,
 )
 
+data class CountryChoiceDto(
+    val code: String = "",
+    val name: String = "",
+)
+
 data class CardMatchDto(
     val matched: Boolean = false,
     val genres: List<String> = emptyList(),
@@ -101,6 +106,8 @@ data class MediaItemDto(
     val overview: String? = null,
     @SerializedName("poster_url") val posterUrl: String? = null,
     val genres: List<String> = emptyList(),
+    val country: String? = null,
+    @SerializedName("country_name") val countryName: String? = null,
     val watched: Boolean = false,
     @SerializedName("on_watchlist") val onWatchlist: Boolean = false,
     @SerializedName("list_names") val listNames: List<String> = emptyList(),
@@ -165,6 +172,8 @@ data class MyMediaResponse(
     val year: String? = null,
     val genres: List<String> = emptyList(),
     @SerializedName("genre_choices") val genreChoices: List<String> = emptyList(),
+    @SerializedName("countries") val countries: List<String> = emptyList(),
+    @SerializedName("country_choices") val countryChoices: List<CountryChoiceDto> = emptyList(),
 )
 
 data class ReviewMarkerDto(
@@ -198,6 +207,8 @@ data class LatestMediaResponse(
     val year: String? = null,
     val genres: List<String> = emptyList(),
     @SerializedName("genre_choices") val genreChoices: List<String> = emptyList(),
+    @SerializedName("countries") val countries: List<String> = emptyList(),
+    @SerializedName("country_choices") val countryChoices: List<CountryChoiceDto> = emptyList(),
 )
 
 data class SyncCatalogResponse(
@@ -287,6 +298,8 @@ data class PreferencesResponse(
     val genres: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     @SerializedName("excluded_genres") val excludedGenres: List<String> = emptyList(),
+    @SerializedName("excluded_countries") val excludedCountries: List<String> = emptyList(),
+    @SerializedName("country_choices") val countryChoices: List<CountryChoiceDto> = emptyList(),
     val lists: List<ListPreferenceDto> = emptyList(),
     @SerializedName("lists_error") val listsError: String? = null,
     val alerts: AlertPrefsDto? = null,
@@ -342,6 +355,7 @@ data class PreferencesSaveRequest(
     val genres: List<String> = emptyList(),
     val keywords: List<String> = emptyList(),
     @SerializedName("excluded_genres") val excludedGenres: List<String> = emptyList(),
+    @SerializedName("excluded_countries") val excludedCountries: List<String> = emptyList(),
     val lists: List<ListPreferenceDto> = emptyList(),
     @SerializedName("lists_prefs") val listsPrefs: ListPrefsSaveRequest? = null,
     val alerts: AlertPrefsDto? = null,
@@ -379,6 +393,8 @@ data class RecommendedMediaResponse(
     val genres: List<String> = emptyList(),
     val year: String? = null,
     @SerializedName("genre_choices") val genreChoices: List<String> = emptyList(),
+    @SerializedName("countries") val countries: List<String> = emptyList(),
+    @SerializedName("country_choices") val countryChoices: List<CountryChoiceDto> = emptyList(),
 )
 
 data class SearchResponse(
@@ -396,6 +412,8 @@ data class SearchResponse(
     val year: String? = null,
     val genres: List<String> = emptyList(),
     @SerializedName("genre_choices") val genreChoices: List<String> = emptyList(),
+    @SerializedName("countries") val countries: List<String> = emptyList(),
+    @SerializedName("country_choices") val countryChoices: List<CountryChoiceDto> = emptyList(),
     @SerializedName("fetch_error") val fetchError: String? = null,
     @SerializedName("actor_q") val actorQ: String? = null,
     @SerializedName("actor_id") val actorId: Int? = null,

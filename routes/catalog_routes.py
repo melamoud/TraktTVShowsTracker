@@ -435,9 +435,9 @@ def _search_catalog() -> dict:
     from services.list_filters import (
         advanced_context, parse_year_filter, resolve_advanced, row_passes_advanced,
     )
-    year, filter_genres = resolve_advanced(current_user, 'search')
+    year, filter_genres, filter_countries = resolve_advanced(current_user, 'search')
     year_range = parse_year_filter(year)
-    has_advanced = bool(year_range or filter_genres)
+    has_advanced = bool(year_range or filter_genres or filter_countries)
 
     types: list[str] = ['movie', 'show'] if type_raw == 'both' else [type_raw]
     rows: list[dict] = []
@@ -550,7 +550,9 @@ def _search_catalog() -> dict:
         if hide_lists:
             rows = [r for r in rows if not _search_on_any_list(r)]
         if has_advanced:
-            rows = [r for r in rows if row_passes_advanced(r, year_range, filter_genres)]
+            rows = [r for r in rows if row_passes_advanced(
+                r, year_range, filter_genres, filter_countries,
+            )]
 
         # Enrich + providers for the visible slice only (after simple paging).
         total = len(rows)
@@ -613,7 +615,7 @@ def _search_catalog() -> dict:
         'raw_total': raw_total,
         'hide_watched': hide_watched,
         'hide_lists': hide_lists,
-        **advanced_context(year, filter_genres),
+        **advanced_context(year, filter_genres, filter_countries),
         'fetch_error': fetch_error,
         'tmdb_configured': tmdb_is_configured(),
         'streaming_region': current_app.config.get('STREAMING_REGION', 'US'),
@@ -783,10 +785,10 @@ def _recommendations_page_data(media_type: str) -> dict:
         unique_items.append(m)
 
     rows_all = _decorate(media_type, unique_items)
-    from services.streaming_matcher import media_has_excluded_genre
+    from services.streaming_matcher import title_hidden_by_prefs
     rows_all = [
         r for r in rows_all
-        if not media_has_excluded_genre(r.get('media'), current_user)
+        if not title_hidden_by_prefs(r.get('media'), current_user)
     ]
     if hide_wishlist:
         rows_all = [r for r in rows_all if not r['on_watchlist']]
@@ -832,10 +834,12 @@ def _recommendations_page_data(media_type: str) -> dict:
     from services.list_filters import (
         advanced_context, parse_year_filter, resolve_advanced, row_passes_advanced,
     )
-    year, filter_genres = resolve_advanced(current_user, view)
+    year, filter_genres, filter_countries = resolve_advanced(current_user, view)
     year_range = parse_year_filter(year)
-    if year_range or filter_genres:
-        rows_all = [r for r in rows_all if row_passes_advanced(r, year_range, filter_genres)]
+    if year_range or filter_genres or filter_countries:
+        rows_all = [r for r in rows_all if row_passes_advanced(
+            r, year_range, filter_genres, filter_countries,
+        )]
     avail = normalize_avail(request.args.get('avail'))
     if avail:
         for r in rows_all:
@@ -879,7 +883,7 @@ def _recommendations_page_data(media_type: str) -> dict:
         'fetch_error': fetch_error,
         'search_q': search_q,
         'avail': avail,
-        **advanced_context(year, filter_genres),
+        **advanced_context(year, filter_genres, filter_countries),
         'title': 'Recommended Movies' if media_type == 'movie' else 'Recommended Shows',
     }
 
@@ -942,11 +946,11 @@ def _latest_visible_rows(
     after_year = len(items)
 
     rows_all = _decorate(media_type, items)
-    from services.streaming_matcher import media_has_excluded_genre
+    from services.streaming_matcher import title_hidden_by_prefs
     if getattr(current_user, 'is_authenticated', False):
         rows_all = [
             r for r in rows_all
-            if not media_has_excluded_genre(r.get('media'), current_user)
+            if not title_hidden_by_prefs(r.get('media'), current_user)
         ]
     if hide_watched:
         rows_all = [r for r in rows_all if not r['watched']]
@@ -1082,10 +1086,12 @@ def _latest_page_data(media_type: str) -> dict:
     from services.list_filters import (
         advanced_context, parse_year_filter, resolve_advanced, row_passes_advanced,
     )
-    year, filter_genres = resolve_advanced(current_user, view)
+    year, filter_genres, filter_countries = resolve_advanced(current_user, view)
     year_range = parse_year_filter(year)
-    if year_range or filter_genres:
-        rows_all = [r for r in rows_all if row_passes_advanced(r, year_range, filter_genres)]
+    if year_range or filter_genres or filter_countries:
+        rows_all = [r for r in rows_all if row_passes_advanced(
+            r, year_range, filter_genres, filter_countries,
+        )]
     avail = normalize_avail(request.args.get('avail'))
     if avail:
         # Streaming filter needs providers — enrich a capped batch when cold.
@@ -1188,7 +1194,7 @@ def _latest_page_data(media_type: str) -> dict:
         'has_more_older': has_more_older,
         'search_q': search_q,
         'avail': avail,
-        **advanced_context(year, filter_genres),
+        **advanced_context(year, filter_genres, filter_countries),
         'tmdb_configured': tmdb_is_configured(),
         'streaming_region': current_app.config.get('STREAMING_REGION', 'US'),
         'title': 'Latest Movies' if media_type == 'movie' else 'Latest Shows',
